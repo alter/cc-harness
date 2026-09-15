@@ -17,6 +17,7 @@ counts=$(jq -r 'select(.message.content|type=="array") | .message.content[] | se
 total=$(jq -r 'select(.message.content|type=="array") | .message.content[] | select(.type=="tool_use") | .name' "$transcript" 2>/dev/null | wc -l | tr -d ' ')
 
 has() { printf '%s' "$counts" | grep -qE "(^| )$1:"; }
+has_graph() { printf '%s' "$counts" | grep -qE "(^| )mcp__[a-z0-9_]*graph[a-z0-9_]*__"; }
 
 if printf '%s' "$last" | grep -qE 'NOT FOUND|НЕ НАЙДЕНО'; then
   [ "$total" -ge 1 ] && exit 0
@@ -27,8 +28,8 @@ fi
 reason=""
 case "$atype" in
   Explore|scout)
-    if [ "$total" -eq 0 ] || ! { has Grep || has Glob || has Read; }; then
-      reason="You reported results for a code search but the transcript shows no Grep/Glob/Read calls ($total tool calls: ${counts:-none})."
+    if [ "$total" -eq 0 ] || ! { has Grep || has Glob || has Read || has_graph; }; then
+      reason="You reported results for a code search but the transcript shows no Grep/Glob/Read or code-graph call ($total tool calls: ${counts:-none})."
     elif ! printf '%s' "$last" | grep -qE '[A-Za-z0-9_./-]+\.[A-Za-z0-9]{1,6}(:[0-9]+)?'; then
       reason="Your answer names no file path. A scout answer is paths with line ranges, or an explicit NOT FOUND."
     fi ;;

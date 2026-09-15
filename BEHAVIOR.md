@@ -166,6 +166,8 @@ To stop: `touch .claude/plan-pause` or `status: paused` in the plan file. In the
 | `worker` | sonnet high, 80 turns, `run-task` preloaded | all | one plan task in delegate mode | Edit/Write/Bash was called; the report reads `T## done\|blocked\|open: …` |
 | anything else | — | — | — | at least one tool call behind a claim of "done" |
 
+`Explore` and `scout` may also answer from a code graph when the session exposes one (`mcp__…graph…__*`, see the README's optional section): the evidence hook counts a graph call as a search, but the answer must still name a `path:line`.
+
 Common to all: the answer ends with `TOOLS USED: <name:count …>`; `NOT DONE: <why>` is always allowed and never checked. The main session's contract adds: a subagent's report is a claim, not a fact; a path from `scout` is Read before use; a test result without `COMMAND:` and an exit code is rerun; a `TOOLS USED` line that does not fit the answer means the answer is discarded.
 
 ## 11. The three complaints — exactly where each is closed

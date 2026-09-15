@@ -117,6 +117,13 @@ check_empty "NOT DONE always allowed" "$out"
 out=$(se scout "$tr_none" "anything" | jq '.stop_hook_active=true' | "$H/subagent-evidence.sh")
 check_empty "stop_hook_active -> allow (no loop)" "$out"
 
+tr_graph="$TMP/tr-graph.jsonl"
+{ jq -nc '{message:{content:[{type:"tool_use",name:"mcp__graphify__get_node",input:{}}]}}'; jq -nc '{message:{content:[{type:"tool_use",name:"mcp__graphify__get_neighbors",input:{}}]}}'; } > "$tr_graph"
+out=$(se scout "$tr_graph" "FILES: src/app.py:L93 assemble(). TOOLS USED: mcp__graphify__get_node:1" | "$H/subagent-evidence.sh")
+check_empty "scout answering from a code graph -> allow" "$out"
+out=$(se scout "$tr_graph" "it lives somewhere in the auth module" | "$H/subagent-evidence.sh")
+check "code-graph answer without a path -> block" "$out" 'names no file path'
+
 echo "== guard-subagent / guard-model-switch"
 gs() { jq -n '{session_id:"g1",tool_input:{subagent_type:"scout"}}'; }
 out=$(gs | CC_SUBAGENT_BUDGET=2 "$H/guard-subagent.sh"); check "1/2 allow" "$out" '"permissionDecision": *"allow"'

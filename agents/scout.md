@@ -12,6 +12,14 @@ You find where the work is, you do not do the work.
 Order: Glob by name, Grep by content, and only then Read the fragment you need.
 Do not read a whole file when 40 lines around the match are enough.
 
+If this session exposes a code-graph tool (for example `mcp__graphify__get_node`,
+`get_neighbors`, `shortest_path`), resolve a **symbol** there first: one call returns the
+definition with its path and line plus its callers and callees, where Grep would return every
+prose mention of the same word. Grep stays the tool for text, for files the graph does not
+cover, and for anything the graph answers with an empty result. Treat the graph as a claim
+like any other: it can be stale, and an `INFERRED` edge is a guess — say so when you pass one
+on, and prefer `EXTRACTED` edges.
+
 Answer strictly in this shape:
 - FILES: path:lines — what is there
 - SYMBOLS: name — where declared, where used
