@@ -155,3 +155,7 @@ claude   # -> /intake
 2. Прочитать `docs/plans/<slug>.md`. Добавить, убрать, переставить.
 3. `cc-night docs/plans/<slug>.md`, в сессии набрать `/goal all tasks in docs/plans/<slug>.md are [x] or [!]`.
 4. Утром: `## Log`, `## Assumptions`, `[!]`-задачи. `/usage` — посмотреть `cron` и `subagent_heavy`.
+
+## Лицензия
+
+MIT — см. `LICENSE`. Берите, меняйте под себя, спрашивать не нужно. `CLAUDE.md` — контракт одного инженера: правила про Python 3, `# filename.ext` и разбиение файлов длиннее 1400 строк меняются под свои привычки в первую очередь.
