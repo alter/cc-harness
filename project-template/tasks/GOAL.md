@@ -1,47 +1,47 @@
-# GOAL — зачем существует это дерево
+# GOAL — why this tree exists
 
-## Цель
+## The goal
 
-<Одно обещание, которое проект даёт. Всё остальное — способ его выполнить.>
+<One promise the project makes. Everything else is a way of keeping it.>
 
-## Что сейчас болит
+## What hurts right now
 
-<Измеренное состояние, с источниками: путь:строка, команда, строка журнала.>
+<The measured state, with sources: path:line, a command, a log line.>
 
-## Ворота — и только они меряют цель
+## The gates — and only they measure the goal
 
-**Ворота 1 — `<фаза>/<задача>` (веха M1).** <Что должно стать правдой и почему
-это видно только так.>
+**Gate 1 — `<phase>/<task>` (milestone M1).** <What must become true, and why it
+is only visible this way.>
 
-**Ворота 2 — `<фаза>/<задача>` (веха M1).** <…>
+**Gate 2 — `<phase>/<task>` (milestone M1).** <…>
 
-**Ворота 3 — `<фаза>/<задача>` (веха M2).** <…>
+**Gate 3 — `<phase>/<task>` (milestone M2).** <…>
 
-## Вехи
+## Milestones
 
-| Веха | Что означает | Условие входа |
+| Milestone | What it means | Entry condition |
 |---|---|---|
-| **M1** | <…> | сейчас |
-| **M2** | <…> | ворота 1 и 2 пройдены |
+| **M1** | <…> | now |
+| **M2** | <…> | gates 1 and 2 passed |
 | **M3** | <…> | <…> |
 
-## Признаки, что мы приближаемся
+## Signs that we are getting closer
 
-- Закрытая задача снимает неопределённость по одному из вопросов ворот, а не
-  увеличивает объём сделанного.
-- Каждое число в документах взято замером и несёт источник.
-- Отвергнутые решения записаны вместе с причиной.
+- A closed task removes uncertainty about one of the gate questions, rather than
+  increasing the amount of work done.
+- Every number in the documents came from a measurement and carries its source.
+- Rejected decisions are recorded together with the reason.
 
-## Признаки, что мы НЕ приближаемся
+## Signs that we are NOT getting closer
 
-- «Закрыто N задач» как отчёт о движении.
-- Отчёт впереди проверки: объявлено сделанным то, что не воспроизводится с
-  чистого состояния.
-- Прогон, который никогда не был красным.
-- Проверка, зелёная по построению: данные выбраны так, что дефект не может
-  проявиться.
-- Работа над поздней вехой раньше ранней.
+- "N tasks closed" reported as progress.
+- A report ahead of its check: something declared done that does not reproduce
+  from a clean state.
+- A run that has never been red.
+- A check that is green by construction: the data is chosen so the defect cannot
+  appear.
+- Work on a later milestone before an earlier one.
 
-## Условие остановки
+## Stop condition
 
-<При каком измеренном результате цель пересматривается, а не «дочинивается».>
+<At which measured result the goal is revised rather than "fixed some more".>

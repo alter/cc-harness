@@ -1,161 +1,161 @@
-# Универсальный harness: спросить один раз, довести до конца, не гадать
+# A personal Claude Code harness: ask once, finish the plan, diagnose instead of guessing
 
-Не привязан к проекту. Всё живёт в `~/.claude/`, проект получает только `docs/plans/`.
-Каждый механизм проверен в двоичном файле Claude Code 2.1.272.
+Not tied to any project. Everything lives in `~/.claude/`; a project only gets `docs/plans/`.
+Every mechanism here was verified against the Claude Code 2.1.272 binary.
 
-## Установка
+## Install
 
 ```bash
-./selftest.sh                       # 48 проверок hook без установки
-./install.sh ~/.claude-harness-test # пробная копия; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
-./install.sh                        # в ~/.claude: резервная копия → файлы → слияние settings.json → проверка
-./uninstall.sh ~/.claude-backup/<дата>   # откат
+./selftest.sh                       # 48 hook checks, installs nothing
+./install.sh ~/.claude-harness-test # trial copy; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
+./install.sh                        # into ~/.claude: backup → files → settings.json merge → checks
+./uninstall.sh ~/.claude-backup/<stamp>   # rollback
 ```
 
-Подробно — резерв, проверка, живой прогон на песочнице, что может пойти не так — в `INSTALL.md`. Нужен `jq`. Уведомления — `osascript` (macOS) или `notify-send`.
+`INSTALL.md` has the full procedure: backup, offline checks, a live run in a sandbox, and what can go wrong. Needs `jq`. Notifications go through `osascript` (macOS) or `notify-send`.
 
-## Три требования → три механизма
+## Three requirements → three mechanisms
 
-### 1. Все вопросы до начала, ни одного посреди
+### 1. Every question before the work, none in the middle
 
-`/plan <задача>` — скилл. Порядок жёсткий:
+`/plan <task>` is a skill with a fixed order:
 
-1. Разведка через subagent `scout`, версии стека с машины.
-2. **Все** вопросы через `AskUserQuestion`, до 4 в одном вызове, несколько вызовов подряд — но все сейчас. Вопросов о том, что можно прочесть в репозитории, не задаёт.
-3. Пишет `docs/plans/<slug>.md`: цель, критерии приёмки с командами проверки, решения из опроса, допущения, границы, задачи по часу с командой проверки у каждой.
-4. Один последний вопрос: «Начинать» / «Сначала поправлю файл».
+1. Reconnaissance through the `scout` subagent; stack versions read off the machine.
+2. **All** questions through `AskUserQuestion`, up to 4 per call, several calls back to back — but all of them now. Nothing that the repository can answer is ever asked.
+3. Writes `docs/plans/<slug>.md`: goal, acceptance criteria with the commands that prove them, decisions from the interview, assumptions, boundaries, and hour-sized tasks each with its verify command.
+4. One final question: "start now" / "I will edit the file first".
 
-Дальше вопросов нет по контракту в `~/.claude/CLAUDE.md`: при развилке модель выбирает вариант, согласный с решениями из плана, записывает в `## Assumptions` и идёт дальше.
+After that there are no questions, by the contract in `~/.claude/CLAUDE.md`: at a fork the model picks the option consistent with the plan's decisions, records it under `## Assumptions`, and moves on.
 
-### 2. Не останавливаться, пока план не закрыт
+### 2. Do not stop until the plan is closed
 
-Три уровня, от дешёвого к надёжному:
+Three layers, cheapest first:
 
-- **Контракт** (`CLAUDE.md` + скилл `/run`): не заканчивать ход, пока есть `- [ ]`; ставить `[x]` только после прохождения команды проверки; `[!] BLOCKED` разрешён ровно в трёх случаях.
-- **`hooks/stop-guard.sh`** (событие `Stop`): пока в `docs/plans/*.md` со `status: running` есть `- [ ]`, ответ `{"decision":"block","reason":"…следующая задача…"}` — и Claude Code возвращает модель в работу. Это официальный контракт Stop-hook. Выходы: слово `NEED_HUMAN` в последнем сообщении, файл `.claude/plan-pause`, предел `CC_STOP_GUARD_CAP` (300 продолжений на сессию). При выходе — уведомление на macOS.
-- **`/goal`** (встроенная команда, ты вводишь её сам перед уходом): `/goal all tasks in docs/plans/x.md are [x] or [!]`. Внутри это тоже Stop-hook, но с повторами при сбоях API (1, 5, 15 минут) и ожиданием сброса лимита. Это ремень поверх подтяжек.
+- **The contract** (`CLAUDE.md` + the `/run` skill): never end a turn while a `- [ ]` remains; mark `[x]` only after the verify command passes; `[!] BLOCKED` is allowed in exactly three cases.
+- **`hooks/stop-guard.sh`** (`Stop` event): while a plan with `status: running` still has `- [ ]`, it answers `{"decision":"block","reason":"…next task…"}` and Claude Code sends the model back to work. That is the documented Stop-hook contract. Exits: the literal `NEED_HUMAN` in the last message, the file `.claude/plan-pause`, or the `CC_STOP_GUARD_CAP` ceiling (300 continuations per session). Every exit sends a desktop notification.
+- **`/goal`** (built-in; you type it yourself before leaving): `/goal all tasks in docs/plans/x.md are [x] or [!]`. Internally it is also a Stop hook, but with retries on API failures (1, 5, 15 minutes) and it waits out a usage-limit reset. Belt over braces.
 
-`autoContinueAtUsageLimit: true` — при упоре в лимит сессия ждёт сброса и продолжает сама. Если днём это мешает, запускай с `--settings '{"autoContinueAtUsageLimit":false}'`.
+`autoContinueAtUsageLimit: true` — on hitting the limit the session waits for the reset and continues by itself. If that gets in the way during the day, start with `--settings '{"autoContinueAtUsageLimit":false}'`.
 
-Ночной запуск: `cc-night docs/plans/<slug>.md` — переводит план в `running`, снимает паузу, стартует `claude --dangerously-skip-permissions --effort high "/run …"`. Ты выбрал bypass в песочнице; этот флаг **никогда** не запускать на машине с боевыми ключами.
+Overnight run: `cc-night docs/plans/<slug>.md` sets the plan to `running`, clears the pause file and starts `claude --dangerously-skip-permissions --effort high "/run …"`. That flag belongs in a sandbox only — **never** on a machine holding production credentials.
 
-Остановить ночной прогон: `touch .claude/plan-pause` или `status: paused` в файле плана.
+Stopping an overnight run: `touch .claude/plan-pause`, or `status: paused` in the plan file.
 
-**Режим исполнения — одна длинная сессия на весь план.** Это осознанный выбор: контекст модели (до 1 млн) хранит «почему» предыдущих задач, и следующая задача не начинается с холодного старта. Цена — рост пересылаемого кэша с каждой задачей; её гасят hook (`compress-output`, `read-guard`), правило «шум — в subagent» (`scout`, `test-runner`, `researcher`) и кэш на 1 час. Сжатие не форсируется раньше предела модели (`autoCompactWindow` не задан); если оно случилось — `session-start` возвращает план в контекст.
+**Execution model: one long session for the whole plan.** A deliberate choice — the model's context (up to 1M) holds the *why* of earlier tasks, so the next task does not start from a cold start. The price is a larger context resent on every turn; that is paid down by the hooks (`compress-output`, `read-guard`), by the rule "noise goes to a subagent" (`scout`, `test-runner`, `researcher`), and by a 1-hour prompt cache. Compaction is not forced before the model's own limit (`autoCompactWindow` is unset); if it happens anyway, `session-start` puts the plan back into context.
 
-Запасной режим — `/run <план> delegate`: главная сессия только раздаёт задачи subagent'у `worker` по одной и читает одну строку ответа. Каждый worker — холодный старт (10–20 тыс. токенов записи кэша) без памяти о предыдущих задачах; годится для длинных планов из независимых задач.
+Fallback: `/run <plan> delegate` — the main session only hands tasks to the `worker` subagent one at a time and reads a single line back. Every worker is a cold start (10–20k tokens of cache write) with no memory of earlier tasks; useful for long plans of independent tasks.
 
-### 3. Диагностика вместо «попробую ещё раз»
+### 3. Diagnosis instead of "let me try again"
 
-- **`hooks/retry-guard.sh`** (`PostToolUse` + `PostToolUseFailure`, matcher `Bash`): считает одинаковые команды с ненулевым кодом выхода на сессию. Второй провал подряд — в контекст модели вкладывается указание перейти к `/diagnose`; третий — запрет следующего вызова инструмента до записи `ROOT CAUSE:` и `EVIDENCE:`. Успех сбрасывает счётчик.
-- **`/diagnose`** — протокол: воспроизвести и сохранить в файл → зафиксировать версии с машины → пройти уровни (общий вид, окружение, зависимости, журналы с поднятым уровнем, трасса снизу вверх, состояние, замеры, отладчик в черновике) → три гипотезы с опровергающим опытом → официальная документация **под зафиксированную версию** через `researcher` → неофициальные обходы только после воспроизведения в черновике → при расколе улик один вызов советника (`/advisor`, Opus) → одна правка, повторное воспроизведение, регрессионный тест.
-- **Советник**: `advisorModel: "opus"`. Основная сессия на Sonnet 5, Opus подключается сам в узловых точках. Предупреждение из самого Claude Code: «Advisor Tool (experimental) is on and may use more tokens».
+- **`hooks/retry-guard.sh`** (`PostToolUse` + `PostToolUseFailure`, matcher `Bash`): counts identical commands that exit non-zero, per session. On the second failure in a row it injects an instruction to switch to `/diagnose`; on the third it forbids the next tool call until `ROOT CAUSE:` and `EVIDENCE:` are written. A success resets the counter.
+- **`/diagnose`** — the protocol: reproduce once and save the output to a file → pin versions off the machine → walk the levels (helicopter view, environment, dependencies, logs at a raised level, stack trace bottom-up, state, measurements, a debugger in scratch) → three hypotheses with a refuting experiment → official documentation **for the pinned version**, through `researcher` → unofficial workarounds only after reproducing them in scratch → one advisor call (`/advisor`, Opus) when the evidence is split → one fix, the original reproduction again, a regression test.
+- **The advisor**: `advisorModel: "opus"`. The main session runs on Sonnet; Opus joins itself at decision points. Claude Code's own warning applies: "Advisor Tool (experimental) is on and may use more tokens".
 
-## Файл плана
+## The plan file
 
 ```
 ---
 status: draft | running | paused | done
 created: 2026-09-15
 ---
-# Название
+# Title
 ## Goal
 ## Acceptance criteria
-- [ ] AC1 … — `команда`
+- [ ] AC1 … — `command`
 ## Stack
 ## Decisions
 ## Assumptions
 ## Out of scope
 ## Tasks
-- [ ] T01 … — verify: `команда`
+- [ ] T01 … — verify: `command`
 - [x] T02 …
-- [!] T03 … BLOCKED: причина
+- [!] T03 … BLOCKED: reason
 ## Log
 ```
 
-Три состояния задачи — это единственное, что читают hook. Задачи не удаляются, только разбиваются.
+The three task states are the only thing the hooks read. Tasks are never deleted, only split.
 
-## Что где
+## What is where
 
-| Файл | Событие / вызов | Назначение |
+| File | Event / call | Purpose |
 |---|---|---|
-| `CLAUDE.md` | каждая сессия | рабочий контракт: вопросы, автономия, отладка, код, гигиена |
-| `BEHAVIOR.md` | чтение | всё поведение харнеса по шагам: запуск, опрос, план, исполнение, охранники, диагностика, ночь |
-| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | вручную | резервная копия, установка со слиянием настроек, 48 проверок hook, откат |
-| `skills/intake` | `/intake` | опрос на уровне проекта, один раз → `docs/PROJECT.md`: реестр возможностей, «решает агент», gate checks, что можно без присмотра |
-| `skills/task` | `/task` | новая задача в дереве `tasks/<фаза>/<NN>-<имя>/` в твоём формате: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` — новое дерево |
-| `skills/plan` | `/plan` | опрос → план; для каталога задачи — `PLAN.md` внутри него, построенный из `task.txt`; `T00` — baseline |
-| `skills/verify` + `agents/verifier.md` | `/verify` | независимая проверка другим контекстом: `VERIFY.md` (Проверил / Как воспроизвести с чистого состояния / Обратный контроль / Что не проверено), `verify:passed|failed` |
-| `skills/run` | `/run` | исполнение до конца без вопросов в одной сессии; `/run … delegate` — раздача задач `worker` по одной |
-| `skills/run-task` | `/run-task <план> <T##>`, предзагружен в `worker` | порядок одной задачи: что читать, делать, проверять, отмечать, писать в Log |
-| `skills/diagnose` | `/diagnose` | инженерная диагностика |
-| `hooks/stop-guard.sh` | `Stop` | не даёт остановиться при открытых задачах |
-| `hooks/retry-guard.sh` | `PostToolUse(Bash)`, `PostToolUseFailure(Bash)` | ловит повтор одной и той же упавшей команды |
-| `hooks/notify.sh` | `Notification`, из stop-guard | уведомление macOS |
-| `hooks/session-start.sh` | `SessionStart` (startup/resume/clear/compact/fork) | вкладывает активный план в контекст после сжатия, `/clear`, `/resume` |
-| `hooks/compress-output.sh` | `PostToolUse(Bash)` | снимает ANSI, схлопывает повторы `(xN)`, длинный вывод в `.claude/scratch/`, модели — голова и хвост (`updatedToolOutput`) |
-| `hooks/read-guard.sh` | `PreToolUse(Read)` | файл > 500 строк без offset/limit → отказ: Grep, потом Read окном |
-| `hooks/subagent-evidence.sh` | `SubagentStop` | сверяет отчёт subagent'а со стенограммой: ноль вызовов инструментов при «сделал» → возврат в работу |
-| `hooks/guard-model-switch.sh` | `PreModelSwitch` | подтверждение смены модели при большом контексте |
-| `hooks/guard-subagent.sh` | `PreToolUse(Agent\|Task)` | предел запусков subagent на сессию |
-| `agents/*` | Agent tool | Explore на Haiku, scout, test-runner (Sonnet), researcher, reviewer, verifier, worker |
-| `night.sh` | вручную | ночной запуск |
-| `project-template/` | копировать в новый репозиторий | `AGENTS.md` (общий контракт для всех агентов), `CLAUDE.md` = `@AGENTS.md`, `docs/PROJECT.md`, пример `.claude/rules/*.md` с `paths:`, `scripts/project_check.py` |
-| `project-template/tasks/` | `/task init` | каркас дерева задач: `README.md` (формат), `PROTOCOL.md`, `GOAL.md`, `ROLES.md`, `DECISIONS.md`, `check.py` — валидатор, словарь берёт из README/ROLES/GOAL самого дерева, проверяет и ссылки `путь:строка` |
-| `statusline.sh` | строка состояния | 5h / 7d / контекст / кэш |
+| `CLAUDE.md` | every session | the working contract: questions, autonomy, debugging, code, cost hygiene |
+| `BEHAVIOR.md` | reading | the whole behaviour step by step: startup, interview, plan, execution, guards, diagnosis, overnight |
+| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 48 hook checks, rollback |
+| `skills/intake` | `/intake` | one project-level interview → `docs/PROJECT.md`: capability ledger, "decided by the agent", gate checks, what may run unattended |
+| `skills/task` | `/task` | a new task in the `tasks/<phase>/<NN>-<slug>/` tree: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` starts a new tree |
+| `skills/plan` | `/plan` | interview → plan; for a task directory, a `PLAN.md` inside it built from `task.txt`; `T00` is the baseline |
+| `skills/verify` + `agents/verifier.md` | `/verify` | independent verification by another context: `VERIFY.md` (verifier line / reproduce from a clean state / reverse control / what was not checked), then `verify:passed\|failed` |
+| `skills/run` | `/run` | execution to the end without questions, in one session; `/run … delegate` hands tasks to `worker` one at a time |
+| `skills/run-task` | `/run-task <plan> <T##>`, preloaded into `worker` | the procedure for one task: what to read, do, verify, mark and log |
+| `skills/diagnose` | `/diagnose` | engineering diagnosis |
+| `hooks/stop-guard.sh` | `Stop` | refuses to stop while tasks are open |
+| `hooks/retry-guard.sh` | `PostToolUse(Bash)`, `PostToolUseFailure(Bash)` | catches the same failed command being repeated |
+| `hooks/notify.sh` | `Notification`, and from stop-guard | desktop notification |
+| `hooks/session-start.sh` | `SessionStart` (startup/resume/clear/compact/fork) | re-injects the active plan after compaction, `/clear`, `/resume` |
+| `hooks/compress-output.sh` | `PostToolUse(Bash)` | strips ANSI, collapses repeats into `(xN)`, saves long output to `.claude/scratch/`, gives the model head and tail (`updatedToolOutput`) |
+| `hooks/read-guard.sh` | `PreToolUse(Read)` | a file over 500 lines without offset/limit is refused: Grep first, then Read a window |
+| `hooks/subagent-evidence.sh` | `SubagentStop` | checks a subagent's report against its transcript: zero tool calls behind "done" sends it back to work |
+| `hooks/guard-model-switch.sh` | `PreModelSwitch` | asks before a model switch on a large context |
+| `hooks/guard-subagent.sh` | `PreToolUse(Agent\|Task)` | a per-session ceiling on subagent spawns |
+| `agents/*` | Agent tool | Explore and scout on Haiku, test-runner (Sonnet), researcher, reviewer, verifier, worker |
+| `night.sh` | by hand | the overnight run |
+| `project-template/` | copy into a new repository | `AGENTS.md` (one contract for every agent), `CLAUDE.md` = `@AGENTS.md`, `docs/PROJECT.md`, an example `.claude/rules/*.md` with `paths:`, `scripts/project_check.py` |
+| `project-template/tasks/` | `/task init` | the task-tree skeleton: `README.md` (the format), `PROTOCOL.md`, `GOAL.md`, `ROLES.md`, `DECISIONS.md`, and `check.py` — a validator that takes its vocabulary from the tree's own README/ROLES/GOAL and also checks `path:line` references |
+| `statusline.sh` | status line | 5h / 7d limits, context, cache |
 
-## Настройки под себя (переменные в `settings.json` → `env`)
+## Tuning (environment variables under `settings.json` → `env`)
 
 ```
-CC_STOP_GUARD_CAP=300     продолжений на сессию, потом уведомление и остановка
-CC_SUBAGENT_BUDGET=40     запусков subagent на сессию (ночью больше, чем днём)
-CC_SWITCH_CTX_LIMIT=40000 порог подтверждения /model
-CC_READ_GUARD_LINES=500   с какого размера файла запрещать чтение целиком
-CC_COMPRESS_MIN_LINES=40  с какого объёма сжимать вывод Bash
+CC_STOP_GUARD_CAP=300     continuations per session, then a notification and a stop
+CC_SUBAGENT_BUDGET=40     subagent spawns per session (more at night than by day)
+CC_SWITCH_CTX_LIMIT=40000 context size above which /model asks for confirmation
+CC_READ_GUARD_LINES=500   file size above which whole-file reads are refused
+CC_COMPRESS_MIN_LINES=40  output size above which Bash output is compressed
 ```
 
-## Что сознательно не сделано
+## Deliberately absent
 
-- **Нет hook, который «сам чинит» ошибку.** Hook даёт модели указание, а не решение — иначе это тот же цикл, только автоматизированный.
-- **Нет встроенных Task-инструментов.** На Sonnet 5 / Opus 5 / Fable они выключены по умолчанию (`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` включает), и они живут в контексте сессии. Файл плана на диске переживает `/clear`, сжатие и перезапуск — и его читают hook.
-- **Нет prompt-hook на `Stop`.** По документации в двоичном файле prompt/agent-hook доступны только для событий инструментов; `/goal` использует его внутренним путём. Поэтому stop-guard — детерминированная команда: ноль токенов, ноль задержки.
-- **Retry-guard считает только одинаковые команды.** Цикл «поправил файл — та же команда снова упала» им ловится (команда та же). Цикл «поправил — другая команда упала» — нет; его ловит контракт в CLAUDE.md.
+- **No hook that "fixes" an error by itself.** A hook hands the model an instruction, never a solution — otherwise it is the same trial-and-error loop, only automated.
+- **No built-in Task tools.** On Sonnet 5 / Opus 5 / Fable they are off by default (`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` turns them on) and they live inside the session's context. A plan file on disk survives `/clear`, compaction and a restart — and hooks can read it.
+- **No prompt hook on `Stop`.** Per the documentation inside the binary, prompt and agent hooks exist only for tool events; `/goal` reaches that path internally. So stop-guard is a deterministic command: zero tokens, zero latency.
+- **Retry-guard only counts identical commands.** The loop "edited the file, ran the same command, failed again" is caught (same command). The loop "edited, a different command failed" is not; the contract in `CLAUDE.md` catches that one.
 
-## Ручные приёмы, которых нет в hook
+## Manual moves that no hook covers
 
-- `/compact <что сохранить>` — у `/compact` есть аргумент с указаниями для сводки: `/compact keep plan path, open tasks, decisions, current ROOT CAUSE`.
-- `claude -p "<задача>"` — для десятка однотипных независимых задач (починить lint в N файлах) дешевле одноразовых вызовов, чем одной длинной сессии: контекст не накапливается. На подписке `-p` получает тот же часовой TTL кэша, что и основной разговор.
-- `/rename` до `/clear`, `/resume` — чтобы вернуться в нужную сессию по имени.
+- `/compact <what to keep>` — `/compact` takes an argument that steers the summary: `/compact keep plan path, open tasks, decisions, current ROOT CAUSE`.
+- `claude -p "<task>"` — for a dozen identical independent chores (fix lint in N files) a batch of one-shot calls is cheaper than one long session, because context does not accumulate. On a subscription, `-p` gets the same 1-hour cache TTL as the main conversation.
+- `/rename` before `/clear`, then `/resume` — to come back to the right session by name.
 
-## Дерево задач
+## The task tree
 
-Формат — каталог на задачу с двумя обязательными файлами и валидатором (`tasks/check.py`). Harness его знает:
+The format is one directory per task, two required files and a validator (`tasks/check.py`). The harness knows it:
 
-- `/task <фаза> <что порождает>` — читает `tasks/README.md` (словарь, язык), спрашивает один раз только то, чего нет в репозитории, пишет `task.txt` и `labels.txt`, гоняет `tasks/check.py`.
-- `/plan tasks/<фаза>/<NN>-<имя>` — превращает `task.txt` в `PLAN.md` внутри каталога задачи: VERIFY → критерии приёмки, `+` → задачи, `−` → границы, DEPENDS → проверка `status:done` у зависимостей.
-- `/run` — исполняет `PLAN.md`; `status:done` только если изделие OUTCOME существует в repository; иначе `in_progress` + `NOTES.md`. Блокировка — `BLOCKED.md` в формате дерева + `status:blocked`. `verify:` не трогает никогда.
-- `/verify <каталог>` — другой контекст (`verifier`) пишет `VERIFY.md` и ставит `verify:`.
-- Hook `stop-guard` и `session-start` видят `tasks/**/PLAN.md` так же, как `docs/plans/*.md`.
+- `/task <phase> <what it produces>` — reads `tasks/README.md` (vocabulary, language), asks once for only what the repository cannot answer, writes `task.txt` and `labels.txt`, runs `tasks/check.py`.
+- `/plan tasks/<phase>/<NN>-<slug>` — turns `task.txt` into a `PLAN.md` inside the task directory: VERIFY → acceptance criteria, `+` lines → tasks, `−` lines → boundaries, DEPENDS → a check that every dependency is `status:done`.
+- `/run` — executes `PLAN.md`; `status:done` only if the OUTCOME artefact exists in the repository, otherwise `in_progress` + `NOTES.md`. Blocking writes `BLOCKED.md` in the tree's format and sets `status:blocked`. It never touches `verify:`.
+- `/verify <directory>` — another context (`verifier`) writes `VERIFY.md` and sets `verify:`.
+- The `stop-guard` and `session-start` hooks see `tasks/**/PLAN.md` exactly as they see `docs/plans/*.md`.
 
-`tasks/check.py` из комплекта — обобщённый: словарь фаз берёт из блока `phase:` в `tasks/README.md`, роли — из таблицы `ROLES.md`, вехи и ворота — из `GOAL.md`; маркеры `VERIFY.md` и `BLOCKED.md` понимает на двух языках. На живом дереве он находит настоящие расхождения: SCOPE без строк `−`, `phase:` вне словаря, `status:blocked` без `BLOCKED.md`, `verify:passed` без `VERIFY.md`, отсутствующий DEPENDS, расхождение текста DEPENDS с меткой, ссылки `путь:строка`, съехавшие после правок.
+The bundled `tasks/check.py` is generic: phases come from the `phase:` block in `tasks/README.md`, roles from the table in `ROLES.md`, milestones and gates from `GOAL.md`; `VERIFY.md` and `BLOCKED.md` markers are recognised in two languages. On a real tree it finds real discrepancies: a SCOPE with no `−` lines, a `phase:` outside the vocabulary, `status:blocked` without `BLOCKED.md`, `verify:passed` without `VERIFY.md`, a missing DEPENDS section, DEPENDS prose disagreeing with the label, and `path:line` references that drifted after edits.
 
-## Новый репозиторий
+## A new repository
 
 ```bash
 cp -r ~/.claude/project-template/{AGENTS.md,CLAUDE.md,docs,scripts,.claude} .
 claude   # -> /intake
 ```
 
-`/intake` заполняет `docs/PROJECT.md`. Дальше каждый `/plan` читает его и не переспрашивает про среду, проверки и границы. Правило реестра: возможность без строки — `absent`; спящий код не считается требованием. Прямая просьба — полное разрешение, записывается в реестр, больше не спрашивается.
+`/intake` fills in `docs/PROJECT.md`. From then on every `/plan` reads it and stops re-asking about the environment, the checks and the boundaries. The ledger rule: a capability with no row is `absent`; dormant code is not a requirement. A direct request is full authorization — it is recorded in the ledger and never asked about again.
 
-## Первый прогон
+## The first run
 
-0. Один раз на репозиторий: `/intake`.
-1. В проекте: `claude` → `/plan <задача на вечер>`. Ответить на вопросы. Выбрать «Сначала поправлю файл» (или «в чистом окне» → `/clear`, `/run`).
-2. Прочитать `docs/plans/<slug>.md`. Добавить, убрать, переставить.
-3. `cc-night docs/plans/<slug>.md`, в сессии набрать `/goal all tasks in docs/plans/<slug>.md are [x] or [!]`.
-4. Утром: `## Log`, `## Assumptions`, `[!]`-задачи. `/usage` — посмотреть `cron` и `subagent_heavy`.
+0. Once per repository: `/intake`.
+1. In the project: `claude` → `/plan <tonight's task>`. Answer the questions. Pick "I will edit the file first" (or "clean window" → `/clear`, `/run`).
+2. Read `docs/plans/<slug>.md`. Add, remove, reorder.
+3. `cc-night docs/plans/<slug>.md`, then in the session type `/goal all tasks in docs/plans/<slug>.md are [x] or [!]`.
+4. In the morning: `## Log`, `## Assumptions`, the `[!]` tasks. Then `/usage` — look at `cron` and `subagent_heavy`.
 
-## Лицензия
+## License
 
-MIT — см. `LICENSE`. Берите, меняйте под себя, спрашивать не нужно. `CLAUDE.md` — контракт одного инженера: правила про Python 3, `# filename.ext` и разбиение файлов длиннее 1400 строк меняются под свои привычки в первую очередь.
+MIT — see `LICENSE`. Take it, change it to fit, no need to ask. `CLAUDE.md` is one engineer's contract: the rules about Python 3, `# filename.ext` and splitting files over 1400 lines are the first things to rewrite for your own habits.

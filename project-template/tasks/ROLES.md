@@ -1,35 +1,35 @@
-# Роли
+# Roles
 
-Каждая роль — отдельный запуск с собственной областью, собственным поддеревом и
-собственным правом записи. **Пересечение запрещено:** два исполнителя, правящих
-один файл, — источник половины поломок.
+Every role is a separate run with its own area, its own subtree and its own
+right to write. **Overlap is forbidden:** two executors editing one file is the
+source of half the breakage.
 
-| Роль | Владеет | Пишет в | Язык |
+| Role | Owns | Writes to | Language |
 |---|---|---|---|
-| **ARCH** | границы слоёв, рецензия чужой работы | ничего, только рецензия | — |
-| **BACK** | <…> | <пути> | Python |
-| **QA** | приёмка по признакам, записанным ДО работы | <пути к проверкам> | Python |
-| **HUMAN** | всё, что машина не может проверить | — | — |
+| **ARCH** | layer boundaries, review of others' work | nothing, review only | — |
+| **BACK** | <…> | <paths> | Python |
+| **QA** | acceptance against criteria recorded BEFORE the work | <paths to the checks> | Python |
+| **HUMAN** | everything a machine cannot check | — | — |
 
 ## ARCH
 
-Кода не пишет. После каждой закрытой задачи отвечает на вопросы: не появилось
-ли нового раздвоения источника истины; не выросла ли цена добавления
-<единицы расширения>; каким маршрутом правка доедет до <работающих систем>.
+Writes no code. After every closed task it answers: has a new split source of
+truth appeared; has the cost of adding <the unit of extension> gone up; by which
+route does a change reach <the running systems>.
 
 ## QA
 
-Никогда не принимает работу у того, кто её сделал. Признаки приёмки записаны в
-`task.txt` **до** начала работы и не подгоняются под результат.
+Never accepts work from whoever did it. The acceptance criteria are written in
+`task.txt` **before** the work starts and are not tuned to the result.
 
-## HUMAN — и это не формальность
+## HUMAN — and this is not a formality
 
-Задачи с этой ролью не выполняются исполнителем и не имитируются. Не потому,
-что он не сумел бы, а потому, что ошибается систематически в одну сторону:
-докладывает, что результат выглядит хорошо.
+Tasks with this role are not executed by an agent and not simulated. Not because
+it could not, but because it errs systematically in one direction: it reports
+that the result looks good.
 
-Места, где судить обязан человек:
+Where a person must judge:
 
-- <решение, которое является обещанием клиенту, а не настройкой>;
-- <согласие на действие с живыми системами или деньгами>;
-- <первая приёмка сквозного прогона глазами>.
+- <a decision that is a promise to a customer rather than a setting>;
+- <consent to an action touching live systems or money>;
+- <the first acceptance of an end-to-end run by eye>.

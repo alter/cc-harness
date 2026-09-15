@@ -1,19 +1,20 @@
-# Решения
+# Decisions
 
-Сквозные решения, не принадлежащие ни одной задаче. Записаны, чтобы их
-перестали переспоривать, и чтобы пересмотр был осознанным действием с причиной,
-а не сползанием.
+Cross-cutting decisions that belong to no single task. Recorded so they stop
+being re-argued, and so that revisiting one is a deliberate act with a reason
+rather than a drift.
 
-Каждая запись: что решено, когда, почему, и что отвергнуто. Где стоит число —
-оно несёт источник. Пометки: **[уже в проекте]** — собрано, принято раньше;
-**[предложено]** — ждёт владельца; ~~зачёркнуто~~ — отменено, с датой и причиной.
+Every entry: what was decided, when, why, and what was rejected. Where a number
+appears it carries its source. Markers: **[already in the project]** — built,
+decided earlier; **[proposed]** — waiting for the owner; ~~struck through~~ —
+cancelled, with a date and a reason.
 
 ---
 
-## D1. <Заголовок решения> — <YYYY-MM-DD> [предложено]
+## D1. <Decision title> — <YYYY-MM-DD> [proposed]
 
-**Решено.** <Одно предложение.>
+**Decided.** <One sentence.>
 
-**Почему.** <Довод с источниками.>
+**Why.** <The argument, with sources.>
 
-**Отвергнуто.** <Альтернатива и почему нет.>
+**Rejected.** <The alternative and why not.>

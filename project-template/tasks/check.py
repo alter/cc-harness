@@ -17,8 +17,8 @@ MILESTONES: dict[str, int] = {}
 STATUSES = {"todo", "in_progress", "review", "done", "blocked"}
 VERIFIES = {"pending", "passed", "failed"}
 GATES_EXPECTED: int | None = None
-VERIFY_REQUIRED = (("Проверил:", "Verifier:"), ("## Как воспроизвести", "## How to reproduce"), ("## Что не проверено", "## What was not checked"))
-BLOCKED_REQUIRED = (("Заблокировано:", "Blocked:"), ("Чего не хватает:", "Missing:"), ("Что сделано до остановки:", "Done before stopping:"))
+VERIFY_REQUIRED = (("Verifier:", "Проверил:"), ("## How to reproduce", "## Как воспроизвести"), ("## What was not checked", "## Что не проверено"))
+BLOCKED_REQUIRED = (("Blocked:", "Заблокировано:"), ("Missing:", "Чего не хватает:"), ("Done before stopping:", "Что сделано до остановки:"))
 LINE_REF = re.compile(r"(?<![\w/.-])([A-Za-z0-9_./-]+\.[A-Za-z0-9]{1,6}):(\d+)(?:-(\d+))?")
 
 
@@ -28,7 +28,7 @@ def read_labels(path: pathlib.Path) -> dict[str, str]:
         if not line.strip():
             continue
         if ":" not in line:
-            raise ValueError(f"строка без двоеточия: {line!r}")
+            raise ValueError(f"line without a colon: {line!r}")
         key, value = line.split(":", 1)
         out[key.strip()] = value.strip()
     return out
@@ -51,7 +51,7 @@ def load_vocab() -> None:
         text = goal.read_text(encoding="utf-8")
         for m in re.finditer(r"\*\*(M\d+)\b", text):
             MILESTONES.setdefault(m.group(1), int(m.group(1)[1:]))
-        gates = len(re.findall(r"^\*\*Ворота \d+|^\*\*Gate \d+", text, re.M))
+        gates = len(re.findall(r"^\*\*Gate \d+|^\*\*Ворота \d+", text, re.M))
         GATES_EXPECTED = gates or None
     if not PHASES:
         for d in ROOT.iterdir():
@@ -71,7 +71,7 @@ def check_line_refs(rel: str, body: str, problems: list[str]) -> None:
         except OSError:
             continue
         if start > total:
-            problems.append(f"{rel}: ссылка {path}:{start} за пределами файла ({total} строк)")
+            problems.append(f"{rel}: reference {path}:{start} is past the end of the file ({total} lines)")
 
 
 def main() -> int:
@@ -89,18 +89,18 @@ def main() -> int:
         for s in SECTIONS:
             m = re.search(rf"^{re.escape(s)}", body, re.M)
             if not m:
-                problems.append(f"{rel}: нет раздела {s}")
+                problems.append(f"{rel}: section {s} is missing")
             else:
                 positions.append(m.start())
         if positions != sorted(positions):
-            problems.append(f"{rel}: разделы не в порядке README")
+            problems.append(f"{rel}: sections are not in the order given by README")
         if "−" not in body:
-            problems.append(f"{rel}: в SCOPE нет строк «−» (граница не записана)")
+            problems.append(f"{rel}: SCOPE has no '−' lines (the boundary is not written down)")
         check_line_refs(rel, body, problems)
 
         labels_path = d / "labels.txt"
         if not labels_path.exists():
-            problems.append(f"{rel}: нет labels.txt")
+            problems.append(f"{rel}: labels.txt is missing")
             continue
         try:
             kv = read_labels(labels_path)
@@ -111,10 +111,10 @@ def main() -> int:
 
         for k in kv:
             if k not in LABELS:
-                problems.append(f"{rel}: неизвестная метка {k}")
+                problems.append(f"{rel}: unknown label {k}")
         for k in ("phase", "role", "type", "priority", "status", "verify", "milestone"):
             if k not in kv:
-                problems.append(f"{rel}: нет метки {k}")
+                problems.append(f"{rel}: label {k} is missing")
         if PHASES and kv.get("phase") not in PHASES:
             problems.append(f"{rel}: phase={kv.get('phase')}")
         for role in re.split(r"[,\s]+", kv.get("role", "")):
@@ -135,37 +135,37 @@ def main() -> int:
 
         dep = kv.get("depends")
         if dep and not (ROOT / dep).is_dir():
-            problems.append(f"{rel}: depends указывает в никуда: {dep}")
+            problems.append(f"{rel}: depends points nowhere: {dep}")
         m = re.search(r"(?ms)^DEPENDS\n\s+(.+?)\s*$", body)
         txt = m.group(1).strip() if m else ""
         if dep and dep not in txt:
-            problems.append(f"{rel}: DEPENDS в тексте «{txt}» не содержит метку «{dep}»")
+            problems.append(f"{rel}: DEPENDS prose '{txt}' does not contain the label '{dep}'")
 
         if kv.get("status") == "blocked":
             bp = d / "BLOCKED.md"
             if not bp.exists():
-                problems.append(f"{rel}: status:blocked без BLOCKED.md")
+                problems.append(f"{rel}: status:blocked without BLOCKED.md")
             else:
                 b = bp.read_text(encoding="utf-8")
                 for need in BLOCKED_REQUIRED:
                     if not any(n in b for n in need):
-                        problems.append(f"{rel}: BLOCKED.md без «{need[0]}»")
+                        problems.append(f"{rel}: BLOCKED.md without '{need[0]}'")
         if kv.get("verify") == "passed":
             vp = d / "VERIFY.md"
             if not vp.exists():
-                problems.append(f"{rel}: verify:passed без VERIFY.md")
+                problems.append(f"{rel}: verify:passed without VERIFY.md")
             else:
                 v = vp.read_text(encoding="utf-8")
                 for need in VERIFY_REQUIRED:
                     if not any(n in v for n in need):
-                        problems.append(f"{rel}: VERIFY.md без «{need[0]}»")
+                        problems.append(f"{rel}: VERIFY.md without '{need[0]}'")
         if kv.get("status") == "done" and kv.get("gate") == "yes" and kv.get("verify") != "passed":
-            problems.append(f"{rel}: ворота закрыты без verify:passed")
+            problems.append(f"{rel}: a gate task is closed without verify:passed")
         plan = d / "PLAN.md"
         if plan.exists() and kv.get("status") in {"done", "blocked"}:
             head = plan.read_text(encoding="utf-8")[:400]
             if "status: running" in head:
-                problems.append(f"{rel}: PLAN.md всё ещё running при status:{kv.get('status')}")
+                problems.append(f"{rel}: PLAN.md is still running while status:{kv.get('status')}")
 
     for rel, kv in tasks.items():
         dep = kv.get("depends")
@@ -174,20 +174,20 @@ def main() -> int:
             theirs = MILESTONES.get(tasks[dep].get("milestone", ""), 0)
             if theirs > mine:
                 problems.append(
-                    f"{rel} ({kv.get('milestone')}) зависит от {dep} "
-                    f"({tasks[dep].get('milestone')}) — более поздняя веха"
+                    f"{rel} ({kv.get('milestone')}) depends on {dep} "
+                    f"({tasks[dep].get('milestone')}) — a later milestone"
                 )
 
     if tasks and GATES_EXPECTED is not None and len(gates) != GATES_EXPECTED:
-        problems.append(f"ворот {len(gates)}, ожидается {GATES_EXPECTED}: {gates}")
+        problems.append(f"{len(gates)} gate tasks, expected {GATES_EXPECTED}: {gates}")
 
-    print(f"каталогов задач: {len(tasks)}; ворота: {gates}")
+    print(f"task directories: {len(tasks)}; gates: {gates}")
     if problems:
-        print(f"проблем: {len(problems)}")
+        print(f"problems: {len(problems)}")
         for p in problems:
             print("  •", p)
         return 1
-    print("проблем: 0")
+    print("problems: 0")
     return 0
 
 

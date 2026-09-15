@@ -1,138 +1,139 @@
-# Дерево задач — <проект>
+# Task tree — <project>
 
-Одна задача — один каталог с двумя обязательными
-файлами и валидатором. Дерево — реестр работы, не журнал: здесь лежит то, что
-должно существовать, разложенное на исполняемые куски.
+One task is one directory with two required files and a validator. The tree is a
+ledger of work, not a journal: it holds what must exist, split into executable
+pieces.
 
-## Ключевые документы
+## Key documents
 
-- `PROTOCOL.md` — читается первым любым исполнителем: что проверить до правки,
-  как делать, обратный контроль, когда задача закрыта, когда остановиться.
-- `GOAL.md` — цель, ворота, признаки приближения и признаки самообмана.
-- `ROLES.md` — роли, что каждая владеет и куда пишет; роль HUMAN.
-- `DECISIONS.md` — сквозные решения `D<n>`: решено / почему / отвергнуто.
+- `PROTOCOL.md` — read first by every executor: what to check before an edit,
+  how to work, reverse control, when a task is closed, when to stop.
+- `GOAL.md` — the goal, the gates, signs of progress and signs of self-deception.
+- `ROLES.md` — the roles, what each owns and where it writes; the HUMAN role.
+- `DECISIONS.md` — cross-cutting decisions `D<n>`: decided / why / rejected.
 
-## Фазы
+## Phases
 
-`NN-<имя>` с шагом 10 в порядке зависимостей. Каждая фаза несёт свои `task.txt`
-и `labels.txt`; SCOPE фазы перечисляет дочерние задачи по строке на каждую.
+`NN-<slug>` in steps of 10, in dependency order. Every phase carries its own
+`task.txt` and `labels.txt`; the phase's SCOPE lists its child tasks, one line
+each.
 
-<заполняется /task init>
+<filled in by /task init>
 
-## Формат задачи
+## Task format
 
-`task.txt`, разделы строго в этом порядке, тела с отступом в два пробела:
+`task.txt`, sections in exactly this order, bodies indented by two spaces:
 
 ```
-TASK: <короткое имя, называет изделие>
+TASK: <short name, names the artefact>
 
 GOAL
-  Что это порождает и зачем существует. Две-три строки. Если служит воротам —
-  каким. Каждое число несёт источник.
+  What this produces and why it exists. Two or three lines. If it serves a gate,
+  say which. Every number carries its source.
 
 CONTEXT
-  3–7 путей, которые надо прочитать ДЛЯ ЭТОЙ задачи. Не «прочитай всё».
+  3–7 paths to read FOR THIS TASK. Never "read everything".
 
 SCOPE
-  + что входит
-  − что сознательно исключено и где оно живёт вместо этого
+  + what is included
+  − what is deliberately excluded, and where it lives instead
 
 OUTCOME
-  Изделие, которое существует, когда задача закрыта: путь или измеримое число.
+  The artefact that exists when the task is closed: a path or a measurable number.
 
-VERIFY (<роль>)
-  Нумерованные проверки, которые выполнит кто-то другой. Хотя бы одна —
-  обратный контроль: что должно сделать проверку красной.
+VERIFY (<role>)
+  Numbered checks somebody else can run. At least one of them is reverse
+  control: what must turn the check red.
 
 ROLE
-  Кто делает.
+  Who does it.
 
 DEPENDS
-  Пути к задачам, которые обязаны завершиться раньше, или (нет).
+  Paths of tasks that must finish first, or (none).
 ```
 
-`labels.txt` — по одной паре `ключ:значение` в строке.
+`labels.txt` — one `key:value` pair per line.
 
-Необязательные файлы рядом: `NOTES.md` (обоснование, замеры, отвергнутые
-варианты; заголовки с датой), `VERIFY.md` (доказательство проверки — пишет
-только проверяющий), `BLOCKED.md` (при `status:blocked`), `PLAN.md`
-(исполнительный план текущей сессии, создаёт `/plan`) и любое изделие —
-журналы, снимки экрана, вывод замера.
+Optional neighbours: `NOTES.md` (rationale, measurements, rejected alternatives;
+dated headings), `VERIFY.md` (proof of verification — written only by the
+verifier), `BLOCKED.md` (when `status:blocked`), `PLAN.md` (the current session's
+execution plan, created by `/plan`) and any artefact — logs, screenshots,
+measurement output.
 
-Строки `−` в SCOPE важны не меньше строк `+`. Незаписанная граница — это
-граница, которую перейдут.
+The `−` lines in SCOPE matter as much as the `+` lines. An unwritten boundary is
+a boundary somebody will cross.
 
-## Метки
+## Labels
 
 ```
-phase:      <из списка фаз, словарь в check.py>
-role:       <из ROLES.md>
+phase:      <from the phase list above>
+role:       <from ROLES.md>
 type:       feature | fix | research | decision | chore
 priority:   P0 | P1 | P2 | P3
-status:     todo | in_progress | review | done | blocked (с BLOCKED.md рядом)
+status:     todo | in_progress | review | done | blocked (with BLOCKED.md next to it)
 verify:     pending | passed | failed
-depends:    <путь к задаче>
-milestone:  <из GOAL.md>
-gate:       yes — только на задачах, которые меряют цель
+depends:    <path to a task>
+milestone:  <from GOAL.md>
+gate:       yes — only on tasks that measure the goal
 ```
 
-## Порядок работы
+## Order of work
 
-1. Исполняющая роль работает (`status: todo → in_progress → done`).
-2. **Другой контекст**, не писавший ни код, ни его проверки, ставит
-   `verify: passed` или `failed` (`/verify`).
-3. Задачи с `gate:yes` подтверждает человек; следующая фаза не начинается,
-   пока они не пройдены.
+1. The executing role works (`status: todo → in_progress → done`).
+2. **Another context**, which wrote neither the code nor its tests, sets
+   `verify: passed` or `failed` (`/verify`).
+3. Tasks with `gate:yes` are confirmed by a human; the next phase does not start
+   until they pass.
 
-## Правило `status:done`
+## The `status:done` rule
 
-`status:done` означает, что **изделие из OUTCOME существует** по названному
-пути, а не что «работа выглядит законченной». Изделие вне repository
-(машина у хостера, телефон в руке, подписанная сборка, чужие глаза) не
-закрывается тем контекстом, который делал: остаётся `in_progress` с запиской
-в `NOTES.md`, чего не хватает и кто может дать.
+`status:done` means **the OUTCOME artefact exists** at the named path, not that
+"the work looks finished". An artefact outside the repository (a machine at a
+provider, a phone in someone's hand, a signed build, another person's eyes) is
+not closed by the context that did the work: it stays `in_progress` with a note
+in `NOTES.md` saying what is missing and who can provide it.
 
-## Правило `verify:passed`
+## The `verify:passed` rule
 
-Требует `VERIFY.md` в каталоге задачи. Слова в сообщении commit'а
-доказательством не являются. Обязательные части:
+Requires a `VERIFY.md` in the task directory. Words in a commit message are not
+proof. Required parts:
 
-- строка `Проверил:` с именем контекста и перечислением того, чего он **не**
-  делал — не автор ни кода, ни его проверок;
-- `## Как воспроизвести` — хотя бы одна команда с чистого состояния: свежий
-  checkout, пустое окружение, ни одной переменной, выставленной руками;
-- `## Обратный контроль` — что было сломано намеренно и какой красный вывод
-  это дало;
-- `## Что не проверено` — непустой. Граница проверки существует всегда.
+- a `Verifier:` line naming the context and listing what it did **not** do — it
+  authored neither the code nor its tests;
+- `## How to reproduce` — at least one command from a clean state: a fresh
+  checkout, an empty environment, not a single variable exported by hand;
+- `## Reverse control` — what was broken on purpose and what red output it gave;
+- `## What was not checked` — non-empty. A verification boundary always exists.
 
-Каждое число в `VERIFY.md` несёт источник — путь, команду, строку журнала.
+Every number in `VERIFY.md` carries its source — a path, a command, a log line.
 
-## Правило остановки
+## The stopping rule
 
-Исполнитель останавливается и **не имитирует**, когда нужен секрет, которого
-нет; нужно решение владельца; задача из DEPENDS не закрыта; изделие требует
-человека; обратный контроль не удаётся сделать красным. В каталоге задачи
-создаётся `BLOCKED.md`:
+The executor stops and **does not simulate** when a missing secret is needed; an
+owner's decision is needed; a task in DEPENDS is not closed; the artefact
+requires a person; or reverse control cannot be made red. A `BLOCKED.md` is
+created in the task directory:
 
 ```
-Заблокировано: <дата>
-Чего не хватает: <одна строка, конкретно — имя переменной, путь задачи, вопрос>
-Что сделано до остановки: <перечень, с путями>
-Что можно сделать без этого: <или «ничего»>
+Blocked: <date>
+Missing: <one line, concrete — a variable name, a task path, a question>
+Done before stopping: <list, with paths>
+What can be done without it: <or "nothing">
 ```
 
-и в `labels.txt` ставится `status:blocked`. Заглушка вместо секрета,
-«пока захардкожу», «предположим, что…» — это не обход блокировки, это ложный
-`done` с задержкой обнаружения.
+and `labels.txt` gets `status:blocked`. A stub instead of a secret, "hardcode it
+for now", "let us assume that…" — that is not a way around a blocker, it is a
+false `done` with delayed discovery.
 
-## Валидатор
+## Validator
 
 ```bash
-python3 tasks/check.py     # ноль проблем — обязательное условие закрытия задачи
+python3 tasks/check.py     # zero problems is a precondition for closing a task
 ```
 
-## Язык
+## Language
 
-Дерево, `NOTES.md`, `VERIFY.md`, `BLOCKED.md` — русский, без русифицированного
-жаргона кириллицей; устойчивые термины латиницей. Код, docstring, сообщения
-commit'ов — английский.
+The tree's language is whatever this file is written in; `check.py` accepts the
+`VERIFY.md` and `BLOCKED.md` markers in English or Russian, so a tree kept in
+another language keeps its own wording. Code, docstrings and commit messages
+follow the existing code.

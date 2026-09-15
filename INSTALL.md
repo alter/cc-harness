@@ -1,71 +1,70 @@
-# Установка, проверка, откат
+# Install, check, roll back
 
-Порядок: резервная копия → проверка без установки → пробная установка в отдельный каталог → живая проверка на песочнице → установка в `~/.claude` → откат, если что-то не так. Каждый шаг — одна команда, каждый обратим.
+The order: back up → run the checks without installing → install a trial copy into a separate directory → run it live in a sandbox → install into `~/.claude` → roll back if anything is wrong. Every step is one command, and every step is reversible.
 
-Нужны: `jq`, `bash` ≥ 4, `claude` ≥ 2.1.267 (`maxEffortLevel`), на macOS — ничего больше (уведомления через `osascript`).
+You need `jq`, `bash` ≥ 4, and `claude` ≥ 2.1.267 (for `maxEffortLevel`). On macOS nothing else (notifications go through `osascript`); on Linux, `notify-send` if you want them.
 
-## 0. Что где лежит у Claude Code — чтобы знать, что копируем
+## 0. What Claude Code keeps where — so you know what is being touched
 
-| Путь | Что | Трогает ли харнес |
+| Path | What it is | Does the harness touch it |
 |---|---|---|
-| `~/.claude/settings.json` | настройки, hook, statusLine | **да** — слияние, не замена |
-| `~/.claude/CLAUDE.md` | глобальный контракт | **да** — замена |
-| `~/.claude/hooks/`, `agents/`, `skills/`, `statusline.sh`, `project-template/` | наши файлы | **да** — добавление; чужие файлы в этих каталогах не удаляются |
-| `~/.claude/settings.local.json`, `commands/`, `keybindings.json` | твоё | нет, но копируется в резерв |
-| `~/.claude.json` | MCP-серверы, состояние входа, onboarding | **нет**; копируется в резерв |
-| `~/.claude/projects/` | стенограммы сессий | нет; в резерв не входит (гигабайты) — см. §1 |
-| `~/bin/cc-night` | ночной запуск | **да** |
+| `~/.claude/settings.json` | settings, hooks, statusLine | **yes** — merged, not replaced |
+| `~/.claude/CLAUDE.md` | the global contract | **yes** — replaced |
+| `~/.claude/hooks/`, `agents/`, `skills/`, `statusline.sh`, `project-template/` | the harness's own files | **yes** — added; other files in those directories are not deleted |
+| `~/.claude/settings.local.json`, `commands/`, `keybindings.json` | yours | no, but copied into the backup |
+| `~/.claude.json` | MCP servers, login state, onboarding | **no**; copied into the backup |
+| `~/.claude/projects/` | session transcripts | no; not in the backup (gigabytes) — see §1 |
+| `~/bin/cc-night` | the overnight launcher | **yes** |
 
-## 1. Резервная копия
+## 1. Backup
 
-`install.sh` делает её сам перед любой записью (в `~/.claude-backup/<дата-время>/`: все файлы из таблицы плюс `MANIFEST.txt` со списком того, что было). Если хочешь полную копию вместе со стенограммами — до установки:
+`install.sh` makes one itself before writing anything, into `~/.claude-backup/<stamp>/`: every file from the table above plus a `MANIFEST.txt` listing what was there. If you want a full copy including transcripts, do it before installing:
 
 ```bash
 tar czf ~/claude-full-$(date +%Y%m%d).tgz -C ~ .claude .claude.json
 du -sh ~/claude-full-*.tgz
 ```
 
-Проверить, что копия читается: `tar tzf ~/claude-full-*.tgz | head`.
+Check that the archive is readable: `tar tzf ~/claude-full-*.tgz | head`.
 
-## 2. Проверка без установки — 48 проверок hook на синтетических данных
+## 2. Checks without installing — 48 hook checks on synthetic input
 
 ```bash
-tar xzf harness.tar.gz && cd harness
-chmod +x *.sh hooks/*.sh
+git clone https://github.com/alter/cc-harness && cd cc-harness
 ./selftest.sh
 ```
 
-Что проверяется (ничего не пишется вне временного каталога, состояние счётчиков изолировано через `XDG_STATE_HOME`):
+What gets checked (nothing is written outside a temporary directory; counter state is isolated through `XDG_STATE_HOME`):
 
-- синтаксис всех скриптов, валидность `settings.json`;
-- `read-guard`: отказ на файл в 600 строк, пропуск при `offset/limit`, пропуск `.md`;
-- `compress-output`: 300 одинаковых строк → `(x300)`, длинный вывод → голова/хвост + файл в `.claude/scratch/`, короткий — нетронут;
-- `retry-guard`: первый провал молча, второй (с другими пробелами — та же команда) → указание на `/diagnose`, третий → «ROOT CAUSE до следующего вызова», успех сбрасывает;
-- `stop-guard`: план с 2 открытыми → `decision: block` с именем следующей задачи; `NEED_HUMAN`, `.claude/plan-pause`, достигнутый предел, ноль открытых → отпускает;
-- `session-start` после сжатия → строка с «2 open, 1 blocked» и хвостом Log;
-- `subagent-evidence`: scout без вызовов → блок; с Grep+Read и путём → пропуск; без пути → блок; `NOT FOUND` без вызовов → блок; test-runner без Bash или без `COMMAND:` → блок; worker без Edit/Write/Bash → блок; `NOT DONE` и `stop_hook_active` → пропуск;
-- `guard-subagent` 1/2, 2/2 → allow, 3/2 → deny; `guard-model-switch` 50 тыс. → ask, 1 тыс. → allow;
-- `statusline` на образце JSON → строка с каталогом, моделью, ctx, 5h, 7d, причиной холодного кэша и долей попаданий.
+- the syntax of every script, and that `settings.json` is valid JSON;
+- `read-guard`: refuses a 600-line file, allows it with `offset/limit`, allows `.md` regardless of size;
+- `compress-output`: 300 identical lines become `(x300)`, long output becomes head/tail plus a file in `.claude/scratch/`, short output is untouched;
+- `retry-guard`: the first failure is silent, the second (with different whitespace — the same command) points at `/diagnose`, the third demands `ROOT CAUSE` before the next call, a success resets the counter;
+- `stop-guard`: a plan with 2 open tasks produces `decision: block` naming the next task; `NEED_HUMAN`, `.claude/plan-pause`, the ceiling, and zero open tasks each release it;
+- `session-start` after compaction produces a line with "2 open, 1 blocked" and the tail of the Log;
+- `subagent-evidence`: a scout with no tool calls is blocked; with Grep+Read and a path it passes; without a path it is blocked; `NOT FOUND` with no calls is blocked; a test-runner with no Bash or no `COMMAND:` is blocked; a worker with no Edit/Write/Bash is blocked; `NOT DONE` and `stop_hook_active` pass;
+- `guard-subagent` 1/2 and 2/2 allow, 3/2 denies; `guard-model-switch` asks at 50k, allows at 1k;
+- `statusline` against a sample JSON renders the directory, model, context, 5h, 7d, the cold-cache cause and the hit ratio.
 
-Последняя строка — `passed N, failed 0`. Иначе — не ставить, прислать вывод.
+The last line must read `passed N, failed 0`. If it does not, do not install — send the output.
 
-## 3. Пробная установка в отдельный каталог — не трогая `~/.claude`
+## 3. A trial install into a separate directory, leaving `~/.claude` alone
 
-Claude Code читает переменную `CLAUDE_CONFIG_DIR` (проверено в двоичном файле): вся конфигурация берётся из неё вместо `~/.claude`.
+Claude Code honours `CLAUDE_CONFIG_DIR` (verified in the binary): the whole configuration is read from there instead of `~/.claude`.
 
 ```bash
 ./install.sh ~/.claude-harness-test
-./selftest.sh ~/.claude-harness-test        # те же проверки + «hook на месте и исполняемы»
+./selftest.sh ~/.claude-harness-test        # the same checks, plus "hooks present and executable"
 CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
 ```
 
-`install.sh` с нестандартным каталогом переписывает все ссылки `~/.claude/...` в hook, agents, skills и `settings.json` на этот каталог. Первый запуск спросит тему и вход (на macOS ключ входа в Keychain общий, повторный вход обычно не нужен; на Linux скопируй `~/.claude/.credentials.json` в тестовый каталог). MCP-серверы из `~/.claude.json` в тестовой конфигурации не появятся — это ожидаемо.
+With a non-default directory, `install.sh` rewrites every `~/.claude/...` reference inside the hooks, agents, skills and `settings.json` to point at that directory. The first launch will ask about the theme and login (on macOS the login key lives in the Keychain and is usually shared, so a second login is not needed; on Linux, copy `~/.claude/.credentials.json` into the test directory). MCP servers from `~/.claude.json` will not appear in the trial configuration — that is expected.
 
-Убрать тестовый каталог потом: `rm -rf ~/.claude-harness-test`.
+Remove the trial directory afterwards with `rm -rf ~/.claude-harness-test`.
 
-## 4. Живая проверка на песочнице (20 минут, ~ниже одного часа лимита)
+## 4. A live run in a sandbox (20 minutes, well under one hour of the limit)
 
-Отдельный пустой репозиторий, не рабочий проект:
+Use a separate empty repository, not a working project:
 
 ```bash
 mkdir -p /tmp/harness-sandbox && cd /tmp/harness-sandbox && git init -q
@@ -97,55 +96,55 @@ git add -A && git commit -qm init
 CLAUDE_CONFIG_DIR=~/.claude-harness-test claude "/run docs/plans/smoke.md"
 ```
 
-Что должен увидеть — и что означает, если не увидел:
+What you should see — and what it means if you do not:
 
-| Наблюдение | Механизм | Если нет |
+| Observation | Mechanism | If it is missing |
 |---|---|---|
-| Первым сообщением модель предлагает `/goal all tasks in docs/plans/smoke.md are [x] or [!]` и не ждёт ответа | skill `/run`, раздел Belt and braces | skill не загрузился: `ls $CLAUDE_CONFIG_DIR/skills/run/SKILL.md`, `/skill-doctor` |
-| Строка состояния внизу: `harness-sandbox  Sonnet 5/medium  ctx N%  5h N%  7d N%  cache …` | `statusLine` | путь в `settings.json` → `statusLine.command`; запусти его руками с `echo '{}' \| ~/.claude/statusline.sh` |
-| Ни одного вопроса за весь прогон | контракт + `/run` | если спросила — прислать стенограмму: это дефект контракта, не hook |
-| Попробуй сам в сессии: «прочитай big.py целиком» → отказ с текстом про Grep и окно | `read-guard` | `claude --debug hooks` покажет, вызывался ли hook |
-| После каждой задачи — `[x]`, строка в `## Log`, commit `T0N: …` (`git log --oneline`) | `run-task` | — |
-| На T04 модель не повторяет `false`, а пишет `ROOT CAUSE:`/`EVIDENCE:` или блокирует | контракт; `retry-guard` включится только при втором одинаковом провале — это ожидаемо | если повторяет 3+ раз — прислать стенограмму |
-| Попробуй прервать: скажи «остановись, продолжим завтра» при открытых задачах → модель возвращается к работе с текстом про N открытых задач | `stop-guard` | `tail ~/.local/state/cc-stop-guard/*` — счётчик растёт? если 0 — hook не вызван: проверь `settings.json` → `hooks.Stop` |
-| По завершении — уведомление macOS «Plan finished» | `notify` из `stop-guard` | `osascript -e 'display notification "x"'` руками |
-| `touch .claude/plan-pause` посреди работы → модель может остановиться | выход из `stop-guard` | — |
+| The first message offers `/goal all tasks in docs/plans/smoke.md are [x] or [!]` and does not wait for an answer | the `/run` skill, "belt and braces" | the skill did not load: check `ls $CLAUDE_CONFIG_DIR/skills/run/SKILL.md`, then `/skill-doctor` |
+| A status line at the bottom: `harness-sandbox  Sonnet 5/medium  ctx N%  5h N%  7d N%  cache …` | `statusLine` | check the path in `settings.json` → `statusLine.command`; run it by hand with `echo '{}' \| ~/.claude/statusline.sh` |
+| Not a single question for the whole run | the contract + `/run` | if it does ask, send the transcript: that is a contract defect, not a hook one |
+| Try it yourself mid-session: "read big.py in full" → refused, with text about Grep and a window | `read-guard` | `claude --debug hooks` shows whether the hook was called |
+| After every task: `[x]`, a Log line, and a commit `T0N: …` (see `git log --oneline`) | `run-task` | — |
+| On T04 the model does not repeat `false` but writes `ROOT CAUSE:`/`EVIDENCE:` or blocks the task | the contract; `retry-guard` only fires on the second identical failure, so this is expected | if it repeats 3+ times, send the transcript |
+| Try interrupting: say "stop, we will continue tomorrow" while tasks are open → the model returns to work with text about N open tasks | `stop-guard` | `tail ~/.local/state/cc-stop-guard/*` — is the counter growing? If it is 0, the hook was not called: check `hooks.Stop` in `settings.json` |
+| When it finishes: a "Plan finished" notification | `notify`, from `stop-guard` | try `osascript -e 'display notification "x"'` by hand |
+| `touch .claude/plan-pause` mid-run → the model is allowed to stop | the stop-guard exit | — |
 
-Дополнительно: `/usage` в сессии — должен показать долю `subagent_heavy`/`cache_miss` (ожидаемо низкую на пяти задачах), `/insights` — ничего лишнего.
+Also worth a look: `/usage` inside the session should show the share of `subagent_heavy` / `cache_miss` (expected to be low across five tasks), and `/insights` should show nothing alarming.
 
-Проверка subagent'ов отдельно, в той же сессии: «найди через scout, где определена переменная line» → ответ обязан содержать `big.py:<строка>` и `TOOLS USED: Grep:… Read:…`. Если scout вернул «не нашёл» без строки `TOOLS USED` — hook `subagent-evidence` должен был его вернуть в работу; `claude --debug hooks` покажет `SubagentStop`.
+Check the subagents separately, in the same session: "use scout to find where the variable `line` is defined". The answer must contain `big.py:<line>` and a `TOOLS USED: Grep:… Read:…` line. If scout answers "not found" with no `TOOLS USED`, the `subagent-evidence` hook should have sent it back; `claude --debug hooks` will show the `SubagentStop` call.
 
-## 5. Установка в `~/.claude`
+## 5. Install into `~/.claude`
 
-Когда §2–4 прошли:
+Once §2–4 have passed:
 
 ```bash
 ./install.sh
 ```
 
-Скрипт: резервная копия → копирование файлов → слияние `settings.json` → проверка синтаксиса → отчёт. Слияние: твои `permissions`, `env`, MCP, чужие hook остаются; наши ключи (`model`, `effortLevel`, кэш, пределы) **перекрывают** твои — diff печатается на экран, прочитай его. Наши hook добавляются к твоим по каждому событию, при повторной установке не дублируются. `~/.claude.json` не трогается.
+The script: backup → copy files → merge `settings.json` → syntax checks → report. The merge keeps your `permissions`, `env`, MCP servers and other people's hooks; the harness's own keys (`model`, `effortLevel`, cache, ceilings) **override** yours, and the diff is printed on screen — read it. The harness's hooks are appended to yours per event, and a repeated install does not duplicate them. `~/.claude.json` is not touched.
 
-Потом:
+Then:
 
 ```bash
 ./selftest.sh ~/.claude
-claude          # в любом проекте; строка состояния появится сразу
+claude          # in any project; the status line appears immediately
 ```
 
-## 6. Откат
+## 6. Rollback
 
 ```bash
-./uninstall.sh ~/.claude-backup/<дата-время>
+./uninstall.sh ~/.claude-backup/<stamp>
 ```
 
-Удаляет наши файлы (только те, что есть в этом архиве харнеса), возвращает `settings.json`, `CLAUDE.md`, `hooks/`, `agents/`, `skills/`, `commands/`, `keybindings.json`, `cc-night` из копии, сверяет с `MANIFEST.txt`. `~/.claude.json` не трогает (копия лежит рядом как `dot-claude.json`, если понадобится).
+It removes the harness's files (only those present in this checkout), restores `settings.json`, `CLAUDE.md`, `hooks/`, `agents/`, `skills/`, `commands/`, `keybindings.json` and `cc-night` from the backup, and verifies the result against `MANIFEST.txt`. `~/.claude.json` is left alone (a copy sits next to the backup as `dot-claude.json` if you need it).
 
-Откат из полной копии §1: `tar xzf ~/claude-full-<дата>.tgz -C ~` поверх.
+To roll back from the full archive in §1: `tar xzf ~/claude-full-<stamp>.tgz -C ~` over the top.
 
-## 7. Что может пойти не так — честно
+## 7. What can go wrong — honestly
 
-- **Слияние `settings.json` перекроет твою модель/effort.** Так и задумано, но если у тебя стоял `opus` по умолчанию — теперь `sonnet`. Diff покажет.
-- **Другой `Stop`-hook у тебя уже есть.** Оба будут вызваны; блок любого из них останавливает выход. Конфликта нет, но два разных текста в контексте. Посмотри `jq .hooks.Stop ~/.claude/settings.json`.
-- **`--dangerously-skip-permissions` в `cc-night`.** Скрипт не проверяет, где ты его запускаешь. Песочница — твоя ответственность.
-- **Проектный `CLAUDE.md` со своими правилами** останется как есть; харнес его не трогает. Если там противоречащее («спрашивай перед каждым шагом») — победит более конкретное, т. е. проектное. Приведи проектные файлы к `AGENTS.md` из `project-template/` через `/intake`.
-- **Версия.** Ключи `maxEffortLevel`, `subagentPromptCacheTtl`, `omitClaudeMd` в agents требуют ≥ 2.1.267/2.1.271. На старой версии Claude Code молча их игнорирует — `claude --version` первым делом.
+- **The `settings.json` merge overrides your model and effort.** That is by design, but if you had `opus` as your default, it is now `sonnet`. The diff shows it.
+- **You already have another `Stop` hook.** Both will be called, and a block from either stops the turn. There is no conflict, but there will be two different texts in the context. Look at `jq .hooks.Stop ~/.claude/settings.json`.
+- **`--dangerously-skip-permissions` inside `cc-night`.** The script does not check where you run it. The sandbox is your responsibility.
+- **A project `CLAUDE.md` with its own rules** is left exactly as it is; the harness does not touch it. If it contains something contradictory ("ask before every step"), the more specific file wins — that is, the project's. Bring project files in line with `project-template/AGENTS.md` through `/intake`.
+- **Version.** The keys `maxEffortLevel`, `subagentPromptCacheTtl` and `omitClaudeMd` in agents need 2.1.267 / 2.1.271 or later. On an older build Claude Code ignores them silently — so check `claude --version` first.

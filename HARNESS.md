@@ -1,202 +1,204 @@
-# Harness: что здесь к чему
+# The harness: how it is built
 
-45 файлов, три этажа. Поведение по шагам — в `BEHAVIOR.md`, этот файл — про устройство. Каждая строка настроек ниже проверена в двоичном файле Claude Code 2.1.272 или в официальной документации; ничего «по памяти».
+47 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
 
-## 1. Три этажа
+## 1. Three floors
 
 ```
-~/.claude/                          ЭТАЖ «Я» — как я работаю, одинаково во всех проектах
-├── CLAUDE.md                       контракт поведения (60 строк)
-├── settings.json                   модель, effort, кэш, пределы, hook
-├── statusline.sh                   строка состояния: лимиты и кэш
-├── hooks/  (9)                     детерминированные охранники вне контекста модели
+~/.claude/                          THE "ME" FLOOR — how I work, the same in every project
+├── CLAUDE.md                       behavioural contract (60 lines)
+├── settings.json                   model, effort, cache, ceilings, hooks
+├── statusline.sh                   status line: limits and cache
+├── hooks/  (9)                     deterministic guards outside the model's context
 ├── skills/ (7)                     /intake /task /plan /run /run-task /verify /diagnose
 ├── agents/ (7)                     Explore scout test-runner researcher reviewer verifier worker
-├── night.sh                        ночной запуск одной длинной сессии
-└── install.sh selftest.sh uninstall.sh   резерв → установка → проверка → откат (INSTALL.md)
+├── night.sh                        the overnight run, one long session
+└── install.sh selftest.sh uninstall.sh   backup → install → checks → rollback (INSTALL.md)
 
-<проект>/                           ЭТАЖ «ПРОЕКТ» — факты о репозитории
-├── AGENTS.md  +  CLAUDE.md=@AGENTS.md    общий контракт для всех агентов
-├── docs/PROJECT.md                 реестр возможностей, «решает агент», gate checks, что можно ночью
-├── .claude/rules/<область>.md      правила с paths: — грузятся при касании файлов
-└── tasks/                          ЭТАЖ «РАБОТА» — реестр задач в твоём формате
+<project>/                          THE "PROJECT" FLOOR — facts about the repository
+├── AGENTS.md  +  CLAUDE.md=@AGENTS.md    one contract for every agent
+├── docs/PROJECT.md                 capability ledger, "decided by the agent", gate checks, night policy
+├── .claude/rules/<area>.md         rules with paths: — loaded when matching files are touched
+└── tasks/                          THE "WORK" FLOOR — the ledger of work
     ├── README PROTOCOL GOAL ROLES DECISIONS check.py
-    └── NN-фаза/NN-задача/{task.txt, labels.txt, PLAN.md, NOTES.md, VERIFY.md, BLOCKED.md}
+    └── NN-phase/NN-task/{task.txt, labels.txt, PLAN.md, NOTES.md, VERIFY.md, BLOCKED.md}
 ```
 
-Принцип разделения: **поведение** живёт у пользователя и не попадает в репозитории; **факты** живут в репозитории и видны всем агентам; **работа** — в дереве задач, которое читают и модель, и hook, и человек. Claude Code разводит первые два этажа настройками пользователя и проекта — мы просто не смешиваем то, что платформа разделила.
+The separation: **behaviour** lives with the user and never enters a repository; **facts** live in the repository and are visible to every agent; **work** lives in the task tree, which the model, the hooks and the human all read. Claude Code already separates the first two floors through user and project settings — this just keeps apart what the platform put apart.
 
-## 2. Путь одной задачи
+## 2. The path of one task
 
 ```
-/intake  (один раз на репозиторий)  →  docs/PROJECT.md
+/intake  (once per repository)       →  docs/PROJECT.md
    ↓
-/task <фаза> <что порождает>        →  tasks/…/task.txt + labels.txt      (все вопросы — здесь)
+/task <phase> <what it produces>     →  tasks/…/task.txt + labels.txt      (all questions happen here)
    ↓
-/plan tasks/…/NN-имя                →  PLAN.md: T00 baseline, T01…Tn с командой проверки у каждой
-   ↓  /clear                          (бесплатно; план на диске, SessionStart-hook его вернёт)
-/run  или  cc-night tasks/…/NN-имя  →  задачи по одной, [x] только после проверки, коммит на задачу
-   ↓                                   Stop-hook не даёт остановиться, пока есть «- [ ] »
-   ↓                                   retry-guard ловит вторую подряд одинаковую упавшую команду → /diagnose
-   ↓                                   изделие OUTCOME существует? → status:done, иначе in_progress + NOTES
-/verify tasks/…/NN-имя              →  другой контекст: VERIFY.md, verify:passed|failed
+/plan tasks/…/NN-slug                →  PLAN.md: T00 baseline, T01…Tn each with its verify command
+   ↓  /clear                           (free; the plan is on disk, the SessionStart hook brings it back)
+/run  or  cc-night tasks/…/NN-slug   →  one task at a time, [x] only after the check, a commit per task
+   ↓                                    the Stop hook refuses to stop while a "- [ ] " remains
+   ↓                                    retry-guard catches the second identical failure → /diagnose
+   ↓                                    does the OUTCOME artefact exist? → status:done, else in_progress + NOTES
+/verify tasks/…/NN-slug              →  another context: VERIFY.md, verify:passed|failed
 ```
 
-Вопросы задаются в двух точках — `/intake` и `/task`/`/plan` — и больше нигде. Всё, что после, работает по контракту «развилка → выбор, согласный с планом → запись в Assumptions → дальше».
+Questions are asked at two points — `/intake` and `/task`/`/plan` — and nowhere else. Everything after that runs on the contract "a fork → pick what agrees with the plan → record it under Assumptions → continue".
 
-## 3. Файл за файлом
+## 3. File by file
 
-### `CLAUDE.md` — контракт (грузится в каждую сессию, ~700 токенов)
+### `CLAUDE.md` — the contract (loaded into every session, ~700 tokens)
 
-Семь разделов: вопросы только до начала; дерево задач — реестр; область по реестру возможностей; довести план до конца; git и рабочая копия; диагностика, не повторы; код; гигиена расхода. Это единственное место, где поведение задано текстом. Всё, что можно было сделать детерминированно, вынесено в hook — текст модель может забыть после сжатия, hook нет.
+Seven sections: questions only before the work starts; scope decided by the capability ledger; the task tree as the ledger of work; finish the plan; git and workspace; diagnosis instead of retries; code; cost hygiene. This is the only place where behaviour is set in prose. Everything that could be made deterministic was moved into a hook — prose can be forgotten after compaction, a hook cannot.
 
-### `settings.json` — что и зачем
+### `settings.json` — what and why
 
-| Ключ | Значение | Зачем |
+| Key | Value | Why |
 |---|---|---|
-| `model` | `sonnet` | Sonnet 5 закрывает основную разработку; Opus сжигает отдельное недельное окно `seven_day_opus` |
-| `advisorModel` | `opus` | Sonnet сам зовёт Opus в узловых точках (`/advisor`): расколотые улики, архитектурная развилка. Дешевле, чем весь день на Opus |
-| `effortLevel` | `medium` | сохраняемое умолчание для рутины |
-| `maxEffortLevel` | `high` | потолок: `xhigh`/`max` не выбираются даже случайно; `max` официально «prone to overthinking» |
-| `autoCompactWindow` | не задан | сжатие у предела модели (для Sonnet 5 / Opus 5 — ~1 млн). Решение владельца: одна сессия на весь план, непрерывность контекста дороже цены хода. Если `/usage` покажет `long_context` выше 10 % — `/autocompact 500k` в конкретной сессии, не в настройках |
-| `autoContinueAtUsageLimit` | `true` | ночной прогон при упоре в лимит ждёт сброса и продолжает сам. Днём можно выключить через `--settings` |
-| `promptCacheTtl` / `subagentPromptCacheTtl` | `1h` | на подписке основной разговор и так живёт час, а subagent/fork/сжатие — **5 минут**; поднятие до часа бьёт прямо в `cache_miss` |
-| `workflowKeywordTriggerEnabled` | `false` | слово «ultracode» в тексте больше не разворачивает веер агентов само |
-| `workflowSizeGuideline` | `small` | если workflow всё же запущен — до 5 агентов |
-| `ultracode` | `false` | не xhigh + постоянная оркестрация |
+| `model` | `sonnet` | Sonnet covers the bulk of development; Opus burns its own weekly window (`seven_day_opus`) |
+| `advisorModel` | `opus` | Sonnet calls Opus itself at decision points (`/advisor`): split evidence, an architectural fork. Cheaper than a whole day on Opus |
+| `effortLevel` | `medium` | a persistent default for routine work |
+| `maxEffortLevel` | `high` | a ceiling: `xhigh`/`max` cannot be selected even by accident; `max` is officially "prone to overthinking" |
+| `autoCompactWindow` | unset | compaction happens at the model's own limit (~1M for Sonnet 5 / Opus 5). The owner's decision: one session per plan, continuity of context is worth more than the price of a turn. If `/usage` shows `long_context` above 10 %, use `/autocompact 500k` in that one session, not in the settings |
+| `autoContinueAtUsageLimit` | `true` | an overnight run that hits the limit waits for the reset and continues by itself. Switch it off for the day through `--settings` |
+| `promptCacheTtl` / `subagentPromptCacheTtl` | `1h` | on a subscription the main conversation already gets an hour, but subagents, forks and compaction get **5 minutes**; raising them to an hour hits `cache_miss` directly |
+| `workflowKeywordTriggerEnabled` | `false` | the word "ultracode" in a prompt no longer fans out a swarm of agents by itself |
+| `workflowSizeGuideline` | `small` | if a workflow does start, up to 5 agents |
+| `ultracode` | `false` | no xhigh plus permanent orchestration |
 
 `env`:
 
-| Переменная | Значение | Умолчание Claude Code | Зачем |
+| Variable | Value | Claude Code default | Why |
 |---|---|---|---|
-| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | 3 | **20** | предел одновременного разгона — главная защита пула |
-| `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | 2 | 3 | subagent может породить одного потомка, не дерево |
-| `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` | 60 | 200 | researcher не уходит в бесконечный поиск |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | sonnet | = основная | subagent без явной модели не наследует Opus |
-| `MAX_MCP_OUTPUT_TOKENS` | 8000 | — | ответ MCP-сервера не заливает окно |
-| `CC_*` | — | — | пороги наших hook (ниже) |
+| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | 3 | **20** | the concurrency ceiling — the main protection for the rate-limit pool |
+| `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | 2 | 3 | a subagent may spawn one child, not a tree |
+| `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` | 60 | 200 | researcher cannot wander off into endless search |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | sonnet | = main model | a subagent without an explicit model does not inherit Opus |
+| `MAX_MCP_OUTPUT_TOKENS` | 8000 | — | an MCP server's answer cannot flood the window |
+| `CC_*` | — | — | thresholds for the hooks below |
 
-Что **не** задано и почему: `bashOutputMaxChars` — умолчание (30 тыс. символов, дальше файл + предпросмотр) уже экономит; поднимать его — загонять журнал в разговор.
+What is deliberately **not** set: `bashOutputMaxChars` — the default (30k characters, then a file plus a preview) already saves; raising it only drives logs into the conversation.
 
-### `hooks/` — девять охранников
+### `hooks/` — nine guards
 
-Hook исполняются как процессы вне окна модели: не стоят токенов, не забываются после сжатия, не обсуждаются.
+Hooks run as processes outside the model's window: they cost no tokens, they are not forgotten after compaction, and they are not up for discussion.
 
-| Hook | Событие | Что делает | Какую ошибку снимает |
+| Hook | Event | What it does | Which failure it removes |
 |---|---|---|---|
-| `stop-guard.sh` | `Stop` | пока в `PLAN.md` со `status: running` есть `- [ ]`, отвечает `{"decision":"block","reason":"следующая задача…"}` — Claude Code возвращает модель в работу | «сделала две задачи из ста и встала». Выходы: `NEED_HUMAN`, `.claude/plan-pause`, предел 300 продолжений |
-| `retry-guard.sh` | `PostToolUse(Bash)`, `PostToolUseFailure` | считает одинаковые упавшие команды; на второй вкладывает требование `/diagnose`, на третьей — запрет следующего вызова до `ROOT CAUSE:` + `EVIDENCE:` | цикл «попробовал — не вышло — ещё раз» |
-| `session-start.sh` | `SessionStart` (startup/resume/clear/compact/fork) | вкладывает активный план, открытые задачи, последние записи Log | потеря нити после авто-сжатия или `/clear` ночью |
-| `compress-output.sh` | `PostToolUse(Bash)` | снимает ANSI, схлопывает повторы `(x30)`, длинный вывод в `.claude/scratch/`, модели — голова и хвост через `updatedToolOutput` | 4000 строк журнала в окне на каждый следующий ход |
-| `read-guard.sh` | `PreToolUse(Read)` | файл > 500 строк без `offset/limit` → отказ: «Grep, потом Read окном» | чтение файла целиком ради одной функции — самая частая утечка окна |
-| `guard-subagent.sh` | `PreToolUse(Agent\|Task)` | предел запусков subagent на сессию (40) | безнадзорный разгон |
-| `subagent-evidence.sh` | `SubagentStop` | читает стенограмму subagent'а, считает настоящие вызовы инструментов по именам; «нашёл в src/x.py:12» без единого Grep/Read, «12 passed» без Bash и `COMMAND:`, «NOT FOUND» без поиска → `decision: block`, агент возвращается делать работу; один повтор, потом пропуск | «я сделал» при нуле вызовов инструментов — ложь subagent'а ловится по стенограмме, не по словам |
-| `guard-model-switch.sh` | `PreModelSwitch` | при контексте > 40 тыс. токенов просит подтверждение | `/model` посреди сессии = полная перестройка кэша |
-| `notify.sh` | `Notification`, из stop-guard | уведомление macOS | ты узнаёшь, когда модель действительно упёрлась или закончила |
+| `stop-guard.sh` | `Stop` | while a `PLAN.md` with `status: running` still has `- [ ]`, answers `{"decision":"block","reason":"next task…"}` — Claude Code sends the model back to work | "did two tasks out of a hundred and stopped". Exits: `NEED_HUMAN`, `.claude/plan-pause`, the ceiling of 300 continuations |
+| `retry-guard.sh` | `PostToolUse(Bash)`, `PostToolUseFailure` | counts identical failed commands; on the second it injects a demand to run `/diagnose`, on the third it forbids the next call until `ROOT CAUSE:` + `EVIDENCE:` are written | the "tried, failed, try again" loop |
+| `session-start.sh` | `SessionStart` (startup/resume/clear/compact/fork) | injects the active plan, the open tasks and the last Log entries | losing the thread after auto-compaction or a `/clear` at night |
+| `compress-output.sh` | `PostToolUse(Bash)` | strips ANSI, collapses repeats into `(x30)`, saves long output to `.claude/scratch/`, gives the model head and tail through `updatedToolOutput` | 4000 lines of log living in the window on every later turn |
+| `read-guard.sh` | `PreToolUse(Read)` | a file over 500 lines without `offset/limit` is refused: "Grep first, then Read a window" | reading a whole file for one function — the most common window leak |
+| `guard-subagent.sh` | `PreToolUse(Agent\|Task)` | a per-session ceiling on subagent spawns (40) | unattended fan-out |
+| `subagent-evidence.sh` | `SubagentStop` | reads the subagent's transcript and counts real tool calls by name; "found it in src/x.py:12" with no Grep/Read, "12 passed" with no Bash and no `COMMAND:`, "NOT FOUND" with no search → `decision: block` and the agent goes back to work; one retry, then it steps aside | "I did it" with zero tool calls — a subagent's lie is caught by its transcript, not by its wording |
+| `guard-model-switch.sh` | `PreModelSwitch` | asks for confirmation when the context is over 40k tokens | `/model` mid-session means rebuilding the whole prompt cache |
+| `notify.sh` | `Notification`, and from stop-guard | desktop notification | you learn when the model is genuinely stuck or genuinely finished |
 
-Почему `PreToolUse`, а не `SubagentStart` для предела subagent: выход `SubagentStart` умеет только `additionalContext`, запретить запуск он не может. Почему stop-guard — команда, а не prompt-hook: prompt/agent-hook доступны только для событий инструментов; команда — ноль токенов, ноль задержки.
+Why `PreToolUse` and not `SubagentStart` for the spawn ceiling: `SubagentStart` output only supports `additionalContext`, it cannot deny a spawn. Why stop-guard is a command and not a prompt hook: prompt and agent hooks exist only for tool events; a command costs zero tokens and zero latency.
 
-### `skills/` — шесть процедур
+### `skills/` — seven procedures
 
-Живут в контексте только описанием (все вместе ≤ 1536 символов), тело грузится при вызове.
+Only their descriptions live in context (under 1536 characters all together); the body loads on call.
 
-| Скилл | Кто зовёт | Что гарантирует |
+| Skill | Called by | What it guarantees |
 |---|---|---|
-| `/intake` | ты, раз на репозиторий | `docs/PROJECT.md`: реестр возможностей (`included/available/absent/removed`; нет строки — `absent`, спящий код не требование), список «решает агент», gate checks, что можно без присмотра |
-| `/task` | ты / модель | каталог задачи в твоём формате, словарь и язык из `tasks/README.md`, вопросы один раз, `check.py` — ноль проблем |
-| `/plan` | ты / модель | из `task.txt` → `PLAN.md`: VERIFY → критерии приёмки, `+` → задачи, `−` → границы, DEPENDS → проверка; `T00` — baseline; каждая задача с командой проверки; завершение — `/clear` + `/run` |
-| `/run` | ты / hook | задачи по одной, `[x]` только после проверки, коммит на задачу, `done` только если изделие существует в репозитории, `BLOCKED.md` вместо заглушки, `verify:` не трогает |
-| `/verify` | ты / `/run` на финише | свежий контекст (`verifier`): `VERIFY.md` с «чего я не делал», воспроизведение с чистого состояния, обратный контроль мутацией, «что не проверено» |
-| `/diagnose` | модель после провала / ты | заморозка → версии с машины → уровни (окружение, зависимости, журналы, трасса, состояние, замеры, отладчик) → три гипотезы → документация под версию → чужие обходы только в черновике → советник при расколе → одна правка + регрессионный тест |
+| `/intake` | you, once per repository | `docs/PROJECT.md`: the capability ledger (`included/available/absent/removed`; no row means `absent`, dormant code is not a requirement), the "decided by the agent" list, gate checks, what may run unattended |
+| `/task` | you / the model | a task directory in the tree's format, vocabulary and language taken from `tasks/README.md`, questions asked once, `check.py` at zero problems |
+| `/plan` | you / the model | `task.txt` → `PLAN.md`: VERIFY → acceptance criteria, `+` → tasks, `−` → boundaries, DEPENDS → a dependency check; `T00` is the baseline; every task carries its verify command; it ends with `/clear` + `/run` |
+| `/run` | you / a hook | one task at a time, `[x]` only after the check, a commit per task, `done` only when the artefact exists in the repository, `BLOCKED.md` instead of a stub, `verify:` never touched |
+| `/run-task` | `worker`, or you for a single task | what one task reads, does, verifies, marks and logs — then stops |
+| `/verify` | you / `/run` when it finishes | a fresh context (`verifier`): `VERIFY.md` stating what this context did *not* do, reproduction from a clean state, reverse control by mutation, "what was not checked" |
+| `/diagnose` | the model after a failure / you | freeze → versions off the machine → the levels (environment, dependencies, logs, trace, state, measurements, debugger) → three hypotheses → documentation for the pinned version → third-party workarounds only in scratch → the advisor on split evidence → one fix plus a regression test |
 
-### `agents/` — шесть ролей
+### `agents/` — seven roles
 
-| Агент | Модель | Контекст | Для чего |
+| Agent | Model | Context | For what |
 |---|---|---|---|
-| `Explore` | haiku | без CLAUDE.md | перекрывает встроенный: с 2.1.198 встроенный Explore наследует модель сессии (потолок Opus) |
-| `scout` | haiku | без CLAUDE.md | «где лежит код» — пути и строки, ничего не меняет |
-| `test-runner` | sonnet, low | без CLAUDE.md | прогон тестов, наружу только причины падений. Не Haiku: выдуманный «12 passed» не самоисправляется, в отличие от выдуманного пути |
-| `researcher` | sonnet, medium | без CLAUDE.md | незнакомая подсистема, документация под версию, ссылки вместо цитат |
-| `reviewer` | opus, high | с CLAUDE.md | придирчивая проверка значимых правок, `FILE:LINE → что сломается` |
-| `verifier` | sonnet, high | с CLAUDE.md | независимая приёмка по `VERIFY.md`, единственный, кто ставит `verify:` |
+| `Explore` | haiku | without CLAUDE.md | overrides the built-in one: since 2.1.198 the built-in Explore inherits the session's model (Opus ceiling) |
+| `scout` | haiku | without CLAUDE.md | "where the code lives" — paths and lines, changes nothing |
+| `test-runner` | sonnet, low | without CLAUDE.md | runs tests, returns only the reasons for failures. Not Haiku: an invented "12 passed" does not self-correct, unlike an invented path |
+| `researcher` | sonnet, medium | without CLAUDE.md | an unfamiliar subsystem, documentation for the pinned version, links instead of paraphrase |
+| `reviewer` | opus, high | with CLAUDE.md | adversarial review of significant changes, `FILE:LINE → what breaks` |
+| `verifier` | sonnet, high | with CLAUDE.md | independent acceptance through `VERIFY.md`, the only one that sets `verify:` |
+| `worker` | sonnet, high | with CLAUDE.md | one plan task in a fresh context, two lines back; only in delegate mode |
 
-Все агенты заканчивают строкой `TOOLS USED: Grep:3 Read:2`; hook сверяет её со стенограммой. Haiku оставлен только там, где ложь самоисправляется на следующем шаге: путь от scout главная сессия сразу читает — выдуманный путь упадёт на первом же Read.
+Every agent ends with a line like `TOOLS USED: Grep:3 Read:2`; a hook compares it against the transcript. Haiku is kept only where a lie self-corrects on the next step: a path from scout is read immediately by the main session, so an invented path fails at the first Read.
 
-Нет агента `builder` намеренно: реализацию делает главная сессия — у неё тёплый кэш и весь контекст; subagent нужен, чтобы изолировать шум, не чтобы писать код.
+There is deliberately no `builder` agent: implementation is done by the main session, which has a warm cache and the whole context. A subagent exists to isolate noise, not to write code.
 
 ### `statusline.sh`
 
 `alpha  Sonnet 5/medium  ctx 43%  5h 62%/38m  7d 88%  cache cold:ttl_expired_5m 84k  hit 91%`
 
-Читает JSON строки состояния: `rate_limits.five_hour/seven_day`, `prompt_cache.warm/ttl/hit_ratio/last_miss_cause/recache_tokens_if_cold`, `context_window.used_percentage`. Всё первичное, от самого Claude Code. `cache cold:<причина>` — из закрытого перечня `system_prompt_changed | tools_changed | model_changed | messages_rewritten | ttl_expired_5m | ttl_expired_1h`.
+Reads the status-line JSON: `rate_limits.five_hour/seven_day`, `prompt_cache.warm/ttl/hit_ratio/last_miss_cause/recache_tokens_if_cold`, `context_window.used_percentage`. All of it first-hand, from Claude Code itself. `cache cold:<cause>` comes from the closed set `system_prompt_changed | tools_changed | model_changed | messages_rewritten | ttl_expired_5m | ttl_expired_1h`.
 
 ### `night.sh`
 
-`cc-night tasks/10-x/03-y` → план в `running`, снимает паузу, `claude --dangerously-skip-permissions --effort high --settings '{"autoContinueAtUsageLimit":true}' "/run …"`. Только в песочнице без боевых ключей — твой выбор, твоя ответственность.
+`cc-night tasks/10-x/03-y` → the plan goes `running`, the pause file is cleared, then `claude --dangerously-skip-permissions --effort high --settings '{"autoContinueAtUsageLimit":true}' "/run …"`. Sandbox without production credentials only — your choice, your responsibility.
 
 ### `project-template/`
 
-Копируется в новый репозиторий: `AGENTS.md` (40 строк, для всех агентов) + `CLAUDE.md` = `@AGENTS.md`; `docs/PROJECT.md`; пример `.claude/rules/*.md` с `paths:`; `scripts/project_check.py`; `tasks/` с README/PROTOCOL/GOAL/ROLES/DECISIONS и обобщённым `check.py` (словарь из README/ROLES/GOAL, двуязычные маркеры, проверка ссылок `путь:строка`).
+Copied into a new repository: `AGENTS.md` (40 lines, for every agent) + `CLAUDE.md` = `@AGENTS.md`; `docs/PROJECT.md`; an example `.claude/rules/*.md` with `paths:`; `scripts/project_check.py`; and `tasks/` with README/PROTOCOL/GOAL/ROLES/DECISIONS plus a generic `check.py` (vocabulary from README/ROLES/GOAL, bilingual markers, `path:line` reference checking).
 
-## 3a. Как исполняется план — одна длинная сессия
+## 3a. How a plan is executed — one long session
 
-Решение принято: `/run` работает в одной сессии на весь план, без `/clear` и ручного `/compact` между задачами, без перезапуска на задачу. Контекст модели (до 1 млн) — память «почему»: решение, принятое в T03, известно в T17 не по пересказу в Log, а напрямую. Второй режим, `/run … delegate` (координатор + `worker` на задачу), включается только словом «delegate».
+The decision: `/run` works in one session for the whole plan, with no `/clear` and no manual `/compact` between tasks, and no restart per task. The model's context (up to 1M) is the memory of *why*: a decision made in T03 is known in T17 directly, not through a paraphrase in the Log. The second mode, `/run … delegate` (a coordinator plus one `worker` per task), is only switched on by the word "delegate".
 
-| Режим | Кто держит состояние между задачами | Что растёт | Цена |
+| Mode | What holds state between tasks | What grows | Price |
 |---|---|---|---|
-| одна сессия (по умолчанию) | контекст сессии + `PLAN.md` | история: до предела модели, потом сжатие | с каждой задачей пересылается больше кэша; «серая зона» внимания в очень длинном контексте |
-| `delegate` | `PLAN.md`; координатор хранит по строке на задачу | контекст координатора, медленно (~100–300 токенов на задачу) | каждый worker — холодный старт 10–20 тыс. токенов записи кэша и нулевая память о предыдущих задачах |
+| one session (default) | the session's context + `PLAN.md` | the history: up to the model's limit, then compaction | more cache resent with every task; an attention grey zone in a very long context |
+| `delegate` | `PLAN.md`; the coordinator keeps one line per task | the coordinator's context, slowly (~100–300 tokens per task) | every worker is a cold start of 10–20k tokens of cache write with zero memory of earlier tasks |
 
-Честная арифметика. Сто задач в одной сессии — контекст дорастает до сотен тысяч токенов, и каждый ход пересылает его целиком как чтение кэша. Сто холодных стартов — 1–2 млн токенов записи кэша, но ни одной задачи с памятью о предыдущей. Первое дороже в токенах чтения, второе — в потерянных «почему» и в повторных ошибках, которые память бы предотвратила. Ты выбрал память; харнес делает так, чтобы она стоила как можно меньше:
+The honest arithmetic. A hundred tasks in one session grow the context to hundreds of thousands of tokens, and every turn resends all of it as a cache read. A hundred cold starts cost 1–2M tokens of cache write, but not one task remembers the previous one. The first is more expensive in read tokens, the second in lost *why* and in repeated mistakes that memory would have prevented. This harness chooses memory and then makes it as cheap as possible:
 
-- шум не входит в контекст: поиск — `scout`, тесты и сборки — `test-runner`, документация — `researcher`; в главной сессии остаётся резюме и `TOOLS USED`;
-- `compress-output` схлопывает повторы и режет длинный вывод (полный — в `.claude/scratch/`), `read-guard` не даёт читать файлы целиком;
-- `promptCacheTtl: 1h` — пауза между ходами до часа не роняет кэш; смена модели или effort посреди прогона запрещена контрактом (она кэш роняет);
-- `autoCompactWindow` не задан — сжатие не наступает раньше предела модели; если наступило, `session-start` (`source: compact`) возвращает план, счётчики и хвост Log;
-- сам план — единственный источник истины: `## Decisions`, `## Assumptions`, `## Log`, `NOTES.md` задачи, `docs/PROJECT.md`. Даже после сжатия «почему» восстанавливается из файлов, а не из памяти.
+- noise never enters the context: search goes to `scout`, tests and builds to `test-runner`, documentation to `researcher`; the main session keeps the summary and the `TOOLS USED` line;
+- `compress-output` collapses repeats and cuts long output (the full text goes to `.claude/scratch/`), `read-guard` refuses whole-file reads;
+- `promptCacheTtl: 1h` — a pause of up to an hour between turns does not drop the cache; switching model or effort mid-run is forbidden by the contract, because that does drop it;
+- `autoCompactWindow` is unset, so compaction does not arrive before the model's limit; when it does, `session-start` (`source: compact`) brings back the plan, the counters and the tail of the Log;
+- the plan itself is the single source of truth: `## Decisions`, `## Assumptions`, `## Log`, the task's `NOTES.md`, `docs/PROJECT.md`. Even after compaction the *why* is recovered from files, not from memory.
 
-## 4. Как это бьёт по трём твоим болям
+## 4. How this addresses the three complaints it was built against
 
-**«Вопросы посреди задачи».** Механика: `/intake` и `/task`/`/plan` собирают всё через `AskUserQuestion` пачками до 4; контракт запрещает спрашивать после `status: running`; развилка → выбор + запись в `## Assumptions`; единственный выход — `NEED_HUMAN`, и только когда все оставшиеся задачи заблокированы. `docs/PROJECT.md` §4 «решает агент» и §5 «что можно ночью» делают большинство будущих вопросов заранее отвеченными.
+**"Questions in the middle of a task."** The mechanism: `/intake` and `/task`/`/plan` collect everything through `AskUserQuestion` in batches of up to 4; the contract forbids asking once a plan is `running`; a fork becomes a choice plus a line under `## Assumptions`; the only exit is `NEED_HUMAN`, and only when every remaining task is blocked. Sections 4 ("decided by the agent") and 5 ("what may run unattended") of `docs/PROJECT.md` answer most future questions in advance.
 
-**«Сделала две задачи и встала».** Три слоя: контракт; `stop-guard` (детерминированный, официальный контракт Stop-hook `decision: block`); `/goal` — встроенный, ты набираешь его перед уходом, внутри тоже Stop-hook, но с повторами при сбоях API (1/5/15 мин) и ожиданием сброса лимита. `autoContinueAtUsageLimit` + `session-start` закрывают лимит и сжатие. `T00` baseline отделяет свои падения от чужих — иначе ночью модель начнёт «чинить» то, что было красным до неё.
+**"It did two tasks and stopped."** Three layers: the contract; `stop-guard` (deterministic, the documented Stop-hook `decision: block`); and `/goal` — built in, typed by you before you leave, internally also a Stop hook but with retries on API failures (1/5/15 min) and waiting out a usage-limit reset. `autoContinueAtUsageLimit` plus `session-start` cover the limit and compaction. The `T00` baseline separates its own failures from pre-existing ones — otherwise the model spends the night "fixing" what was already red.
 
-**«Попробовал — не вышло — ещё раз».** `retry-guard` ловит вторую одинаковую упавшую команду — ровно момент «поправил файл, та же команда снова упала»; `/diagnose` — протокол с обязательным `ROOT CAUSE:`+`EVIDENCE:` до правки, версиями с машины, документацией под версию, обходами только в черновике; `/advisor` (Opus) при расколе улик. Дерево задач добавляет обратный контроль: проверка, которая никогда не была красной, не считается.
+**"Tried, failed, try again."** `retry-guard` catches the second identical failed command — exactly the moment of "edited the file, the same command failed again"; `/diagnose` is a protocol with a mandatory `ROOT CAUSE:` + `EVIDENCE:` before any edit, versions read off the machine, documentation for the pinned version, and workarounds reproduced in scratch first; `/advisor` (Opus) when the evidence is split. The task tree adds reverse control: a check that was never red does not count.
 
-**Меньше ошибок вообще.** Из твоего дерева: `done` = изделие существует; OUTCOME вне репозитория не закрывает исполнитель; `verify:` ставит другой контекст с записью «чего я не делал»; `−` в SCOPE — граница; `BLOCKED.md` вместо заглушки; каждое число несёт источник. Из vibe: реестр возможностей (не строить лишнего из спящего кода), запрет `stash/reset/clean`, архитектура как проверка (`import-linter`), а не абзац.
+**Fewer mistakes in general.** From the task tree: `done` means the artefact exists; an OUTCOME outside the repository is not closed by the executor; `verify:` is set by another context that records what it did not do; a `−` line in SCOPE is a boundary; `BLOCKED.md` instead of a stub; every number carries a source. Plus: a capability ledger (so nothing extra is built out of dormant code), a ban on `stash/reset/clean`, and architecture expressed as a check (`import-linter`) rather than a paragraph.
 
-## 5. Как экономятся токены
+## 5. Where the tokens are saved
 
-Модель расхода: **контекст — это аренда, платишь каждым ходом.** Что вошло в окно, пересылается на каждом следующем запросе до `/clear`. Значит, рычаги — на входе в окно и на границах сессий, а не на выходе модели.
+The cost model: **context is rent, paid on every turn.** Whatever entered the window is resent with every later request until `/clear`. So the levers are at the entrance to the window and at session boundaries, not on the model's output.
 
-| Рычаг | Механизм | Что даёт |
+| Lever | Mechanism | What it buys |
 |---|---|---|
-| Кэш не ломается | одна модель и effort на сессию; `guard-model-switch`; `/output-style` вместо правки CLAUDE.md посреди сессии; `tools_changed` закрыт в 2.1.267 отложенными описаниями | промах кэша = вся история без кэша. Причины промаха видны в statusline |
-| TTL 1 час для subagent | `subagentPromptCacheTtl` | по умолчанию subagent/fork/сжатие — 5 минут; каждый повторный запуск платил запись кэша заново |
-| Границы сессий | `/clear` между задачами (0 запросов), `/compact` перед уходом (пока тёплый), `/rewind` вместо переубеждения; план на диске переживает всё | `long_context` и `cache_miss` — две из пяти статей расхода, которые `/usage` умеет показать |
-| Память вместо порога сжатия | `autoCompactWindow` не задан; одна сессия на план | по токенам ход на 900 тыс. дороже хода на 300 тыс. в три раза даже из кэша, но потеря нити после сжатия стоит дороже — переделка. Контекст держат малым не порогом, а тем, что шум уходит в subagent и hook режут вывод |
-| Что попадает в окно | `read-guard` (файл окном, не целиком), `compress-output` (журналы схлопнуты, длинное — в файл), `MAX_MCP_OUTPUT_TOKENS`, subagent для шума с `omitClaudeMd` | каждая строка вывода живёт в окне до `/clear` |
-| Дешёвые модели там, где хватает | `Explore`/`scout`/`test-runner` на Haiku; `researcher` на Sonnet medium; `SUBAGENT_MODEL=sonnet` | встроенный Explore с 2.1.198 шёл бы по модели сессии |
-| Разгон под контролем | `MAX_CONCURRENT_SUBAGENTS=3` (было 20), глубина 2, `guard-subagent` 40/сессия, workflow `small`, ultracode выкл, keyword выкл | `subagent_heavy` и `high_parallel` — ещё две статьи из пяти |
-| Потолок рассуждения | `maxEffortLevel: high`, `effortLevel: medium` | «Higher effort … uses your limits faster» — текст самого Claude Code |
-| Не Opus по умолчанию | Sonnet + advisor Opus | отдельное недельное окно Opus не сжигается рутиной |
-| Наблюдаемость | statusline, `/usage` (пять поведений с порогом 10 %, верхние subagent/скиллы/MCP), `/cost`, `/skill-doctor`, `/insights` | сначала измерить, потом крутить. Без этого настройка — гадание |
+| The cache stays warm | one model and one effort per session; `guard-model-switch`; `/output-style` instead of editing CLAUDE.md mid-session; `tools_changed` closed in 2.1.267 by deferred tool descriptions | a cache miss means the whole history uncached. The miss cause is visible in the status line |
+| 1-hour TTL for subagents | `subagentPromptCacheTtl` | by default subagents, forks and compaction get 5 minutes, so every relaunch paid for the cache write again |
+| Session boundaries | `/clear` between unrelated jobs (0 requests), `/compact` before leaving (while it is still warm), `/rewind` instead of arguing; the plan on disk survives all of it | `long_context` and `cache_miss` are two of the five cost behaviours `/usage` can show |
+| Memory instead of a compaction threshold | `autoCompactWindow` unset; one session per plan | in tokens, a turn at 900k costs three times a turn at 300k even from cache — but losing the thread after compaction costs more, in rework. The context is kept small not by a threshold but by noise going to subagents and hooks trimming output |
+| What gets into the window at all | `read-guard` (a window, not a whole file), `compress-output` (logs collapsed, long output to a file), `MAX_MCP_OUTPUT_TOKENS`, subagents with `omitClaudeMd` for noise | every line of output lives in the window until `/clear` |
+| Cheap models where they suffice | `Explore`/`scout` on Haiku; `test-runner` and `researcher` on Sonnet; `SUBAGENT_MODEL=sonnet` | since 2.1.198 the built-in Explore would otherwise run on the session's model |
+| Fan-out under control | `MAX_CONCURRENT_SUBAGENTS=3` (was 20), depth 2, `guard-subagent` at 40/session, workflows `small`, ultracode off, keyword trigger off | `subagent_heavy` and `high_parallel` are two more of the five |
+| A reasoning ceiling | `maxEffortLevel: high`, `effortLevel: medium` | "Higher effort … uses your limits faster" — Claude Code's own wording |
+| Not Opus by default | Sonnet plus an Opus advisor | the separate weekly Opus window is not burned on routine |
+| Observability | the status line, `/usage` (five behaviours with a 10 % threshold, top subagents/skills/MCP), `/cost`, `/skill-doctor`, `/insights` | measure first, then tune. Without this, tuning is guessing |
 
-Чего harness **не** делает и честно об этом: не сжимает выходные токены модели (caveman-стили — минус для профиля, где расход в кэше и входе); не считает доллары (на подписке они бессмысленны); не обещает процентов — их покажет твой `/usage` через неделю.
+What this harness does **not** do, stated plainly: it does not compress the model's output tokens (caveman styles are a net loss for a profile where the spend is in cache and input); it does not count dollars (meaningless on a subscription); and it promises no percentages — your own `/usage` will show them after a week.
 
-## 6. Что ты делаешь руками
+## 6. What you do by hand
 
-- Раз на репозиторий: `/intake`, скопировать `project-template/`.
-- Новая работа: `/task`, ответить на вопросы; `/plan`, ответить; `/clear`; `/run` или `cc-night`.
-- Перед уходом на ночь: `/goal all tasks in <PLAN.md> are [x] or [!]` — ремень поверх подтяжек.
-- Утром: `## Log`, `## Assumptions`, `BLOCKED.md`; `/verify` на закрытое; `python3 tasks/check.py`.
-- Раз в день: `/usage` — какие из пяти поведений выше 10 %; раз в неделю `/skill-doctor`, `/insights`.
-- При изменении своих привычек — `~/.claude/CLAUDE.md`, не CLAUDE.md проекта.
+- Once per repository: `/intake`, and copy `project-template/`.
+- New work: `/task`, answer the questions; `/plan`, answer; `/clear`; then `/run` or `cc-night`.
+- Before leaving for the night: `/goal all tasks in <PLAN.md> are [x] or [!]` — belt over braces.
+- In the morning: `## Log`, `## Assumptions`, `BLOCKED.md`; `/verify` on what was closed; `python3 tasks/check.py`.
+- Once a day: `/usage` — which of the five behaviours is above 10 %; once a week: `/skill-doctor`, `/insights`.
+- When your own habits change: edit `~/.claude/CLAUDE.md`, not the project's `CLAUDE.md`.
 
-## 7. Границы
+## 7. Limits
 
-- `retry-guard` видит только одинаковую команду; «поправил — упала другая» ловит лишь контракт.
-- `stop-guard` проверяет факт `[x]`, не качество: если модель поставит `[x]` без прохождения проверки, hook этого не увидит — увидит `/verify` и утренний `## Log`.
-- `read-guard` можно обойти через `cat` в Bash; тогда сработает `compress-output`. Полной непроницаемости нет и не будет — hook снижают частоту, не исключают.
-- Ночной `--dangerously-skip-permissions` — без песочницы это не harness, а риск.
-- Всё измерено на 2.1.272. Следующие выпуски меняют hook и кэш каждую неделю (в 2.1.257–2.1.271 — больше двадцати правок кэша); после обновления — `/skill-doctor` и статус hook в `/hooks`.
+- `retry-guard` only sees an identical command; "edited it and a different one failed" is caught by the contract alone.
+- `stop-guard` checks the fact of `[x]`, not its quality: if the model marks `[x]` without the check passing, the hook will not notice — `/verify` and the morning `## Log` will.
+- `read-guard` can be bypassed with `cat` in Bash; then `compress-output` takes over. There is no full impermeability and there will not be — hooks lower the frequency, they do not eliminate.
+- The overnight `--dangerously-skip-permissions` is not a harness without a sandbox; it is a risk.
+- Everything was measured on 2.1.272. Later releases change hooks and caching every week (2.1.257–2.1.271 carried more than twenty cache changes); after an upgrade, run `/skill-doctor` and check hook status in `/hooks`.
