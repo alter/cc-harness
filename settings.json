@@ -1,0 +1,137 @@
+{
+  "model": "sonnet",
+  "advisorModel": "opus",
+  "effortLevel": "medium",
+  "maxEffortLevel": "high",
+  "modelSettings": {
+    "claude-opus-5": {
+      "maxEffortLevel": "high"
+    }
+  },
+  "autoCompactEnabled": true,
+  "autoContinueAtUsageLimit": true,
+  "promptCacheTtl": "1h",
+  "subagentPromptCacheTtl": "1h",
+  "workflowKeywordTriggerEnabled": false,
+  "workflowSizeGuideline": "small",
+  "ultracode": false,
+  "includeCoAuthoredBy": false,
+  "env": {
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "3",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2",
+    "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "60",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
+    "MAX_MCP_OUTPUT_TOKENS": "8000",
+    "CC_SUBAGENT_BUDGET": "40",
+    "CC_STOP_GUARD_CAP": "300",
+    "CC_SWITCH_CTX_LIMIT": "40000",
+    "CC_READ_GUARD_LINES": "500",
+    "CC_COMPRESS_MIN_LINES": "40"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  },
+  "hooks": {
+    "PreModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/guard-model-switch.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/guard-subagent.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/read-guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/compress-output.sh",
+            "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/retry-guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/retry-guard.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/stop-guard.sh",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|idle_prompt|usage_limit|elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/subagent-evidence.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
