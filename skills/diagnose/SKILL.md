@@ -58,7 +58,7 @@ Search the exact error string plus the library name. Any workaround found:
 
 ## 7. Conflict escalation
 
-If two hypotheses remain with split evidence, or the docs contradict observed behavior, get one outside opinion with the evidence table. Use the `advisor` tool when this session has it. It is not always there: `advisorModel` only takes effect when the account's gate allows it (`CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL=1` forces it on, and `claude --debug` prints either `[AdvisorTool] Server-side tool enabled …` or `[AdvisorTool] Skipping advisor - …`). When it is absent, say so in one line and send the evidence table to the `reviewer` subagent on Opus instead. Do not commit to a branch on a coin flip, and do not report advice from a tool that never ran.
+If two hypotheses remain with split evidence, or the docs contradict observed behavior, get one outside opinion with the evidence table. Use the `advisor` tool when this session has it — it is a server-side tool in your own tool list, not something `ToolSearch` or the agent list can find. It is not always there: `advisorModel` only takes effect when the account's gate allows it (`CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL=1` forces it on, and `claude --debug` prints either `[AdvisorTool] Server-side tool enabled …` or `[AdvisorTool] Skipping advisor - …`). When it is absent, say so in one line and send the evidence table to the `reviewer` subagent on Opus instead. Do not commit to a branch on a coin flip, and do not report advice from a tool that never ran.
 
 ## 8. Fix once
 
