@@ -5,6 +5,7 @@ set -uo pipefail
 SRC=$(cd "$(dirname "$0")" && pwd)
 TARGET=${1:-$SRC}
 TARGET=${TARGET/#\~/$HOME}
+TARGET=$(cd "$TARGET" 2>/dev/null && pwd || echo "$TARGET")
 H="$TARGET/hooks"
 [ -d "$H" ] || { echo "no hooks dir at $H" >&2; exit 1; }
 
@@ -22,6 +23,10 @@ echo "== syntax"
 for f in "$H"/*.sh "$TARGET/statusline.sh"; do
   if bash -n "$f" 2>/dev/null; then ok "bash -n $(basename "$f")"; else bad "bash -n $(basename "$f")" "syntax error"; fi
 done
+if [ "$TARGET" = "$SRC" ]; then
+  echo "  NOTE  testing the source tree; hooks wired into another config dir are reported as SKIP."
+  echo "        To check what is actually installed: $0 ~/.claude"
+fi
 if [ -f "$TARGET/settings.json" ]; then
   if jq -e . "$TARGET/settings.json" >/dev/null 2>&1; then ok "settings.json is JSON"; else bad "settings.json is JSON" "invalid"; fi
   for cmd in $(jq -r '.. | .command? // empty' "$TARGET/settings.json" | grep -E '\.sh$'); do

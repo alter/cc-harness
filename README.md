@@ -6,9 +6,10 @@ Every mechanism here was verified against the Claude Code 2.1.272 binary.
 ## Install
 
 ```bash
-./selftest.sh                       # 50 hook checks, installs nothing
+./selftest.sh                       # 50 hook checks on the checkout, installs nothing
 ./install.sh ~/.claude-harness-test # trial copy; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
 ./install.sh                        # into ~/.claude: backup → files → settings.json merge → checks
+./selftest.sh ~/.claude             # the same checks against what is now installed
 ./uninstall.sh ~/.claude-backup/<stamp>   # rollback
 ```
 

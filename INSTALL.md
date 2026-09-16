@@ -47,6 +47,11 @@ What gets checked (nothing is written outside a temporary directory; counter sta
 - `subagent-evidence` also accepts a code-graph call (`mcp__…graph…__*`) as search evidence for scout;
 - `statusline` against a sample JSON renders the directory, model, context, 5h, 7d, the cold-cache cause and the hit ratio.
 
+`./selftest.sh` with no argument tests the checkout, so the hook paths inside its `settings.json`
+(`~/.claude/hooks/...`) point somewhere else and are reported as `SKIP` — that is the source tree
+being checked, not a problem. After installing, run `./selftest.sh ~/.claude`: the same checks run
+against the installed copy and every `SKIP` becomes a `PASS` ("hook exists+x"), so the total grows.
+
 The last line must read `passed N, failed 0`. If it does not, do not install — send the output.
 
 ## 3. A trial install into a separate directory, leaving `~/.claude` alone
