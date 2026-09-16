@@ -93,6 +93,18 @@ touch "$proj/.claude-pause-probe"; mkdir -p "$proj/.claude"; touch "$proj/.claud
 out=$(sp "stopping" | HOME="$TMP" "$H/stop-guard.sh"); check_empty "plan-pause releases" "$out"
 rm -f "$proj/.claude/plan-pause"
 out=$(sp "x" | CC_STOP_GUARD_CAP=1 HOME="$TMP" "$H/stop-guard.sh"); check_empty "cap reached releases (counter already at 1)" "$out"
+
+stallproj="$TMP/stall"; mkdir -p "$stallproj/docs/plans"
+printf -- '---\nstatus: running\n---\n# S\n## Tasks\n- [ ] T01 a\n- [ ] T02 b\n- [ ] T03 c\n## Log\n' > "$stallproj/docs/plans/s.md"
+stp() { jq -n --arg c "$stallproj" '{cwd:$c,session_id:"stall-case",last_assistant_message:"stopping"}'; }
+blocks=0
+for i in 1 2 3; do out=$(stp | HOME="$TMP" "$H/stop-guard.sh"); printf '%s' "$out" | grep -q '"block"' && blocks=$((blocks+1)); done
+[ "$blocks" -eq 3 ] && ok "stop-guard blocks while the plan may still move (3)" || bad "stop-guard blocks while the plan may still move (3)" "blocked $blocks times"
+out=$(stp | HOME="$TMP" "$H/stop-guard.sh"); check_empty "stalled plan releases after CC_STOP_GUARD_STALL blocks" "$out"
+out=$(stp | HOME="$TMP" "$H/stop-guard.sh"); check_empty "stalled plan stays released while nothing changes" "$out"
+sed -i.bak 's/- \[ \] T01/- [x] T01/' "$stallproj/docs/plans/s.md"
+out=$(stp | HOME="$TMP" "$H/stop-guard.sh"); check "a closed task resumes blocking" "$out" '"decision": *"block"'
+
 out=$(jq -n --arg c "$proj" '{cwd:$c,source:"compact"}' | "$H/session-start.sh")
 check "session-start after compact re-injects plan" "$out" 'Context was just compacted.*2 open, 1 blocked'
 check "session-start carries last log" "$out" 'T00 done: baseline green'

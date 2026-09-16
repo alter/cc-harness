@@ -76,6 +76,7 @@ Seven sections: questions only before the work starts; scope decided by the capa
 | `CLAUDE_CODE_SUBAGENT_MODEL` | sonnet | = main model | a subagent without an explicit model does not inherit Opus |
 | `MAX_MCP_OUTPUT_TOKENS` | 8000 | — | an MCP server's answer cannot flood the window |
 | `CC_*` | — | — | thresholds for the hooks below |
+| `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` | 400 | **8** | one finished task is one more consecutive block; the default would override the Stop hook at task nine |
 
 What is deliberately **not** set: `bashOutputMaxChars` — the default (30k characters, then a file plus a preview) already saves; raising it only drives logs into the conversation.
 
@@ -85,7 +86,7 @@ Hooks run as processes outside the model's window: they cost no tokens, they are
 
 | Hook | Event | What it does | Which failure it removes |
 |---|---|---|---|
-| `stop-guard.sh` | `Stop` | while a `PLAN.md` with `status: running` still has `- [ ]`, answers `{"decision":"block","reason":"next task…"}` — Claude Code sends the model back to work | "did two tasks out of a hundred and stopped". Exits: `NEED_HUMAN`, `.claude/plan-pause`, the ceiling of 300 continuations |
+| `stop-guard.sh` | `Stop` | while a `PLAN.md` with `status: running` still has `- [ ]`, answers `{"decision":"block","reason":"next task…"}` — Claude Code sends the model back to work; releases the turn once the open-task count stops changing (3 blocks) | "did two tasks out of a hundred and stopped". Exits: `NEED_HUMAN`, `.claude/plan-pause`, 300 continuations, or a plan that is not advancing. Claude Code caps *consecutive* blocks at 8 by default, which would end a plan at task nine: `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=400` moves that ceiling above ours |
 | `retry-guard.sh` | `PostToolUse(Bash)`, `PostToolUseFailure` | counts identical failed commands; on the second it injects a demand to run `/diagnose`, on the third it forbids the next call until `ROOT CAUSE:` + `EVIDENCE:` are written | the "tried, failed, try again" loop |
 | `session-start.sh` | `SessionStart` (startup/resume/clear/compact/fork) | injects the active plan, the open tasks and the last Log entries | losing the thread after auto-compaction or a `/clear` at night |
 | `compress-output.sh` | `PostToolUse(Bash)` | strips ANSI, collapses repeats into `(x30)`, saves long output to `.claude/scratch/`, gives the model head and tail through `updatedToolOutput` | 4000 lines of log living in the window on every later turn |

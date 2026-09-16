@@ -27,7 +27,7 @@ du -sh ~/claude-full-*.tgz
 
 Check that the archive is readable: `tar tzf ~/claude-full-*.tgz | head`.
 
-## 2. Checks without installing — 55 hook checks on synthetic input
+## 2. Checks without installing — 59 hook checks on synthetic input
 
 ```bash
 git clone https://github.com/alter/cc-harness && cd cc-harness
@@ -40,7 +40,7 @@ What gets checked (nothing is written outside a temporary directory; counter sta
 - `read-guard`: refuses a 600-line file, allows it with `offset/limit`, allows `.md` regardless of size;
 - `compress-output`: 300 identical lines become `(x300)`, long output becomes head/tail plus a file in `.claude/scratch/`, short output is untouched;
 - `retry-guard`: the first failure is silent, the second (with different whitespace — the same command) points at `/diagnose`, the third demands `ROOT CAUSE` before the next call, a success resets the counter;
-- `stop-guard`: a plan with 2 open tasks produces `decision: block` naming the next task; `NEED_HUMAN`, `.claude/plan-pause`, the ceiling, and zero open tasks each release it;
+- `stop-guard`: a plan with 2 open tasks produces `decision: block` naming the next task; `NEED_HUMAN`, `.claude/plan-pause`, the ceiling, and zero open tasks each release it; a plan whose open count does not change is blocked three times and then released, and closing a task resumes blocking;
 - `session-start` after compaction produces a line with "2 open, 1 blocked" and the tail of the Log;
 - `subagent-evidence`: a scout with no tool calls is blocked; with Grep+Read and a path it passes; without a path it is blocked; `NOT FOUND` with no calls is blocked; a test-runner with no Bash or no `COMMAND:` is blocked; a worker with no Edit/Write/Bash is blocked; `NOT DONE` and `stop_hook_active` pass;
 - `guard-subagent` 1/2 and 2/2 allow, 3/2 denies; `guard-model-switch` asks at 50k, allows at 1k;

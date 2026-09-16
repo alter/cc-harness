@@ -3,6 +3,7 @@
 set -uo pipefail
 
 CAP=${CC_STOP_GUARD_CAP:-300}
+STALL=${CC_STOP_GUARD_STALL:-3}
 NOTIFY="$HOME/.claude/hooks/notify.sh"
 
 payload=$(cat)
@@ -46,6 +47,29 @@ if [ "$count" -ge "$CAP" ]; then
   [ -x "$NOTIFY" ] && "$NOTIFY" "Stop-guard cap reached" "$rel: $open open after $CAP continuations" || true
   exit 0
 fi
+
+# Release the turn when the plan stops advancing. Blocking is only justified while
+# work is being closed: if the open-task count is unchanged across STALL
+# consecutive blocks, the model has nothing it can do here (a stale plan left
+# running, every remaining task waiting on something) and further blocks would
+# just burn continuations until Claude Code overrides the hook anyway.
+stall_file="$state_dir/$session.open"
+prev=""
+[ -f "$stall_file" ] && prev=$(cat "$stall_file" 2>/dev/null || echo "")
+prev_open=${prev%%:*}
+prev_state=${prev#*:}
+stalls=0
+if [ -n "$prev" ] && [ "$prev_open" = "$open" ]; then
+  # Already released on this count: stay out of the way until the plan moves.
+  [ "$prev_state" = "stalled" ] && exit 0
+  case "$prev_state" in ''|*[!0-9]*) stalls=0 ;; *) stalls=$prev_state ;; esac
+fi
+if [ "$stalls" -ge "$STALL" ]; then
+  echo "$open:stalled" > "$stall_file"
+  [ -x "$NOTIFY" ] && "$NOTIFY" "Plan not advancing" "$rel: $open open, unchanged after $STALL continuations" || true
+  exit 0
+fi
+echo "$open:$(( stalls + 1 ))" > "$stall_file"
 echo $(( count + 1 )) > "$counter"
 
 next=$(grep -E '^- \[ \] ' "$plan" | head -n 3 | sed -E 's/^- \[ \] //' | tr '\n' ';' | sed 's/;$//')

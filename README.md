@@ -6,7 +6,7 @@ Every mechanism here was verified against the Claude Code 2.1.272 binary.
 ## Install
 
 ```bash
-./selftest.sh                       # 55 hook checks on the checkout, installs nothing
+./selftest.sh                       # 59 hook checks on the checkout, installs nothing
 ./install.sh ~/.claude-harness-test # trial copy; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
 ./install.sh                        # into ~/.claude: backup → files → settings.json merge → checks
 ./selftest.sh ~/.claude             # the same checks against what is now installed
@@ -33,7 +33,8 @@ After that there are no questions, by the contract in `~/.claude/CLAUDE.md`: at 
 Three layers, cheapest first:
 
 - **The contract** (`CLAUDE.md` + the `/run` skill): never end a turn while a `- [ ]` remains; mark `[x]` only after the verify command passes; `[!] BLOCKED` is allowed in exactly three cases.
-- **`hooks/stop-guard.sh`** (`Stop` event): while a plan with `status: running` still has `- [ ]`, it answers `{"decision":"block","reason":"…next task…"}` and Claude Code sends the model back to work. That is the documented Stop-hook contract. Exits: the literal `NEED_HUMAN` in the last message, the file `.claude/plan-pause`, or the `CC_STOP_GUARD_CAP` ceiling (300 continuations per session). Every exit sends a desktop notification.
+- **`hooks/stop-guard.sh`** (`Stop` event): while a plan with `status: running` still has `- [ ]`, it answers `{"decision":"block","reason":"…next task…"}` and Claude Code sends the model back to work. That is the documented Stop-hook contract. Exits: the literal `NEED_HUMAN` in the last message, the file `.claude/plan-pause`, the `CC_STOP_GUARD_CAP` ceiling (300 continuations per session), and — the one that matters in practice — **a plan that stops advancing**: if the open-task count is unchanged across `CC_STOP_GUARD_STALL` blocks (3), the turn is released and a notification says the plan is not moving. Every exit notifies.
+  Claude Code has its own ceiling on *consecutive* blocks, `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`, and its default is **8** — since every finished task is one more block, a plan longer than eight tasks would be cut off with "a hook blocked the turn from ending 9 consecutive times". This harness sets it to 400, above its own 300, so the harness's own limits are the ones that fire.
 - **`/goal`** (built-in; you type it yourself before leaving): `/goal all tasks in docs/plans/x.md are [x] or [!]`. Internally it is also a Stop hook, but with retries on API failures (1, 5, 15 minutes) and it waits out a usage-limit reset. Belt over braces.
 
 `autoContinueAtUsageLimit: true` — on hitting the limit the session waits for the reset and continues by itself. If that gets in the way during the day, start with `--settings '{"autoContinueAtUsageLimit":false}'`.
@@ -82,7 +83,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 |---|---|---|
 | `CLAUDE.md` | every session | the working contract: questions, autonomy, debugging, code, cost hygiene |
 | `BEHAVIOR.md` | reading | the whole behaviour step by step: startup, interview, plan, execution, guards, diagnosis, overnight |
-| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 55 hook checks, rollback |
+| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 59 hook checks, rollback |
 | `skills/intake` | `/intake` | one project-level interview → `docs/PROJECT.md`: capability ledger, "decided by the agent", gate checks, what may run unattended |
 | `skills/task` | `/task` | a new task in the `tasks/<phase>/<NN>-<slug>/` tree: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` starts a new tree |
 | `skills/plan` | `/plan` | interview → plan; for a task directory, a `PLAN.md` inside it built from `task.txt`; `T00` is the baseline |
@@ -110,6 +111,8 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 
 ```
 CC_STOP_GUARD_CAP=300     continuations per session, then a notification and a stop
+CC_STOP_GUARD_STALL=3     blocks with an unchanged open-task count before the turn is released
+CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=400  Claude Code's own consecutive-block ceiling (its default 8 is too low for a plan)
 CC_SUBAGENT_BUDGET=40     subagent spawns per session (more at night than by day)
 CC_SWITCH_CTX_LIMIT=40000 context size above which /model asks for confirmation
 CC_READ_GUARD_LINES=500   file size above which whole-file reads are refused
