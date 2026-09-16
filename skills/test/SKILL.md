@@ -44,9 +44,51 @@ Mutations worth trying, in order: invert a condition, drop a guard clause, swap 
 - The floor rises by itself when coverage grows and never falls on its own. **Lowering it by hand is a decision, not a fix**: it goes into `docs/PROJECT.md` with a reason and a date, or it does not happen.
 - If the suite is slow, the ratchet belongs to the whole plan rather than each task: run it at `T00` and again at the finish, and keep the per-task verify narrow. Say which you chose in `## Decisions`.
 
+## 5a. A one-off mutation audit — when coverage is green and you still do not trust it
+
+Coverage says execution passed through a line. It does not say the test would notice the line being
+wrong. `assert fee(100) is not None` covers the line and proves nothing: change `amount * 0.1` to
+`amount * 0.2` and the suite stays green. A model asked to raise coverage writes exactly these tests,
+because they are the cheapest ones that satisfy the ratchet.
+
+A mutation run finds them mechanically: it breaks the code by patterns and reports which broken
+versions the suite failed to catch. A surviving mutant is a named blind spot with a line number.
+
+**Not a gate check.** A full run re-executes the suite once per mutant — hours on a real project. This
+is a deliberate audit, run by hand, on a module at a time.
+
+Pick the module by consequence, not by size: where a silently wrong value is worse than a crash —
+money and fees, sizes and limits, boundaries and rounding, retry and idempotency, permissions. One
+module per audit.
+
+```bash
+pip install mutmut && mutmut run --paths-to-mutate src/billing/ && mutmut results   # Python
+npx stryker run --mutate 'src/billing/**/*.ts'                                       # TypeScript
+```
+
+Both write a report of survivors. Read it as a list of findings, not as a score:
+
+- A **survivor** in the ranked areas above is a missing test case. It becomes a task through `/task`
+  (or a line in the current plan) that names the mutation verbatim: "a test that fails when
+  `src/billing/fee.py:41` `<=` becomes `<`". That task is written red first, like any other.
+- A survivor in glue, logging, or a defensive branch that cannot be reached is **not** a finding.
+  Record it once in `NOTES.md` as accepted, with the reason, so the next audit does not re-litigate it.
+- A **timeout** or an **error** mutant is usually an infinite loop the mutation triggered; it counts as
+  killed, not as a finding.
+- The mutation score itself goes nowhere near the gate checks and nowhere near `.coverage-gate.json`.
+  Nobody optimises it; the survivors are the output.
+
+What comes out of an audit is a short list of tests worth writing, already justified. What must not
+come out of it is a rewrite of the suite to please the tool, or a new number to chase.
+
+Run it when: a regression got through despite green tests; before trusting an unattended run with a
+module that moves money or data; once after a large stretch of agent-written tests, to see what those
+tests actually assert. Not on a schedule.
+
 ## 6. Report
 
 - What is now covered that was not, by behaviour and not by file.
 - The number before and after, from the tool and not from memory.
 - Every mutation you tried, and which ones the suite caught. Name the ones it did not.
 - What is still uncovered on purpose, and why — the honest boundary, the same list `/verify` writes under "what was not checked".
+- After a mutation audit: the survivors, split into tests to write and survivors accepted with a reason. Never the score.

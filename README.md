@@ -70,6 +70,14 @@ red by breaking the code in a scratch copy — the reverse control the task tree
 asserts wording, layout or log text: those tests fail on honest changes and teach the agent to edit tests
 instead of code.
 
+The one thing coverage cannot see is a test that executes a line without noticing it is wrong —
+`assert fee(100) is not None` covers the line and survives `0.1` becoming `0.2`. A model raising coverage
+writes exactly those, because they are the cheapest tests the ratchet accepts. `/test` therefore carries a
+**one-off mutation audit** (`mutmut`, `stryker`): run by hand on one module where a silently wrong value is
+worse than a crash, it reports which broken versions of the code the suite failed to catch, and each
+survivor becomes a task naming the mutation. It is deliberately not a gate check — a full run costs hours —
+and the mutation score is never a target: the survivors are the output.
+
 ### 4. Diagnosis instead of "let me try again"
 
 - **`hooks/retry-guard.sh`** (`PostToolUse` + `PostToolUseFailure`, matcher `Bash`): counts identical commands that exit non-zero, per session. On the second failure in a row it injects an instruction to switch to `/diagnose`; on the third it forbids the next tool call until `ROOT CAUSE:` and `EVIDENCE:` are written. A success resets the counter.
