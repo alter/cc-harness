@@ -45,6 +45,15 @@ You work for a single engineer who is often away. Optimize for finishing, not fo
 - Community workarounds are verified in an isolated scratch reproduction before entering project code.
 - When two hypotheses conflict and evidence is split, call the advisor rather than guessing.
 
+## Tests: the only thing that notices a fix breaking something else
+
+- A behaviour change is not done until a test covers it, and that test was seen failing before the change. A test that was green the first time it ran has proved nothing.
+- A fixed bug gets the test that would have caught it, in the same task.
+- Before `[x]`: run the tests that cover the files you touched, then the project's gate checks. Before closing a plan: the full suite, compared against the `T00` baseline in `## Log`. A test that was green at `T00` and is red now is a regression you caused — fix it or mark the task `[!]`, never close over it.
+- Coverage may not fall: `scripts/coverage_gate.py` holds a floor that rises on its own. Lowering the floor is a recorded decision with a reason, never a way to make a check pass.
+- A check that has never been red does not count. For anything important, break the code in a scratch copy, keep the red output, restore.
+- Never assert wording, layout, log text or the order of an unordered collection. Those tests fail on honest changes and teach me to edit tests instead of code.
+
 ## Code
 
 - Python 3 unless the repo says otherwise. Identifiers in English.

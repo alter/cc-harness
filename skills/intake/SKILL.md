@@ -24,7 +24,8 @@ AskUserQuestion, up to 4 per call, calls back to back, none later. Cover:
 4. **Irreversible actions**: which may run unattended (migrations on a dev DB, deploys to staging) and which never may (production deploy, payments, data deletion, sending email/messages to real users).
 5. **Environments**: where tests run, what needs Docker or credentials, what is allowed to touch the network.
 6. **Definition of done for any task**: the exact commands that must exit 0 before a task is `[x]` (tests, lint, type check, architecture check). If the suite is already red, is the baseline accepted as-is?
-7. **Delivery**: commit per task or per plan; branch policy; who reviews.
+7. **Coverage**: is there a coverage command and a report format; what does it measure today (run it, do not ask for the number); should the ratchet (`scripts/coverage_gate.py`, a floor that rises and never falls by itself) be part of the gate checks, and if the suite is slow, per task or per plan?
+8. **Delivery**: commit per task or per plan; branch policy; who reviews.
 
 Do not ask about: file layout, naming, library choice when the repo already has one, formatting, hosting-provider comparisons, anything in "Decided by the agent".
 
@@ -34,7 +35,7 @@ Fill the template. Rules:
 
 - The **capability ledger** holds one state per row: `included` / `available` / `absent` / `removed`. A capability with no row is `absent`. Dormant code, an old migration or a doc mention is not a requirement: never build or restore an `absent`/`removed` capability without a direct request. A direct request is full authorization — record it and proceed without asking again.
 - **Decided by the agent** lists decision classes the user does not want to be asked about. Start from the defaults in the template, add project-specific ones from the interview.
-- **Gate checks** lists the commands from question 6 verbatim. `/plan` copies them into every task's verify line.
+- **Gate checks** lists the commands from question 6 verbatim, plus `python3 scripts/coverage_gate.py --run` when the answer to question 7 put the ratchet there. `/plan` copies them into every task's verify line. The first run of the gate records the coverage floor (`--set-floor`); the floor is where the project is today, not where it should be.
 - **Unattended policy** lists what `/run` may do alone and what must become `[!] BLOCKED`.
 - Set `intake: completed <date>`.
 

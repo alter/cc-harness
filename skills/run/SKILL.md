@@ -61,7 +61,7 @@ Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.
 ## Finish
 
 When no `- [ ]` remains:
-- All `[x]`: set `status: done`, run every acceptance criterion command once more, mark each AC. In a task tree: apply the `labels.txt` rules above, then suggest `/verify <task dir>` in a fresh context. Report: what changed, why, which checks ran with results, remaining risk, suggested commit message. Stop.
+- All `[x]`: set `status: done`, run the full suite and every acceptance criterion command once more, mark each AC. Compare the suite against the `T00` baseline recorded in `## Log`: a test that was green then and is red now is a regression this run caused — it is fixed before the plan closes, or the plan ends `paused` with that test named. A rising coverage floor is expected; a fallen one is a failure, not a formality. In a task tree: apply the `labels.txt` rules above, then suggest `/verify <task dir>` in a fresh context. Report: what changed, why, which checks ran with results, remaining risk, suggested commit message. Stop.
 - Some `[!]`: set `status: paused`, list the blocked tasks with their reasons, and end the message with the literal token `NEED_HUMAN`. Stop.
 
 ## Context hygiene during a long run

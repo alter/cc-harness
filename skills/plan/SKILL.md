@@ -70,7 +70,8 @@ One paragraph. What is true when this is done.
 ```
 
 Task rules:
-- `T00` is always the baseline: run the project's gate checks once before any edit and record the pre-existing state in `## Log` (which tests were already red). New failures are then distinguishable from old ones. When `docs/PROJECT.md` §7 or a pre-commit hook forbids commits on the current branch, `T00` also creates the plan's branch (name per the repository's pattern) and `## Decisions` records `Branch: <name>`.
+- `T00` is always the baseline: run the project's gate checks once before any edit and record the pre-existing state in `## Log` (which tests were already red, and the coverage percentage from the tool). New failures are then distinguishable from old ones. When `docs/PROJECT.md` §7 or a pre-commit hook forbids commits on the current branch, `T00` also creates the plan's branch (name per the repository's pattern) and `## Decisions` records `Branch: <name>`.
+- A task that changes behaviour carries its test: the task line says which test proves it, and the task is not done until that test was seen failing before the change. A task that only adds tests is fine and belongs to `/test`.
 - Every task ends in a verifiable state and names the command that verifies it. The verify line includes the gate checks from `docs/PROJECT.md`, not only the task-local test.
 - Architecture or layering decisions become a check, not a paragraph: a task that introduces a boundary also adds the script that enforces it (`import-linter` contract for Python) to the gate checks.
 - Order by dependency, then by the user's priority answer.

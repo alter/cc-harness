@@ -15,6 +15,7 @@ Shared instructions for every coding agent in this repository. `CLAUDE.md` impor
 - Match investigation to the change: contracts need producer, consumer, serializer and read/write checks; auth and routing need enforcement, guards and state; async work needs retries, idempotency, ordering, cancellation and failure visibility.
 - Architecture rules live in checks, not prose: put layering and import boundaries into a script that exits non-zero (`import-linter` for Python) and list it under gate checks.
 - Reproducible bug → failing regression test first, then the fix, then the original reproduction again.
+- A behaviour change carries its test, and that test was seen failing before the change. Coverage may not fall: the floor in `.coverage-gate.json` rises by itself and is lowered only as a recorded decision. A check that has never been red does not count — break the code in a scratch copy once and keep the red output.
 
 ## Validation
 

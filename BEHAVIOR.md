@@ -76,7 +76,7 @@ The session does the tasks itself, one at a time, following the `run-task` proce
 1. **Reads only**: the `T##` line, `## Goal`, `## Decisions`, `## Assumptions`, `## Out of scope`, the last 10 lines of `## Log`; in a tree, that task's `task.txt` (CONTEXT lists what to open first) and `PROTOCOL.md`; `docs/PROJECT.md` §5–6. Other tasks' details only if named as a dependency.
 2. **Checks its authority**: `(needs confirmation)` on the line, or an action from the "must become BLOCKED" column → `- [!] BLOCKED: needs confirmation`, a Log line, next task.
 3. **Does the work**, keeping noise out of the context: repository search → `scout`; tests, builds, linters, long commands → `test-runner`; documentation, changelogs, an unfamiliar subsystem → `researcher`; a review before a risky commit → `reviewer`. It reads only what it will edit, and only the window it needs (Grep first).
-4. **Verifies**: the task's `verify:` command plus the gate checks. Pass → `- [x]`, a `- <time> T## done: …` line in the Log, `git add <the files it changed>` and a commit (never `git add -A`: submodule pointers and marker files). Fail → `/diagnose` (§7). Still red → the line stays `- [ ]` and the Log gets `- <time> T## open: <root cause or best hypothesis, with evidence>`, so the next attempt starts from evidence rather than zero.
+4. **Verifies**: the task's `verify:` command, the tests covering the files it touched, plus the gate checks (the coverage ratchet among them when `docs/PROJECT.md` §6 lists it — a fallen floor fails the task). Pass → `- [x]`, a `- <time> T## done: …` line in the Log, `git add <the files it changed>` and a commit (never `git add -A`: submodule pointers and marker files). Fail → `/diagnose` (§7). Still red → the line stays `- [ ]` and the Log gets `- <time> T## open: <root cause or best hypothesis, with evidence>`, so the next attempt starts from evidence rather than zero.
 5. **A decision made alone** → one line under `## Assumptions`. A question to the user: never.
 6. Between tasks: nothing. No `/clear`, no manual `/compact`, no recap of what was done. The next task starts from the plan line. If the model catches itself re-reading the plan header, that is context bloat, not progress.
 
@@ -115,6 +115,25 @@ All of them are commands outside the model's context; their decisions cannot be 
 | `session-start` | `SessionStart` | an active plan with open tasks | see §1 |
 
 What the hooks do **not** do: they never edit code, never commit, never touch the network, never call the model. Each runs within 20 seconds and steps aside silently on error (except refusals, which are always explicit).
+
+## 6a. Tests — what stops a fix from breaking something else
+
+The failure this exists for: the model fixes T07 and quietly trades away a behaviour that T03 relied on, and
+nobody is awake to notice.
+
+- A behaviour change is not closed until a test covers it, and that test was **seen failing** before the
+  change. `/plan` puts it in the task line; the contract repeats it; a test that was green on its first run
+  has proved nothing yet.
+- Every fixed bug gets the test that would have caught it, in the same task.
+- Before `[x]`: the tests covering the touched files, then the gate checks. Before the plan closes: the full
+  suite, compared with the `T00` baseline in `## Log` — a test green at `T00` and red now is a regression this
+  run caused, and it is fixed or the plan ends `paused` naming it.
+- `scripts/coverage_gate.py` holds a floor in `.coverage-gate.json`: it rises when coverage grows, never
+  falls by itself, and exits non-zero when coverage drops past the tolerance. Lowering it is a decision
+  written into `docs/PROJECT.md` with a date and a reason.
+- `/test` is the procedure: measure first, choose by risk (money and data, branchy code, every past defect,
+  contracts, then stop), write red first, then break the code in a scratch copy to prove each guard can go
+  red — the same reverse control the task tree demands. Wording, layout and log text are never asserted.
 
 ## 7. Breakage — `/diagnose`
 

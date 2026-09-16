@@ -6,7 +6,7 @@ Every mechanism here was verified against the Claude Code 2.1.272 binary.
 ## Install
 
 ```bash
-./selftest.sh                       # 59 hook checks on the checkout, installs nothing
+./selftest.sh                       # 66 checks on the checkout, installs nothing
 ./install.sh ~/.claude-harness-test # trial copy; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
 ./install.sh                        # into ~/.claude: backup → files → settings.json merge → checks
 ./selftest.sh ~/.claude             # the same checks against what is now installed
@@ -15,7 +15,7 @@ Every mechanism here was verified against the Claude Code 2.1.272 binary.
 
 `INSTALL.md` has the full procedure: backup, offline checks, a live run in a sandbox, and what can go wrong. Needs `jq`. Notifications go through `osascript` (macOS) or `notify-send`.
 
-## Three requirements → three mechanisms
+## Four requirements → four mechanisms
 
 ### 1. Every question before the work, none in the middle
 
@@ -47,7 +47,30 @@ Stopping an overnight run: `touch .claude/plan-pause`, or `status: paused` in th
 
 Fallback: `/run <plan> delegate` — the main session only hands tasks to the `worker` subagent one at a time and reads a single line back. Every worker is a cold start (10–20k tokens of cache write) with no memory of earlier tasks; useful for long plans of independent tasks.
 
-### 3. Diagnosis instead of "let me try again"
+### 3. Tests: the only thing that notices a fix breaking something else
+
+An agent edits all night; nobody is watching which of yesterday's behaviours it traded away for today's
+fix. Prose cannot catch that. Three mechanisms do:
+
+- **A test per behaviour change, seen red first.** The contract and `/plan` make it part of the task, not a
+  follow-up: the task line names the test, and a test that was green the first time it ran has proved
+  nothing yet. A fixed bug gets the test that would have caught it, in the same task.
+- **`scripts/coverage_gate.py` — a floor that rises and never falls by itself.** It reads the project's
+  coverage report (`coverage-py`, `json-summary`, `cobertura`, `lcov`, `go`), compares it with the floor in
+  `.coverage-gate.json`, raises the floor when coverage grows, and exits non-zero when it drops by more
+  than the tolerance. Put it in the gate checks and `/run` cannot mark a task `[x]` while coverage is
+  falling. Lowering the floor is a decision recorded in `docs/PROJECT.md`, with a date and a reason.
+- **`T00` and the finish, compared.** `T00` records which tests were already red and what coverage was,
+  before any edit. At the plan's finish the full suite runs again: a test that was green at `T00` and is red
+  now is a regression this run caused, and the plan does not close over it.
+
+`/test` is the procedure for getting there: measure first, choose by risk (money and data, then branchy
+code, then every past defect, then contracts, then nothing), write red first, then prove each guard can go
+red by breaking the code in a scratch copy — the reverse control the task tree already demands. It never
+asserts wording, layout or log text: those tests fail on honest changes and teach the agent to edit tests
+instead of code.
+
+### 4. Diagnosis instead of "let me try again"
 
 - **`hooks/retry-guard.sh`** (`PostToolUse` + `PostToolUseFailure`, matcher `Bash`): counts identical commands that exit non-zero, per session. On the second failure in a row it injects an instruction to switch to `/diagnose`; on the third it forbids the next tool call until `ROOT CAUSE:` and `EVIDENCE:` are written. A success resets the counter.
 - **`/diagnose`** — the protocol: reproduce once and save the output to a file → pin versions off the machine → walk the levels (helicopter view, environment, dependencies, logs at a raised level, stack trace bottom-up, state, measurements, a debugger in scratch) → three hypotheses with a refuting experiment → official documentation **for the pinned version**, through `researcher` → unofficial workarounds only after reproducing them in scratch → one advisor call (`/advisor`, Opus) when the evidence is split → one fix, the original reproduction again, a regression test.
@@ -83,13 +106,14 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 |---|---|---|
 | `CLAUDE.md` | every session | the working contract: questions, autonomy, debugging, code, cost hygiene |
 | `BEHAVIOR.md` | reading | the whole behaviour step by step: startup, interview, plan, execution, guards, diagnosis, overnight |
-| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 59 hook checks, rollback |
+| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 66 checks, rollback |
 | `skills/intake` | `/intake` | one project-level interview → `docs/PROJECT.md`: capability ledger, "decided by the agent", gate checks, what may run unattended |
 | `skills/task` | `/task` | a new task in the `tasks/<phase>/<NN>-<slug>/` tree: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` starts a new tree |
 | `skills/plan` | `/plan` | interview → plan; for a task directory, a `PLAN.md` inside it built from `task.txt`; `T00` is the baseline |
 | `skills/verify` + `agents/verifier.md` | `/verify` | independent verification by another context: `VERIFY.md` (verifier line / reproduce from a clean state / reverse control / what was not checked), then `verify:passed\|failed` |
 | `skills/run` | `/run` | execution to the end without questions, in one session; `/run … delegate` hands tasks to `worker` one at a time |
 | `skills/run-task` | `/run-task <plan> <T##>`, preloaded into `worker` | the procedure for one task: what to read, do, verify, mark and log |
+| `skills/test` | `/test` | coverage by risk, red first, reverse control by mutation, and the ratchet wired into the gate checks |
 | `skills/diagnose` | `/diagnose` | engineering diagnosis |
 | `hooks/stop-guard.sh` | `Stop` | refuses to stop while tasks are open |
 | `hooks/retry-guard.sh` | `PostToolUse(Bash)`, `PostToolUseFailure(Bash)` | catches the same failed command being repeated |
@@ -102,7 +126,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 | `hooks/guard-subagent.sh` | `PreToolUse(Agent\|Task)` | a per-session ceiling on subagent spawns |
 | `agents/*` | Agent tool | Explore and scout on Haiku, test-runner (Sonnet), researcher, reviewer, verifier, worker |
 | `night.sh` | by hand | the overnight run |
-| `project-template/` | copy into a new repository | `AGENTS.md` (one contract for every agent), `CLAUDE.md` = `@AGENTS.md`, `docs/PROJECT.md`, an example `.claude/rules/*.md` with `paths:`, `scripts/project_check.py` |
+| `project-template/` | copy into a new repository | `AGENTS.md` (one contract for every agent), `CLAUDE.md` = `@AGENTS.md`, `docs/PROJECT.md`, an example `.claude/rules/*.md` with `paths:`, `scripts/project_check.py`, `scripts/coverage_gate.py` |
 | `project-template/tasks/` | `/task init` | the task-tree skeleton: `README.md` (the format), `PROTOCOL.md`, `GOAL.md`, `ROLES.md`, `DECISIONS.md`, and `check.py` — a validator that takes its vocabulary from the tree's own README/ROLES/GOAL and also checks `path:line` references |
 | `statusline.sh` | status line | 5h / 7d limits, context, cache (the weekly Opus window is not in the status payload — `/usage` shows it) |
 | `advisor-stats.sh` | by hand | how often the advisor fired and how much context each call forwarded, read from `~/.claude/projects/*.jsonl` |

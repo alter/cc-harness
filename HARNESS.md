@@ -1,6 +1,6 @@
 # The harness: how it is built
 
-48 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
+50 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
 
 ## 1. Three floors
 
@@ -10,7 +10,7 @@
 ├── settings.json                   model, effort, cache, ceilings, hooks
 ├── statusline.sh                   status line: limits and cache
 ├── hooks/  (9)                     deterministic guards outside the model's context
-├── skills/ (7)                     /intake /task /plan /run /run-task /verify /diagnose
+├── skills/ (8)                     /intake /task /plan /run /run-task /test /verify /diagnose
 ├── agents/ (7)                     Explore scout test-runner researcher reviewer verifier worker
 ├── night.sh                        the overnight run, one long session
 ├── install.sh selftest.sh uninstall.sh   backup → install → checks → rollback (INSTALL.md)
@@ -98,7 +98,7 @@ Hooks run as processes outside the model's window: they cost no tokens, they are
 
 Why `PreToolUse` and not `SubagentStart` for the spawn ceiling: `SubagentStart` output only supports `additionalContext`, it cannot deny a spawn. Why stop-guard is a command and not a prompt hook: prompt and agent hooks exist only for tool events; a command costs zero tokens and zero latency.
 
-### `skills/` — seven procedures
+### `skills/` — eight procedures
 
 Only their descriptions live in context (under 1536 characters all together); the body loads on call.
 
@@ -109,6 +109,7 @@ Only their descriptions live in context (under 1536 characters all together); th
 | `/plan` | you / the model | `task.txt` → `PLAN.md`: VERIFY → acceptance criteria, `+` → tasks, `−` → boundaries, DEPENDS → a dependency check; `T00` is the baseline; every task carries its verify command; it ends with `/clear` + `/run` |
 | `/run` | you / a hook | one task at a time, `[x]` only after the check, a commit per task, `done` only when the artefact exists in the repository, `BLOCKED.md` instead of a stub, `verify:` never touched |
 | `/run-task` | `worker`, or you for a single task | what one task reads, does, verifies, marks and logs — then stops |
+| `/test` | you, or `/plan` when a task needs cover | coverage chosen by risk, every test seen red before it passes, a mutation proving each guard can fail, and `scripts/coverage_gate.py` in the gate checks so the floor can only rise |
 | `/verify` | you / `/run` when it finishes | a fresh context (`verifier`): `VERIFY.md` stating what this context did *not* do, reproduction from a clean state, reverse control by mutation, "what was not checked" |
 | `/diagnose` | the model after a failure / you | freeze → versions off the machine → the levels (environment, dependencies, logs, trace, state, measurements, debugger) → three hypotheses → documentation for the pinned version → third-party workarounds only in scratch → the advisor on split evidence → one fix plus a regression test |
 

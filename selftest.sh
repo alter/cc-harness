@@ -155,6 +155,29 @@ check "switch at 50k ctx -> ask" "$out" '"permissionDecision": *"ask"'
 out=$(jq -n '{context_tokens:1000,from_model:"sonnet",to_model:"opus",source:"user"}' | "$H/guard-model-switch.sh")
 check "switch at 1k ctx -> allow" "$out" '"permissionDecision": *"allow"'
 
+echo "== coverage gate"
+cg="$SRC/project-template/scripts/coverage_gate.py"
+cgdir="$TMP/cov"; mkdir -p "$cgdir"
+echo '{"totals":{"percent_covered":73.4}}' > "$cgdir/coverage.json"
+printf '{"format":"coverage-py","report":"coverage.json","floor":70.0,"tolerance":0.2}\n' > "$cgdir/.coverage-gate.json"
+out=$(python3 "$cg" --root "$cgdir" 2>&1)
+check "coverage grew: floor raised" "$out" 'floor raised from 70.00'
+out=$(python3 "$cg" --root "$cgdir" 2>&1)
+check "coverage unchanged: pass" "$out" 'PASS 73.40% \(floor 73.40%\)'
+echo '{"totals":{"percent_covered":71.9}}' > "$cgdir/coverage.json"
+out=$(python3 "$cg" --root "$cgdir" 2>&1); rc=$?
+check "coverage fell: fail" "$out" 'FAIL 71.90% < floor 73.40%'
+[ "$rc" -ne 0 ] && ok "coverage gate exits non-zero on a drop" || bad "coverage gate exits non-zero on a drop" "exit $rc"
+floor_before=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["floor"])' "$cgdir/.coverage-gate.json")
+[ "$floor_before" = "73.4" ] && ok "a drop does not lower the floor" || bad "a drop does not lower the floor" "floor is $floor_before"
+printf 'SF:a.js\nLF:10\nLH:8\nend_of_record\n' > "$cgdir/lcov.info"
+printf '{"format":"lcov","report":"lcov.info","floor":0,"tolerance":0.2}\n' > "$cgdir/.coverage-gate.json"
+out=$(python3 "$cg" --root "$cgdir" 2>&1)
+check "lcov report is understood" "$out" 'PASS 80.00%'
+rm -f "$cgdir/.coverage-gate.json"
+out=$(python3 "$cg" --root "$cgdir" 2>&1)
+check "missing config explains itself" "$out" 'no .coverage-gate.json'
+
 echo "== advisor-stats"
 adir="$TMP/projects"; mkdir -p "$adir"
 python3 - "$adir/s1.jsonl" <<'PYEOF'

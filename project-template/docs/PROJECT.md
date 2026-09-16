@@ -69,6 +69,19 @@ _unanswered_
 
 Baseline accepted as-is (pre-existing failures tolerated): _unanswered_
 
+Coverage: the command, its report format, and where the floor lives (`.coverage-gate.json`). The ratchet
+(`python3 scripts/coverage_gate.py --run`) belongs in the list above per task, or runs at `T00` and at the
+plan's finish when the suite is slow — say which. The floor rises on its own; lowering it is a decision
+recorded here, with a date and a reason, and never a way to make a check pass.
+
+| Question | Answer |
+|---|---|
+| Coverage command | _unanswered_ |
+| Report format (`coverage-py` / `json-summary` / `cobertura` / `lcov` / `go`) | _unanswered_ |
+| Floor today (from the tool, not from memory) | _unanswered_ |
+| Ratchet per task or per plan | _unanswered_ |
+| Areas deliberately left uncovered, and why | _unanswered_ |
+
 ## 7. Delivery
 
 | Question | Answer |
