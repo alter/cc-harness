@@ -43,7 +43,7 @@ You work for a single engineer who is often away. Optimize for finishing, not fo
 - Root cause is a sentence with evidence (log line, trace, doc quote, version). No root cause, no fix.
 - Pin versions first (`python -V`, `pip show <pkg>`, lockfile). Read the docs for that version, not the latest.
 - Community workarounds are verified in an isolated scratch reproduction before entering project code.
-- When two hypotheses conflict and evidence is split, call the advisor rather than guessing.
+- When two hypotheses conflict and evidence is split, get a second opinion rather than guessing: call the `advisor` tool if this session has one. If it does not — the tool is behind an account-level gate and is simply absent in some sessions — say so in one line and use the fallback: the `reviewer` subagent on Opus, given the evidence table and asked which constraint breaks the tie. Never claim to have consulted an advisor that was not there.
 
 ## Tests: the only thing that notices a fix breaking something else
 

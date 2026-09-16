@@ -6,7 +6,7 @@ Every mechanism here was verified against the Claude Code 2.1.272 binary.
 ## Install
 
 ```bash
-./selftest.sh                       # 85 checks on the checkout, installs nothing
+./selftest.sh                       # 86 checks on the checkout, installs nothing
 ./install.sh ~/.claude-harness-test # trial copy; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
 ./install.sh                        # into ~/.claude: backup → files → settings.json merge → checks
 ./selftest.sh ~/.claude             # the same checks against what is now installed
@@ -82,7 +82,7 @@ and the mutation score is never a target: the survivors are the output.
 
 - **`hooks/retry-guard.sh`** (`PostToolUse` + `PostToolUseFailure`, matcher `Bash`): counts identical commands that exit non-zero, per session. On the second failure in a row it injects an instruction to switch to `/diagnose`; on the third it forbids the next tool call until `ROOT CAUSE:` and `EVIDENCE:` are written. A success resets the counter.
 - **`/diagnose`** — the protocol: reproduce once and save the output to a file → pin versions off the machine → walk the levels (helicopter view, environment, dependencies, logs at a raised level, stack trace bottom-up, state, measurements, a debugger in scratch) → three hypotheses with a refuting experiment → official documentation **for the pinned version**, through `researcher` → unofficial workarounds only after reproducing them in scratch → one advisor call (`/advisor`, Opus) when the evidence is split → one fix, the original reproduction again, a regression test.
-- **The advisor**: `advisorModel: "opus"` — that key alone switches it on (no env var needed), provided the advisor is at least as capable as the main model. It is a server-side tool the main model calls itself, and Claude Code's own prompt tells it to call before substantive work, when stuck, when changing approach, and before declaring the task done. Every call forwards **the whole conversation** to Opus and bills to the separate weekly Opus window, so in one long session the price of a call grows with the session. `advisor-stats.sh` counts the calls and the context they forwarded, from the transcripts; `/usage` shows the Opus window. `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1` turns it off for a run.
+- **The advisor**: `advisorModel: "opus"` plus `CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL=1`. The key alone is **not** enough: the binary gates the tool behind the first-party API and a server-side flag that is off for most accounts, so without the variable the tool never appears and the model truthfully says it has none. `claude --debug` settles it in one line: `[AdvisorTool] Server-side tool enabled …` or `[AdvisorTool] Skipping advisor - …`. The advisor must also be at least as capable as the main model. It is a server-side tool the main model calls itself, and Claude Code's own prompt tells it to call before substantive work, when stuck, when changing approach, and before declaring the task done. Every call forwards **the whole conversation** to Opus and bills to the separate weekly Opus window, so in one long session the price of a call grows with the session. `advisor-stats.sh` counts the calls and the context they forwarded, from the transcripts; `/usage` shows the Opus window. `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1` turns it off for a run.
 
 ## The plan file
 
@@ -114,7 +114,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 |---|---|---|
 | `CLAUDE.md` | every session | the working contract: questions, autonomy, debugging, code, cost hygiene |
 | `BEHAVIOR.md` | reading | the whole behaviour step by step: startup, interview, plan, execution, guards, diagnosis, overnight |
-| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 85 checks, rollback |
+| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 86 checks, rollback |
 | `skills/intake` | `/intake` | one project-level interview → `docs/PROJECT.md`: capability ledger, "decided by the agent", gate checks, what may run unattended |
 | `skills/task` | `/task` | a new task in the `tasks/<phase>/<NN>-<slug>/` tree: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` starts a new tree |
 | `skills/plan` | `/plan` | interview → plan; for a task directory, a `PLAN.md` inside it built from `task.txt`; `T00` is the baseline |
