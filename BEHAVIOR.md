@@ -135,6 +135,7 @@ nobody is awake to notice.
 - `/test` is the procedure: measure first, choose by risk (money and data, branchy code, every past defect,
   contracts, then stop), write red first, then break the code in a scratch copy to prove each guard can go
   red — the same reverse control the task tree demands. Wording, layout and log text are never asserted.
+- The advisor is available inside subagents too, and cannot be switched off per agent (no `env` in the agent schema, and it bypasses `disallowedTools`). Measured on a real installation: 13 calls across 50 sessions, median 129k tokens forwarded, **911k on the largest** — all of them in long-running agent sessions. That is why `worker` and `verifier` are told to report a fork upward rather than resolve it, and why subagent contexts are kept small.
 - What coverage cannot see: a test that runs a line without noticing it is wrong. `/test` §5a is a one-off
   mutation audit (`mutmut`, `stryker`) on a single module where a wrong value is worse than a crash; every
   surviving mutant becomes a task quoting the mutation. By hand, never a gate check, and the score is not a
