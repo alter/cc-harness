@@ -143,6 +143,21 @@ check "switch at 50k ctx -> ask" "$out" '"permissionDecision": *"ask"'
 out=$(jq -n '{context_tokens:1000,from_model:"sonnet",to_model:"opus",source:"user"}' | "$H/guard-model-switch.sh")
 check "switch at 1k ctx -> allow" "$out" '"permissionDecision": *"allow"'
 
+echo "== advisor-stats"
+adir="$TMP/projects"; mkdir -p "$adir"
+python3 - "$adir/s1.jsonl" <<'PYEOF'
+import json, sys
+rows = [{"type":"assistant","message":{"usage":{"input_tokens":5,"cache_read_input_tokens":100000,"cache_creation_input_tokens":0},"content":[{"type":"text","text":"x"}]}},
+        {"type":"assistant","message":{"usage":{"input_tokens":5,"cache_read_input_tokens":300000,"cache_creation_input_tokens":0},"content":[{"type":"server_tool_use","name":"advisor","input":{}}]}}]
+open(sys.argv[1], "w").write("\n".join(json.dumps(r) for r in rows))
+PYEOF
+out=$(bash "$SRC/advisor-stats.sh" "$adir" 2>&1)
+check "advisor-stats counts a call" "$out" 'advisor calls: 1'
+check "advisor-stats reports forwarded context" "$out" 'max 300k per call'
+rm -f "$adir/s1.jsonl"
+out=$(bash "$SRC/advisor-stats.sh" "$adir" 2>&1)
+check "advisor-stats on an empty directory" "$out" 'no transcripts with model turns found'
+
 echo "== statusline"
 out=$(jq -n '{model:{display_name:"Sonnet 5"},effort:{level:"medium"},context_window:{used_percentage:42.7},rate_limits:{five_hour:{used_percentage:61,resets_at:(now+5400)},seven_day:{used_percentage:23}},prompt_cache:{warm:false,ttl:"1h",hit_ratio:0.83,last_miss_cause:{causes:["model_changed"]},recache_tokens_if_cold:123456},workspace:{current_dir:"/x/myproj"}}' | "$TARGET/statusline.sh" | sed -E 's/\x1B\[[0-9;]*m//g')
 check "statusline renders dir/model/ctx/5h/7d" "$out" 'myproj  Sonnet 5/medium  ctx 42%  5h 61%/(89|90)m  7d 23%'

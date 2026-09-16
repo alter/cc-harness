@@ -6,7 +6,7 @@ Every mechanism here was verified against the Claude Code 2.1.272 binary.
 ## Install
 
 ```bash
-./selftest.sh                       # 52 hook checks on the checkout, installs nothing
+./selftest.sh                       # 55 hook checks on the checkout, installs nothing
 ./install.sh ~/.claude-harness-test # trial copy; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
 ./install.sh                        # into ~/.claude: backup → files → settings.json merge → checks
 ./selftest.sh ~/.claude             # the same checks against what is now installed
@@ -50,7 +50,7 @@ Fallback: `/run <plan> delegate` — the main session only hands tasks to the `w
 
 - **`hooks/retry-guard.sh`** (`PostToolUse` + `PostToolUseFailure`, matcher `Bash`): counts identical commands that exit non-zero, per session. On the second failure in a row it injects an instruction to switch to `/diagnose`; on the third it forbids the next tool call until `ROOT CAUSE:` and `EVIDENCE:` are written. A success resets the counter.
 - **`/diagnose`** — the protocol: reproduce once and save the output to a file → pin versions off the machine → walk the levels (helicopter view, environment, dependencies, logs at a raised level, stack trace bottom-up, state, measurements, a debugger in scratch) → three hypotheses with a refuting experiment → official documentation **for the pinned version**, through `researcher` → unofficial workarounds only after reproducing them in scratch → one advisor call (`/advisor`, Opus) when the evidence is split → one fix, the original reproduction again, a regression test.
-- **The advisor**: `advisorModel: "opus"`. The main session runs on Sonnet; Opus joins itself at decision points. Claude Code's own warning applies: "Advisor Tool (experimental) is on and may use more tokens".
+- **The advisor**: `advisorModel: "opus"` — that key alone switches it on (no env var needed), provided the advisor is at least as capable as the main model. It is a server-side tool the main model calls itself, and Claude Code's own prompt tells it to call before substantive work, when stuck, when changing approach, and before declaring the task done. Every call forwards **the whole conversation** to Opus and bills to the separate weekly Opus window, so in one long session the price of a call grows with the session. `advisor-stats.sh` counts the calls and the context they forwarded, from the transcripts; `/usage` shows the Opus window. `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1` turns it off for a run.
 
 ## The plan file
 
@@ -82,7 +82,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 |---|---|---|
 | `CLAUDE.md` | every session | the working contract: questions, autonomy, debugging, code, cost hygiene |
 | `BEHAVIOR.md` | reading | the whole behaviour step by step: startup, interview, plan, execution, guards, diagnosis, overnight |
-| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 52 hook checks, rollback |
+| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 55 hook checks, rollback |
 | `skills/intake` | `/intake` | one project-level interview → `docs/PROJECT.md`: capability ledger, "decided by the agent", gate checks, what may run unattended |
 | `skills/task` | `/task` | a new task in the `tasks/<phase>/<NN>-<slug>/` tree: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` starts a new tree |
 | `skills/plan` | `/plan` | interview → plan; for a task directory, a `PLAN.md` inside it built from `task.txt`; `T00` is the baseline |
@@ -103,7 +103,8 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 | `night.sh` | by hand | the overnight run |
 | `project-template/` | copy into a new repository | `AGENTS.md` (one contract for every agent), `CLAUDE.md` = `@AGENTS.md`, `docs/PROJECT.md`, an example `.claude/rules/*.md` with `paths:`, `scripts/project_check.py` |
 | `project-template/tasks/` | `/task init` | the task-tree skeleton: `README.md` (the format), `PROTOCOL.md`, `GOAL.md`, `ROLES.md`, `DECISIONS.md`, and `check.py` — a validator that takes its vocabulary from the tree's own README/ROLES/GOAL and also checks `path:line` references |
-| `statusline.sh` | status line | 5h / 7d limits, context, cache |
+| `statusline.sh` | status line | 5h / 7d limits, context, cache (the weekly Opus window is not in the status payload — `/usage` shows it) |
+| `advisor-stats.sh` | by hand | how often the advisor fired and how much context each call forwarded, read from `~/.claude/projects/*.jsonl` |
 
 ## Tuning (environment variables under `settings.json` → `env`)
 

@@ -1,6 +1,6 @@
 # The harness: how it is built
 
-47 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
+48 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
 
 ## 1. Three floors
 
@@ -13,7 +13,8 @@
 ├── skills/ (7)                     /intake /task /plan /run /run-task /verify /diagnose
 ├── agents/ (7)                     Explore scout test-runner researcher reviewer verifier worker
 ├── night.sh                        the overnight run, one long session
-└── install.sh selftest.sh uninstall.sh   backup → install → checks → rollback (INSTALL.md)
+├── install.sh selftest.sh uninstall.sh   backup → install → checks → rollback (INSTALL.md)
+└── advisor-stats.sh                 how often the Opus advisor fired, and on how much context
 
 <project>/                          THE "PROJECT" FLOOR — facts about the repository
 ├── AGENTS.md  +  CLAUDE.md=@AGENTS.md    one contract for every agent
@@ -55,7 +56,7 @@ Seven sections: questions only before the work starts; scope decided by the capa
 | Key | Value | Why |
 |---|---|---|
 | `model` | `sonnet[1m]` | Sonnet covers the bulk of development; Opus burns its own weekly window (`seven_day_opus`). The `[1m]` suffix asks for the 1M-context variant, which is what makes one session per plan possible; drop it to `sonnet` if 1M is not enabled for your account (`CLAUDE_CODE_DISABLE_1M_CONTEXT` also turns it off) |
-| `advisorModel` | `opus` | Sonnet calls Opus itself at decision points (`/advisor`): split evidence, an architectural fork. Cheaper than a whole day on Opus |
+| `advisorModel` | `opus` | Sonnet calls Opus itself at decision points: split evidence, an architectural fork. Cheaper than a whole day on Opus — but every call forwards the entire conversation to Opus and bills to the weekly Opus window, so a call late in a long session costs the whole session. `advisor-stats.sh` measures it; `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1` switches it off |
 | `effortLevel` | `medium` | a persistent default for routine work |
 | `maxEffortLevel` | `high` | a ceiling: `xhigh`/`max` cannot be selected even by accident; `max` is officially "prone to overthinking" |
 | `autoCompactWindow` | unset | compaction happens at the model's own limit (~1M for Sonnet 5 / Opus 5). The owner's decision: one session per plan, continuity of context is worth more than the price of a turn. If `/usage` shows `long_context` above 10 %, use `/autocompact 500k` in that one session, not in the settings |
@@ -182,7 +183,7 @@ The cost model: **context is rent, paid on every turn.** Whatever entered the wi
 | Fan-out under control | `MAX_CONCURRENT_SUBAGENTS=3` (was 20), depth 2, `guard-subagent` at 40/session, workflows `small`, ultracode off, keyword trigger off | `subagent_heavy` and `high_parallel` are two more of the five |
 | A reasoning ceiling | `maxEffortLevel: high`, `effortLevel: medium` | "Higher effort … uses your limits faster" — Claude Code's own wording |
 | Not Opus by default | Sonnet plus an Opus advisor | the separate weekly Opus window is not burned on routine |
-| Observability | the status line, `/usage` (five behaviours with a 10 % threshold, top subagents/skills/MCP), `/cost`, `/skill-doctor`, `/insights` | measure first, then tune. Without this, tuning is guessing |
+| Observability | the status line, `/usage` (five behaviours with a 10 % threshold, top subagents/skills/MCP, and the weekly Opus window the status line cannot show), `/cost`, `/skill-doctor`, `/insights`, `advisor-stats.sh` | measure first, then tune. Without this, tuning is guessing |
 
 What this harness does **not** do, stated plainly: it does not compress the model's output tokens (caveman styles are a net loss for a profile where the spend is in cache and input); it does not count dollars (meaningless on a subscription); and it promises no percentages — your own `/usage` will show them after a week.
 
