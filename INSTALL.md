@@ -27,7 +27,7 @@ du -sh ~/claude-full-*.tgz
 
 Check that the archive is readable: `tar tzf ~/claude-full-*.tgz | head`.
 
-## 2. Checks without installing — 86 checks on synthetic input
+## 2. Checks without installing — 91 checks on synthetic input
 
 ```bash
 git clone https://github.com/alter/cc-harness && cd cc-harness
@@ -138,7 +138,8 @@ Then:
 
 ```bash
 ./selftest.sh ~/.claude
-claude          # in any project; the status line appears immediately
+./advisor-check.sh      # one 'ping' request: ENABLED — claude-opus-5, or the reason it is not
+claude                  # in any project; the status line appears immediately
 ```
 
 ## 6. Rollback

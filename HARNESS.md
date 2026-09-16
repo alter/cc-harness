@@ -1,6 +1,6 @@
 # The harness: how it is built
 
-51 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
+52 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
 
 ## 1. Three floors
 
@@ -14,6 +14,7 @@
 ├── agents/ (7)                     Explore scout test-runner researcher reviewer verifier worker
 ├── night.sh                        the overnight run, one long session
 ├── install.sh selftest.sh uninstall.sh   backup → install → checks → rollback (INSTALL.md)
+├── advisor-check.sh                 is the advisor actually enabled in this install, and if not, why
 └── advisor-stats.sh                 how often the Opus advisor fired, and on how much context
 
 <project>/                          THE "PROJECT" FLOOR — facts about the repository

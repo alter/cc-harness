@@ -96,6 +96,7 @@ Done.
   backup:   $BACKUP
   rollback: $SRC/uninstall.sh $BACKUP $TARGET
   selftest: $SRC/selftest.sh $TARGET
+  advisor:  $SRC/advisor-check.sh        (one 'ping' request; says ENABLED or why not)
 EOF
 if [ "$TARGET" != "$HOME/.claude" ]; then
   cat <<EOF

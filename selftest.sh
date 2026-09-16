@@ -204,6 +204,19 @@ check "switch at 50k ctx -> ask" "$out" '"permissionDecision": *"ask"'
 out=$(jq -n '{context_tokens:1000,from_model:"sonnet",to_model:"opus",source:"user"}' | "$H/guard-model-switch.sh")
 check "switch at 1k ctx -> allow" "$out" '"permissionDecision": *"allow"'
 
+echo "== advisor-check"
+printf '[DEBUG] [AdvisorTool] Server-side tool enabled with claude-opus-5 as the advisor model\n' > "$TMP/adv-ok.log"
+printf '[DEBUG] [AdvisorTool] Skipping advisor - sonnet cannot advise opus (advisor must be at least as capable as the base model)\n' > "$TMP/adv-skip.log"
+printf '[DEBUG] GrowthBook is off for this session: telemetry opted out\n[DEBUG] [engine] turn 1 start\n' > "$TMP/adv-gate.log"
+out=$(CLAUDE_CONFIG_DIR=/nonexistent bash "$SRC/advisor-check.sh" --log "$TMP/adv-ok.log" 2>&1); rc=$?
+check "advisor-check reads an enabled log" "$out" 'ENABLED . claude-opus-5'
+[ "$rc" -eq 0 ] && ok "advisor-check exits 0 when enabled" || bad "advisor-check exits 0 when enabled" "exit $rc"
+out=$(CLAUDE_CONFIG_DIR=/nonexistent bash "$SRC/advisor-check.sh" --log "$TMP/adv-skip.log" 2>&1); rc=$?
+check "advisor-check relays the skip reason" "$out" 'cannot advise opus'
+[ "$rc" -ne 0 ] && ok "advisor-check exits non-zero when disabled" || bad "advisor-check exits non-zero when disabled" "exit $rc"
+out=$(CLAUDE_CONFIG_DIR=/nonexistent bash "$SRC/advisor-check.sh" --log "$TMP/adv-gate.log" 2>&1)
+check "advisor-check names telemetry when the gate closed silently" "$out" 'GrowthBook is off'
+
 echo "== coverage gate"
 cg="$SRC/project-template/scripts/coverage_gate.py"
 cgdir="$TMP/cov"; mkdir -p "$cgdir"
