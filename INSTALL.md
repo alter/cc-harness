@@ -27,7 +27,7 @@ du -sh ~/claude-full-*.tgz
 
 Check that the archive is readable: `tar tzf ~/claude-full-*.tgz | head`.
 
-## 2. Checks without installing — 85 checks on synthetic input
+## 2. Checks without installing — 86 checks on synthetic input
 
 ```bash
 git clone https://github.com/alter/cc-harness && cd cc-harness
@@ -45,7 +45,7 @@ What gets checked (nothing is written outside a temporary directory; counter sta
 - `session-start` after compaction produces a line with "2 open, 1 blocked" and the tail of the Log;
 - `subagent-evidence`: a scout with no tool calls is blocked; with Grep+Read and a path it passes; without a path it is blocked; `NOT FOUND` with no calls is blocked; a test-runner with no Bash or no `COMMAND:` is blocked; a worker with no Edit/Write/Bash is blocked; `NOT DONE` and `stop_hook_active` pass;
 - `guard-subagent` 1/2 and 2/2 allow, 3/2 denies; `guard-model-switch` asks at 50k, allows at 1k;
-- the installed `settings.json`: valid JSON, no hook registered twice inside one event, and a `model` that still carries its context variant (`sonnet[1m]`);
+- the installed `settings.json`: valid JSON, no hook registered twice inside one event, a `model` that still carries its context variant (`sonnet[1m]`), and an `advisorModel` that is actually reachable (it needs `CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL=1` beside it);
 - `subagent-evidence` also accepts a code-graph call (`mcp__…graph…__*`) as search evidence for scout;
 - `scripts/coverage_gate.py` against synthetic reports: the floor rises when coverage grows, a drop exits non-zero and does not lower the floor, and lcov as well as coverage.py reports are understood;
 - `advisor-stats.sh` against a synthetic transcript counts the advisor calls and the context they forwarded;
