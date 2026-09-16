@@ -23,6 +23,10 @@ echo "== syntax"
 for f in "$H"/*.sh "$TARGET/statusline.sh"; do
   if bash -n "$f" 2>/dev/null; then ok "bash -n $(basename "$f")"; else bad "bash -n $(basename "$f")" "syntax error"; fi
 done
+for f in "$H"/*.py; do
+  [ -e "$f" ] || continue
+  if python3 -c "import ast,sys,pathlib; ast.parse(pathlib.Path(sys.argv[1]).read_text())" "$f" 2>/dev/null; then ok "python -m ast $(basename "$f")"; else bad "python -m ast $(basename "$f")" "syntax error"; fi
+done
 if [ "$TARGET" = "$SRC" ]; then
   echo "  NOTE  testing the source tree; hooks wired into another config dir are reported as SKIP."
   echo "        To check what is actually installed: $0 ~/.claude"
@@ -33,10 +37,16 @@ if [ -f "$TARGET/settings.json" ]; then
   [ -z "$dup" ] && ok "no duplicated hook commands" || bad "no duplicated hook commands" "registered more than once: $dup"
   m=$(jq -r '.model // "unset"' "$TARGET/settings.json")
   case "$m" in *"[1m]"|unset) ok "model keeps its context variant ($m)" ;; *) bad "model keeps its context variant" "$m — the [1m] suffix is gone, the window is 200k" ;; esac
-  for cmd in $(jq -r '.. | .command? // empty' "$TARGET/settings.json" | grep -E '\.sh$'); do
+  for cmd in $(jq -r '.. | .command? // empty' "$TARGET/settings.json" | grep -oE '[^ ]+\.(sh|py)$'); do
     p=${cmd/#\~/$HOME}
-    case "$p" in "$TARGET"/*) [ -x "$p" ] && ok "hook exists+x: $cmd" || bad "hook exists+x: $cmd" "missing or not executable" ;;
-      *) printf '  SKIP  %s (not installed here)\n' "$cmd" ;; esac
+    case "$p" in
+      "$TARGET"/*)
+        case "$p" in
+          *.py) [ -f "$p" ] && ok "hook present: $cmd" || bad "hook present: $cmd" "missing" ;;
+          *)    [ -x "$p" ] && ok "hook exists+x: $cmd" || bad "hook exists+x: $cmd" "missing or not executable" ;;
+        esac ;;
+      *) printf '  SKIP  %s (not installed here)\n' "$cmd" ;;
+    esac
   done
 fi
 
@@ -47,8 +57,26 @@ check "deny whole read of 600-line file" "$out" '"permissionDecision": *"deny"'
 out=$(jq -n --arg f "$TMP/big.py" '{tool_name:"Read",tool_input:{file_path:$f,offset:100,limit:50}}' | "$H/read-guard.sh")
 check_empty "allow windowed read" "$out"
 cp "$TMP/big.py" "$TMP/big.md"
+seq 1 40 > "$TMP/small.py"
+seq 1 900 > "$TMP/with space.py"
 out=$(jq -n --arg f "$TMP/big.md" '{tool_name:"Read",tool_input:{file_path:$f}}' | "$H/read-guard.sh")
 check_empty "allow .md regardless of size" "$out"
+
+echo "== bash-read-guard"
+brg() { jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}' | python3 "$H/bash-read-guard.py"; }
+check "cat of a 600-line file is refused" "$(brg "cat $TMP/big.py")" '"permissionDecision": *"deny"'
+check_empty "tail -5 is a targeted read" "$(brg "tail -5 $TMP/big.py")"
+check_empty "head -n 20 is a targeted read" "$(brg "head -n 20 $TMP/big.py")"
+check "head -n 900 is a whole-file read" "$(brg "head -n 900 $TMP/big.py")" '"permissionDecision": *"deny"'
+check "tail -n +1 is a whole-file read" "$(brg "tail -n +1 $TMP/big.py")" '"permissionDecision": *"deny"'
+check_empty "a pipe means the output is processed" "$(brg "cat $TMP/big.py | grep 42")"
+check_empty "a redirect does not reach the window" "$(brg "cat $TMP/big.py > /tmp/out")"
+check_empty "small files pass" "$(brg "cat $TMP/small.py")"
+check_empty "markdown is exempt like in read-guard" "$(brg "cat $TMP/big.md")"
+check_empty "unrelated commands pass" "$(brg "git log --oneline -5")"
+spaced="$TMP/with space.py"
+check "a quoted path with spaces is still checked" "$(brg "cat \"$spaced\"")" '"permissionDecision": *"deny"'
+check "cd && cat is judged per segment" "$(brg "cd /tmp && cat $TMP/big.py")" '"permissionDecision": *"deny"'
 
 echo "== compress-output"
 big=$(for i in $(seq 1 300); do echo "same line"; done; seq 1 400 | sed 's/^/unique /')
@@ -144,6 +172,21 @@ out=$(se scout "$tr_graph" "FILES: src/app.py:L93 assemble(). TOOLS USED: mcp__g
 check_empty "scout answering from a code graph -> allow" "$out"
 out=$(se scout "$tr_graph" "it lives somewhere in the auth module" | "$H/subagent-evidence.sh")
 check "code-graph answer without a path -> block" "$out" 'names no file path'
+
+tr_web="$TMP/tr-web.jsonl"
+jq -nc '{message:{content:[{type:"tool_use",name:"WebSearch",input:{}}]}}' > "$tr_web"
+out=$(se web-researcher "$tr_grep" "The rate grew 12% in 2026." | "$H/subagent-evidence.sh")
+check "an unknown web agent without a web call -> block" "$out" 'no WebFetch/WebSearch call'
+out=$(se web-researcher "$tr_web" "The rate grew 12%." | "$H/subagent-evidence.sh")
+check "an unknown web agent without a URL -> block" "$out" 'carries the URL it came from'
+out=$(se web-researcher "$tr_web" "Grew 12% (https://example.org/report, 2026-04-01)." | "$H/subagent-evidence.sh")
+check_empty "an unknown web agent with a URL -> allow" "$out"
+out=$(se file-reader "$tr_web" "The file defines fee()." | "$H/subagent-evidence.sh")
+check "an unknown file agent without a read -> block" "$out" 'no Read/Grep/Glob call'
+out=$(se file-reader "$tr_grep" "It lives somewhere in the billing module." | "$H/subagent-evidence.sh")
+check "an unknown file agent without a path -> block" "$out" 'names the path it came from'
+out=$(se file-reader "$tr_grep" "src/billing/fee.py:41 def fee(). TOOLS USED: Read:1" | "$H/subagent-evidence.sh")
+check_empty "an unknown file agent with a path -> allow" "$out"
 
 echo "== guard-subagent / guard-model-switch"
 gs() { jq -n '{session_id:"g1",tool_input:{subagent_type:"scout"}}'; }

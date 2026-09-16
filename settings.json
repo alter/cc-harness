@@ -63,6 +63,16 @@
             "command": "~/.claude/hooks/read-guard.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/bash-read-guard.py",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [

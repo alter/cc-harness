@@ -35,14 +35,14 @@ echo "== install -> $TARGET"
 mkdir -p "$TARGET"/{hooks,agents,skills} "$BIN_DIR"
 cp "$SRC/CLAUDE.md" "$TARGET/CLAUDE.md"
 cp "$SRC/statusline.sh" "$TARGET/statusline.sh"
-cp "$SRC"/hooks/*.sh "$TARGET/hooks/"
+cp "$SRC"/hooks/* "$TARGET/hooks/"
 cp "$SRC"/agents/*.md "$TARGET/agents/"
 for s in "$SRC"/skills/*/; do
   name=$(basename "$s"); mkdir -p "$TARGET/skills/$name"; cp "$s"/* "$TARGET/skills/$name/"
 done
 rm -rf "$TARGET/project-template"; cp -R "$SRC/project-template" "$TARGET/project-template"
 cp "$SRC/night.sh" "$BIN_DIR/cc-night"
-chmod +x "$TARGET/statusline.sh" "$TARGET"/hooks/*.sh "$BIN_DIR/cc-night"
+chmod +x "$TARGET/statusline.sh" "$TARGET"/hooks/* "$BIN_DIR/cc-night"
 
 if [ "$TARGET" != "$HOME/.claude" ]; then
   echo "== rewrite ~/.claude -> $TARGET in installed copies"
@@ -56,7 +56,7 @@ NEW=$(mktemp)
 if [ "$TARGET" = "$HOME/.claude" ]; then cp "$SRC/settings.json" "$NEW"; else sed -e "s#~/\.claude#$TARGET#g" "$SRC/settings.json" > "$NEW"; fi
 if [ -f "$TARGET/settings.json" ] && jq -e . "$TARGET/settings.json" >/dev/null 2>&1; then
   MERGED=$(mktemp)
-  OURS=$(cd "$SRC/hooks" && ls *.sh | tr '\n' '|' | sed 's/|$//')
+  OURS=$(cd "$SRC/hooks" && ls | sed 's/\./\\./g' | tr '\n' '|' | sed 's/|$//')
   jq -s --arg t "$TARGET/hooks/" --arg ours "$OURS" '
     .[0] as $old | .[1] as $new
     # An entry is ours if its command names one of this harness'"'"'s hook scripts, whether the
@@ -82,11 +82,12 @@ jq -e . "$TARGET/settings.json" >/dev/null || { echo "settings.json is not valid
 
 echo "== check"
 for f in "$TARGET"/hooks/*.sh "$TARGET/statusline.sh"; do bash -n "$f"; done
+for f in "$TARGET"/hooks/*.py; do [ -e "$f" ] || continue; python3 -c "import ast,sys,pathlib; ast.parse(pathlib.Path(sys.argv[1]).read_text())" "$f"; done
 for f in "$TARGET"/agents/*.md "$TARGET"/skills/*/SKILL.md; do
   head -n 1 "$f" | grep -q '^---$' || { echo "bad frontmatter: $f" >&2; exit 1; }
   grep -qE '^name: ' "$f" || { echo "no name: $f" >&2; exit 1; }
 done
-echo "   hooks: $(ls "$TARGET"/hooks/*.sh | wc -l | tr -d ' '), agents: $(ls "$TARGET"/agents/*.md | wc -l | tr -d ' '), skills: $(ls -d "$TARGET"/skills/*/ | wc -l | tr -d ' ')"
+echo "   hooks: $(ls "$TARGET"/hooks/ | wc -l | tr -d ' '), agents: $(ls "$TARGET"/agents/*.md | wc -l | tr -d ' '), skills: $(ls -d "$TARGET"/skills/*/ | wc -l | tr -d ' ')"
 command -v claude >/dev/null 2>&1 && echo "   claude $(claude --version 2>/dev/null | head -n 1)"
 
 cat <<EOF

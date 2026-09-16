@@ -6,7 +6,7 @@ Every mechanism here was verified against the Claude Code 2.1.272 binary.
 ## Install
 
 ```bash
-./selftest.sh                       # 66 checks on the checkout, installs nothing
+./selftest.sh                       # 85 checks on the checkout, installs nothing
 ./install.sh ~/.claude-harness-test # trial copy; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
 ./install.sh                        # into ~/.claude: backup → files → settings.json merge → checks
 ./selftest.sh ~/.claude             # the same checks against what is now installed
@@ -114,7 +114,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 |---|---|---|
 | `CLAUDE.md` | every session | the working contract: questions, autonomy, debugging, code, cost hygiene |
 | `BEHAVIOR.md` | reading | the whole behaviour step by step: startup, interview, plan, execution, guards, diagnosis, overnight |
-| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 66 checks, rollback |
+| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 85 checks, rollback |
 | `skills/intake` | `/intake` | one project-level interview → `docs/PROJECT.md`: capability ledger, "decided by the agent", gate checks, what may run unattended |
 | `skills/task` | `/task` | a new task in the `tasks/<phase>/<NN>-<slug>/` tree: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` starts a new tree |
 | `skills/plan` | `/plan` | interview → plan; for a task directory, a `PLAN.md` inside it built from `task.txt`; `T00` is the baseline |
@@ -129,6 +129,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 | `hooks/session-start.sh` | `SessionStart` (startup/resume/clear/compact/fork) | re-injects the active plan after compaction, `/clear`, `/resume` |
 | `hooks/compress-output.sh` | `PostToolUse(Bash)` | strips ANSI, collapses repeats into `(xN)`, saves long output to `.claude/scratch/`, gives the model head and tail (`updatedToolOutput`) |
 | `hooks/read-guard.sh` | `PreToolUse(Read)` | a file over 500 lines without offset/limit is refused: Grep first, then Read a window |
+| `hooks/bash-read-guard.py` | `PreToolUse(Bash)` | the same rule for the shell: `cat`/`less`/`head -n 900` on a large file is refused, while a pipe, a redirect or a real window (`tail -5`) passes |
 | `hooks/subagent-evidence.sh` | `SubagentStop` | checks a subagent's report against its transcript: zero tool calls behind "done" sends it back to work |
 | `hooks/guard-model-switch.sh` | `PreModelSwitch` | asks before a model switch on a large context |
 | `hooks/guard-subagent.sh` | `PreToolUse(Agent\|Task)` | a per-session ceiling on subagent spawns |
@@ -147,7 +148,7 @@ CC_STOP_GUARD_STALL=3     blocks with an unchanged open-task count before the tu
 CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=400  Claude Code's own consecutive-block ceiling (its default 8 is too low for a plan)
 CC_SUBAGENT_BUDGET=40     subagent spawns per session (more at night than by day)
 CC_SWITCH_CTX_LIMIT=40000 context size above which /model asks for confirmation
-CC_READ_GUARD_LINES=500   file size above which whole-file reads are refused
+CC_READ_GUARD_LINES=500   file size above which whole-file reads are refused, through Read and through the shell alike
 CC_COMPRESS_MIN_LINES=40  output size above which Bash output is compressed
 ```
 

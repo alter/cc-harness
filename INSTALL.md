@@ -27,7 +27,7 @@ du -sh ~/claude-full-*.tgz
 
 Check that the archive is readable: `tar tzf ~/claude-full-*.tgz | head`.
 
-## 2. Checks without installing — 66 checks on synthetic input
+## 2. Checks without installing — 85 checks on synthetic input
 
 ```bash
 git clone https://github.com/alter/cc-harness && cd cc-harness
@@ -38,6 +38,7 @@ What gets checked (nothing is written outside a temporary directory; counter sta
 
 - the syntax of every script, and that `settings.json` is valid JSON;
 - `read-guard`: refuses a 600-line file, allows it with `offset/limit`, allows `.md` regardless of size;
+- `bash-read-guard`: refuses `cat` and `head -n 900` on a large file, allows `tail -5`, `head -n 20`, a pipe, a redirect and small files, judges `cd && cat` per segment, and still sees a quoted path with spaces;
 - `compress-output`: 300 identical lines become `(x300)`, long output becomes head/tail plus a file in `.claude/scratch/`, short output is untouched;
 - `retry-guard`: the first failure is silent, the second (with different whitespace — the same command) points at `/diagnose`, the third demands `ROOT CAUSE` before the next call, a success resets the counter;
 - `stop-guard`: a plan with 2 open tasks produces `decision: block` naming the next task; `NEED_HUMAN`, `.claude/plan-pause`, the ceiling, and zero open tasks each release it; a plan whose open count does not change is blocked three times and then released, and closing a task resumes blocking;

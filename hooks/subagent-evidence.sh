@@ -62,8 +62,23 @@ case "$atype" in
       reason="VERIFY.md was not written (no Write/Edit call)."
     fi ;;
   *)
+    # Agents this harness did not define still get a rule, chosen by what their name says they do:
+    # the weakest guard belongs to agents that only think, not to those that read or search.
+    lower=$(printf '%s' "$atype" | tr '[:upper:]' '[:lower:]')
     if [ "$total" -eq 0 ]; then
       reason="You reported completion with zero tool calls. Either do the work with tools, or answer plainly 'NOT DONE: <why>'."
+    elif printf '%s' "$lower" | grep -qE 'web|search|research'; then
+      if ! { has WebFetch || has WebSearch || has_graph; }; then
+        reason="You reported a web answer but the transcript shows no WebFetch/WebSearch call ($total tool calls: ${counts:-none})."
+      elif ! printf '%s' "$last" | grep -qE 'https?://'; then
+        reason="A web answer carries the URL it came from. Give the source for every fact, or say plainly what the search did not find."
+      fi
+    elif printf '%s' "$lower" | grep -qE 'read|file|code|grep|explore|scout'; then
+      if ! { has Read || has Grep || has Glob || has_graph; }; then
+        reason="You reported what a file contains but the transcript shows no Read/Grep/Glob call ($total tool calls: ${counts:-none})."
+      elif ! printf '%s' "$last" | grep -qE '[A-Za-z0-9_./-]+\.[A-Za-z0-9]{1,6}(:[0-9]+)?'; then
+        reason="An answer about files names the path it came from, with line numbers where they matter."
+      fi
     fi ;;
 esac
 

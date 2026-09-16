@@ -1,6 +1,6 @@
 # The harness: how it is built
 
-50 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
+51 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
 
 ## 1. Three floors
 
@@ -9,7 +9,7 @@
 ├── CLAUDE.md                       behavioural contract (60 lines)
 ├── settings.json                   model, effort, cache, ceilings, hooks
 ├── statusline.sh                   status line: limits and cache
-├── hooks/  (9)                     deterministic guards outside the model's context
+├── hooks/ (10)                     deterministic guards outside the model's context
 ├── skills/ (8)                     /intake /task /plan /run /run-task /test /verify /diagnose
 ├── agents/ (7)                     Explore scout test-runner researcher reviewer verifier worker
 ├── night.sh                        the overnight run, one long session
@@ -80,7 +80,7 @@ Seven sections: questions only before the work starts; scope decided by the capa
 
 What is deliberately **not** set: `bashOutputMaxChars` — the default (30k characters, then a file plus a preview) already saves; raising it only drives logs into the conversation.
 
-### `hooks/` — nine guards
+### `hooks/` — ten guards
 
 Hooks run as processes outside the model's window: they cost no tokens, they are not forgotten after compaction, and they are not up for discussion.
 
@@ -91,6 +91,7 @@ Hooks run as processes outside the model's window: they cost no tokens, they are
 | `session-start.sh` | `SessionStart` (startup/resume/clear/compact/fork) | injects the active plan, the open tasks and the last Log entries | losing the thread after auto-compaction or a `/clear` at night |
 | `compress-output.sh` | `PostToolUse(Bash)` | strips ANSI, collapses repeats into `(x30)`, saves long output to `.claude/scratch/`, gives the model head and tail through `updatedToolOutput` | 4000 lines of log living in the window on every later turn |
 | `read-guard.sh` | `PreToolUse(Read)` | a file over 500 lines without `offset/limit` is refused: "Grep first, then Read a window" | reading a whole file for one function — the most common window leak |
+| `bash-read-guard.py` | `PreToolUse(Bash)` | the same limit for the shell, parsed with `shlex`: `cat`/`less`/`nl` and an explicit `head -n 900` on a large file are refused; a pipe, a redirect, a substitution and a real window (`tail -5`, `head -n 20`) pass; each `;`/`&&` segment is judged on its own | the obvious way around `read-guard` — `cat` in Bash |
 | `guard-subagent.sh` | `PreToolUse(Agent\|Task)` | a per-session ceiling on subagent spawns (40) | unattended fan-out |
 | `subagent-evidence.sh` | `SubagentStop` | reads the subagent's transcript and counts real tool calls by name; "found it in src/x.py:12" with no Grep/Read, "12 passed" with no Bash and no `COMMAND:`, "NOT FOUND" with no search → `decision: block` and the agent goes back to work; one retry, then it steps aside | "I did it" with zero tool calls — a subagent's lie is caught by its transcript, not by its wording |
 | `guard-model-switch.sh` | `PreModelSwitch` | asks for confirmation when the context is over 40k tokens | `/model` mid-session means rebuilding the whole prompt cache |
@@ -202,6 +203,6 @@ What this harness does **not** do, stated plainly: it does not compress the mode
 
 - `retry-guard` only sees an identical command; "edited it and a different one failed" is caught by the contract alone.
 - `stop-guard` checks the fact of `[x]`, not its quality: if the model marks `[x]` without the check passing, the hook will not notice — `/verify` and the morning `## Log` will.
-- `read-guard` can be bypassed with `cat` in Bash; then `compress-output` takes over. There is no full impermeability and there will not be — hooks lower the frequency, they do not eliminate.
+- `read-guard` and `bash-read-guard` cover Read and the plain shell read; a file can still arrive through a language runtime (`python -c 'print(open(...).read())'`), and then `compress-output` is what trims it. There is no full impermeability and there will not be — hooks lower the frequency, they do not eliminate.
 - The overnight `--dangerously-skip-permissions` is not a harness without a sandbox; it is a risk.
 - Everything was measured on 2.1.272. Later releases change hooks and caching every week (2.1.257–2.1.271 carried more than twenty cache changes); after an upgrade, run `/skill-doctor` and check hook status in `/hooks`.
