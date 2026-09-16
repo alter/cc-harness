@@ -29,6 +29,10 @@ if [ "$TARGET" = "$SRC" ]; then
 fi
 if [ -f "$TARGET/settings.json" ]; then
   if jq -e . "$TARGET/settings.json" >/dev/null 2>&1; then ok "settings.json is JSON"; else bad "settings.json is JSON" "invalid"; fi
+  dup=$(jq -r '(.hooks // {}) | to_entries | map(.key as $e | [.value[].hooks[].command] | group_by(.) | map(select(length > 1) | "\($e): \(.[0])")) | flatten | join(", ")' "$TARGET/settings.json")
+  [ -z "$dup" ] && ok "no duplicated hook commands" || bad "no duplicated hook commands" "registered more than once: $dup"
+  m=$(jq -r '.model // "unset"' "$TARGET/settings.json")
+  case "$m" in *"[1m]"|unset) ok "model keeps its context variant ($m)" ;; *) bad "model keeps its context variant" "$m — the [1m] suffix is gone, the window is 200k" ;; esac
   for cmd in $(jq -r '.. | .command? // empty' "$TARGET/settings.json" | grep -E '\.sh$'); do
     p=${cmd/#\~/$HOME}
     case "$p" in "$TARGET"/*) [ -x "$p" ] && ok "hook exists+x: $cmd" || bad "hook exists+x: $cmd" "missing or not executable" ;;

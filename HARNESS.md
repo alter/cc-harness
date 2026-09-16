@@ -54,7 +54,7 @@ Seven sections: questions only before the work starts; scope decided by the capa
 
 | Key | Value | Why |
 |---|---|---|
-| `model` | `sonnet` | Sonnet covers the bulk of development; Opus burns its own weekly window (`seven_day_opus`) |
+| `model` | `sonnet[1m]` | Sonnet covers the bulk of development; Opus burns its own weekly window (`seven_day_opus`). The `[1m]` suffix asks for the 1M-context variant, which is what makes one session per plan possible; drop it to `sonnet` if 1M is not enabled for your account (`CLAUDE_CODE_DISABLE_1M_CONTEXT` also turns it off) |
 | `advisorModel` | `opus` | Sonnet calls Opus itself at decision points (`/advisor`): split evidence, an architectural fork. Cheaper than a whole day on Opus |
 | `effortLevel` | `medium` | a persistent default for routine work |
 | `maxEffortLevel` | `high` | a ceiling: `xhigh`/`max` cannot be selected even by accident; `max` is officially "prone to overthinking" |

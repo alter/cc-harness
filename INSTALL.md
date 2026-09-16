@@ -149,7 +149,7 @@ To roll back from the full archive in §1: `tar xzf ~/claude-full-<stamp>.tgz -C
 
 ## 7. What can go wrong — honestly
 
-- **The `settings.json` merge overrides your model and effort.** That is by design, but if you had `opus` as your default, it is now `sonnet`. The diff shows it.
+- **The `settings.json` merge overrides your model and effort.** That is by design, but if you had `opus[1m]` as your default, it is now `sonnet[1m]`, and an `effortLevel` of `high` becomes `medium`. The diff shows both — read it. Your own `env` variables survive the merge, including ones this harness deliberately leaves off (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is the one to look for: agent teams cost about 7x the tokens, which is why `ultracode` and the workflow keyword trigger are off here).
 - **You already have another `Stop` hook.** Both will be called, and a block from either stops the turn. There is no conflict, but there will be two different texts in the context. Look at `jq .hooks.Stop ~/.claude/settings.json`.
 - **`--dangerously-skip-permissions` inside `cc-night`.** The script does not check where you run it. The sandbox is your responsibility.
 - **A project `CLAUDE.md` with its own rules** is left exactly as it is; the harness does not touch it. If it contains something contradictory ("ask before every step"), the more specific file wins — that is, the project's. Bring project files in line with `project-template/AGENTS.md` through `/intake`.

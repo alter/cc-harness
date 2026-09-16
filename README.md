@@ -6,7 +6,7 @@ Every mechanism here was verified against the Claude Code 2.1.272 binary.
 ## Install
 
 ```bash
-./selftest.sh                       # 50 hook checks on the checkout, installs nothing
+./selftest.sh                       # 52 hook checks on the checkout, installs nothing
 ./install.sh ~/.claude-harness-test # trial copy; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
 ./install.sh                        # into ~/.claude: backup → files → settings.json merge → checks
 ./selftest.sh ~/.claude             # the same checks against what is now installed
@@ -42,7 +42,7 @@ Overnight run: `cc-night docs/plans/<slug>.md` sets the plan to `running`, clear
 
 Stopping an overnight run: `touch .claude/plan-pause`, or `status: paused` in the plan file.
 
-**Execution model: one long session for the whole plan.** A deliberate choice — the model's context (up to 1M) holds the *why* of earlier tasks, so the next task does not start from a cold start. The price is a larger context resent on every turn; that is paid down by the hooks (`compress-output`, `read-guard`), by the rule "noise goes to a subagent" (`scout`, `test-runner`, `researcher`), and by a 1-hour prompt cache. Compaction is not forced before the model's own limit (`autoCompactWindow` is unset); if it happens anyway, `session-start` puts the plan back into context.
+**Execution model: one long session for the whole plan.** The model is set to `sonnet[1m]` for exactly this reason — the `[1m]` suffix asks for the 1M-context variant; without it the window is 200k and a long plan compacts early. Drop the suffix if 1M is not enabled for your account. A deliberate choice — the model's context (up to 1M) holds the *why* of earlier tasks, so the next task does not start from a cold start. The price is a larger context resent on every turn; that is paid down by the hooks (`compress-output`, `read-guard`), by the rule "noise goes to a subagent" (`scout`, `test-runner`, `researcher`), and by a 1-hour prompt cache. Compaction is not forced before the model's own limit (`autoCompactWindow` is unset); if it happens anyway, `session-start` puts the plan back into context.
 
 Fallback: `/run <plan> delegate` — the main session only hands tasks to the `worker` subagent one at a time and reads a single line back. Every worker is a cold start (10–20k tokens of cache write) with no memory of earlier tasks; useful for long plans of independent tasks.
 
@@ -82,7 +82,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 |---|---|---|
 | `CLAUDE.md` | every session | the working contract: questions, autonomy, debugging, code, cost hygiene |
 | `BEHAVIOR.md` | reading | the whole behaviour step by step: startup, interview, plan, execution, guards, diagnosis, overnight |
-| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 50 hook checks, rollback |
+| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 52 hook checks, rollback |
 | `skills/intake` | `/intake` | one project-level interview → `docs/PROJECT.md`: capability ledger, "decided by the agent", gate checks, what may run unattended |
 | `skills/task` | `/task` | a new task in the `tasks/<phase>/<NN>-<slug>/` tree: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` starts a new tree |
 | `skills/plan` | `/plan` | interview → plan; for a task directory, a `PLAN.md` inside it built from `task.txt`; `T00` is the baseline |

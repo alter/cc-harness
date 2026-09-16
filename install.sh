@@ -56,9 +56,15 @@ NEW=$(mktemp)
 if [ "$TARGET" = "$HOME/.claude" ]; then cp "$SRC/settings.json" "$NEW"; else sed -e "s#~/\.claude#$TARGET#g" "$SRC/settings.json" > "$NEW"; fi
 if [ -f "$TARGET/settings.json" ] && jq -e . "$TARGET/settings.json" >/dev/null 2>&1; then
   MERGED=$(mktemp)
-  jq -s --arg t "$TARGET/hooks/" '
+  OURS=$(cd "$SRC/hooks" && ls *.sh | tr '\n' '|' | sed 's/|$//')
+  jq -s --arg t "$TARGET/hooks/" --arg ours "$OURS" '
     .[0] as $old | .[1] as $new
-    | (($old.hooks // {}) | with_entries(.value |= map(select(((.hooks // []) | any(.command | tostring | contains($t))) | not)))
+    # An entry is ours if its command names one of this harness'"'"'s hook scripts, whether the
+    # path was stored absolute ("/home/x/.claude/hooks/stop-guard.sh") or with a tilde
+    # ("~/.claude/hooks/stop-guard.sh"). Matching only the absolute form let a second install
+    # append a duplicate set, so every Bash call ran retry-guard twice.
+    | ("hooks/(" + $ours + ")$") as $re
+    | (($old.hooks // {}) | with_entries(.value |= map(select(((.hooks // []) | any((.command | tostring) | test($re) or contains($t))) | not)))
                           | with_entries(select(.value | length > 0))) as $kept
     | ($old * $new)
     | .env = (($old.env // {}) + ($new.env // {}))

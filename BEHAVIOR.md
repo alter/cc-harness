@@ -20,7 +20,7 @@ The effect: after any interruption — compaction, a usage limit, a restart — 
 
 | Setting | Value | Behaviour |
 |---|---|---|
-| `model` / `advisorModel` | `sonnet` / `opus` | the work runs on Sonnet; Opus joins by itself as an advisor at decision points (`/advisor`, split evidence in `/diagnose`) |
+| `model` / `advisorModel` | `sonnet[1m]` / `opus` | the work runs on Sonnet; Opus joins by itself as an advisor at decision points (`/advisor`, split evidence in `/diagnose`) |
 | `effortLevel` / `maxEffortLevel` | `medium` / `high` | medium reasoning depth by default; the ceiling is `high`, so `xhigh` is unavailable even if the model asks for it |
 | `modelSettings.claude-opus-5.maxEffortLevel` | `high` | the advisor does not go to `xhigh` either |
 | `autoCompactEnabled`, no `autoCompactWindow` | `true`, unset | compaction only at the model's limit (~1M), not earlier. The owner's decision: one session per plan, the memory of *why* is worth more than the price of a turn |
