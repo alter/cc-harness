@@ -240,6 +240,39 @@ claude   # -> /intake
 
 `/intake` fills in `docs/PROJECT.md`. From then on every `/plan` reads it and stops re-asking about the environment, the checks and the boundaries. The ledger rule: a capability with no row is `absent`; dormant code is not a requirement. A direct request is full authorization — it is recorded in the ledger and never asked about again.
 
+## A repository you are already working in
+
+Nothing has to be migrated. Installing the harness changes how a session behaves; it does not change the
+repository until you ask it to.
+
+1. **`/intake`, once.** It reads the repository first and asks only what it could not find out. The result is
+   `docs/PROJECT.md`: the capability ledger, what the agent decides on its own, the commands that gate every
+   task, and what may run unattended. Every later `/plan` reads it instead of asking you again.
+2. **An existing `CLAUDE.md` stays where it is.** The harness never edits a project's own contract. Where the
+   two disagree, the more specific file wins — that is, the project's — so a line like "ask before every step"
+   will quietly cancel the harness's autonomy. Either fix that line or move the file's content into
+   `AGENTS.md` and leave `CLAUDE.md` as `@AGENTS.md`, the way `project-template/` does.
+3. **Your existing plans, issues and TODOs are not converted.** Start the next piece of work through `/task`
+   and `/plan`; the old ones stay as they are. There is no importer and there should not be one.
+4. **Optionally `/graphify`**, if the repository is one component and not an umbrella of submodules.
+
+### What the working day looks like afterwards
+
+The familiar loop — *describe what you want, have a strong model cut it into tasks, let agents run it to the
+end while you stay out of it* — is unchanged in shape. What changed is where you spend attention:
+
+| | before | with the harness |
+|---|---|---|
+| you describe the work | in the chat, once | `/task` — the questions all arrive together, at the start |
+| tasks appear | the model invents them mid-run | `/plan` writes them to disk with a verify command each, and `T00` measures the baseline first |
+| you review | by reading the run | by reading one file, `PLAN.md`, before anything runs |
+| execution | agents, until they decide they are finished | one session to the end; the Stop hook refuses to finish while a `- [ ]` remains |
+| a failure | "let me try again" | the second identical failure is caught and turned into `/diagnose` |
+| the end | a summary you have to trust | the artefact exists in the repository, or the task is `blocked` with `BLOCKED.md` |
+
+The two places you are still needed are `/intake` and `/task`/`/plan`. After `/run` starts, being asked a
+question is a defect, not a feature — send the transcript.
+
 ## The first run
 
 0. Once per repository: `/intake`.

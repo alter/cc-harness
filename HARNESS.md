@@ -59,7 +59,7 @@ Seven sections: questions only before the work starts; scope decided by the capa
 |---|---|---|
 | `model` | `sonnet[1m]` | Sonnet covers the bulk of development; Opus burns its own weekly window (`seven_day_opus`). The `[1m]` suffix asks for the 1M-context variant, which is what makes one session per plan possible; drop it to `sonnet` if 1M is not enabled for your account (`CLAUDE_CODE_DISABLE_1M_CONTEXT` also turns it off) |
 | `advisorModel` | `opus` | Sonnet calls Opus itself at decision points: split evidence, an architectural fork. Cheaper than a whole day on Opus — but every call forwards the entire conversation to Opus and bills to the weekly Opus window, so a call late in a long session costs the whole session. `advisor-stats.sh` measures it; `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1` switches it off |
-| advisor in subagents | — | — | there is no per-agent switch: the agent frontmatter schema has no `env`, and the advisor is appended to the request after the tool filter, so `disallowedTools` misses it. The only levers are context size (`maxTurns`, `omitClaudeMd`, narrow tools) and the agent's own prompt: `worker` and `verifier` are told to report a fork upward instead of buying an Opus review of their whole context |
+| advisor in subagents | no switch | there is no per-agent switch: the agent frontmatter schema has no `env`, and the advisor is appended to the request after the tool filter, so `disallowedTools` misses it. The only levers are context size (`maxTurns`, `omitClaudeMd`, narrow tools) and the agent's own prompt: `worker` and `verifier` are told to report a fork upward instead of buying an Opus review of their whole context |
 | `CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL` (env) | `1` | **`advisorModel` alone does not enable anything.** The binary gates the tool: first-party API (a subscription is first-party), experimental betas not disabled, and then either this variable or the server-side flag `tengu_sage_compass2`. That flag arrives through GrowthBook, which does not run when telemetry is opted out — so `DISABLE_TELEMETRY` silently leaves the advisor off, and this variable is what turns it back on. Without it the tool is simply absent from the session and the model — correctly — reports it has no advisor. `claude --debug` prints `[AdvisorTool] Server-side tool enabled …` or `[AdvisorTool] Skipping advisor - …` |
 | `effortLevel` | `medium` | a persistent default for routine work |
 | `maxEffortLevel` | `high` | a ceiling: `xhigh`/`max` cannot be selected even by accident; `max` is officially "prone to overthinking" |
@@ -103,7 +103,7 @@ Hooks run as processes outside the model's window: they cost no tokens, they are
 
 Why `PreToolUse` and not `SubagentStart` for the spawn ceiling: `SubagentStart` output only supports `additionalContext`, it cannot deny a spawn. Why stop-guard is a command and not a prompt hook: prompt and agent hooks exist only for tool events; a command costs zero tokens and zero latency.
 
-### `skills/` — eight procedures
+### `skills/` — nine procedures
 
 Only their descriptions live in context (under 1536 characters all together); the body loads on call.
 
@@ -124,7 +124,7 @@ Only their descriptions live in context (under 1536 characters all together); th
 | Agent | Model | Context | For what |
 |---|---|---|---|
 | `Explore` | haiku | without CLAUDE.md | overrides the built-in one: since 2.1.198 the built-in Explore inherits the session's model (Opus ceiling) |
-| `scout` | haiku | without CLAUDE.md | "where the code lives" — paths and lines, changes nothing |
+| `scout` | haiku | without CLAUDE.md | "where the code lives" — paths and lines, changes nothing; carries the four `mcp__graphify__*` tools, which resolve to nothing where no graph was built |
 | `test-runner` | sonnet, low | without CLAUDE.md | runs tests, returns only the reasons for failures. Not Haiku: an invented "12 passed" does not self-correct, unlike an invented path |
 | `researcher` | sonnet, medium | without CLAUDE.md | an unfamiliar subsystem, documentation for the pinned version, links instead of paraphrase |
 | `reviewer` | opus, high | with CLAUDE.md | adversarial review of significant changes, `FILE:LINE → what breaks` |
@@ -144,6 +144,17 @@ Reads the status-line JSON: `rate_limits.five_hour/seven_day`, `prompt_cache.war
 ### `night.sh`
 
 `cc-night tasks/10-x/03-y` → the plan goes `running`, the pause file is cleared, then `claude --dangerously-skip-permissions --effort high --settings '{"autoContinueAtUsageLimit":true}' "/run …"`. Sandbox without production credentials only — your choice, your responsibility.
+
+### the standalone scripts
+
+| Script | When | What it does |
+|---|---|---|
+| `install.sh` | by hand | backup → copy → merge `settings.json` (your `permissions`, `env` and other people's hooks survive; the harness's own keys win, and the diff is printed) → syntax checks. Repeatable: a second run does not duplicate a hook. `CC_BIN_DIR` decides where `cc-night` lands — set it to a directory that is actually in your `PATH`. |
+| `uninstall.sh` | by hand | removes only the files this checkout owns and restores the backup, checked against `MANIFEST.txt` |
+| `selftest.sh` | by hand | 107 checks on a checkout, 119 against an installed copy; writes nothing outside a temporary directory |
+| `graph-setup.sh` | `/graphify`, or by hand | builds the code graph and decides whether it is fit to expose; `--stats <graph.json> [code-files]` prints the verdict for an existing graph without touching anything |
+| `advisor-check.sh` | after installing | one `ping` through `--debug-file`, then `ENABLED — claude-opus-5` or the ordered list of reasons it is off |
+| `advisor-stats.sh` | by hand | how often the advisor fired and how much context each call forwarded, from `~/.claude/projects/*.jsonl` |
 
 ### `project-template/`
 

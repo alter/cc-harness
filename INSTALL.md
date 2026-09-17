@@ -10,7 +10,7 @@ You need `jq`, `bash` ≥ 4, and `claude` ≥ 2.1.267 (for `maxEffortLevel`). On
 |---|---|---|
 | `~/.claude/settings.json` | settings, hooks, statusLine | **yes** — merged, not replaced |
 | `~/.claude/CLAUDE.md` | the global contract | **yes** — replaced |
-| `~/.claude/hooks/`, `agents/`, `skills/`, `statusline.sh`, `project-template/` | the harness's own files | **yes** — added; other files in those directories are not deleted |
+| `~/.claude/hooks/`, `agents/`, `skills/`, `statusline.sh`, `graph-setup.sh`, `project-template/` | the harness's own files | **yes** — added; other files in those directories are not deleted |
 | `~/.claude/settings.local.json`, `commands/`, `keybindings.json` | yours | no, but copied into the backup |
 | `~/.claude.json` | MCP servers, login state, onboarding | **no**; copied into the backup |
 | `~/.claude/projects/` | session transcripts | no; not in the backup (gigabytes) — see §1 |
@@ -143,6 +143,27 @@ Then:
 claude                  # in any project; the status line appears immediately
 ```
 
+`cc-night` goes into `$HOME/bin` unless `CC_BIN_DIR` says otherwise, and that directory is often not in
+`PATH` — then `which cc-night` finds nothing although the file is there and executable. Either add it
+(`echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc`) or install into a directory already on the path
+(`CC_BIN_DIR=~/.local/bin ./install.sh`), deleting the old copy so two versions cannot drift apart.
+Nothing inside the harness calls `cc-night`: it is a launcher you type, so `PATH` is convenience, not a
+requirement — `~/bin/cc-night <plan>` works either way.
+
+### Optional, per project: a code graph
+
+```bash
+pip install graphifyy
+/graphify                       # inside the project, in a claude session
+```
+
+`/graphify` builds the graph locally (no API key, no model tokens) and refuses to wire anything when the
+result would answer wrongly — submodules, an empty extraction, under 20 nodes, over 25% `INFERRED` edges,
+or under 30% of code files reaching the graph. On a pass it merges a `graphify` server into `.mcp.json`,
+ignores `graphify-out/`, and installs a git post-commit hook that rebuilds the graph after every commit.
+MCP servers start at session start, so restart `claude` afterwards, then check one symbol you already know
+against `grep -n` before trusting the rest.
+
 ## 6. Rollback
 
 ```bash
@@ -160,4 +181,8 @@ To roll back from the full archive in §1: `tar xzf ~/claude-full-<stamp>.tgz -C
 - **`--dangerously-skip-permissions` inside `cc-night`.** The script does not check where you run it. The sandbox is your responsibility.
 - **A project `CLAUDE.md` with its own rules** is left exactly as it is; the harness does not touch it. If it contains something contradictory ("ask before every step"), the more specific file wins — that is, the project's. Bring project files in line with `project-template/AGENTS.md` through `/intake`.
 - **Debug output goes to the log, not to a pipe.** `claude --debug -p ping | grep …` prints nothing because the debug sink takes over once stdout is not a terminal. Use `claude --debug --debug-file /tmp/cc.log -p ping` and grep the file — that is how to read `[AdvisorTool]`, hook and cache lines.
+- **`/graphify` edits project files, not yours.** It writes `.mcp.json` (merging, never replacing) and a line in
+  `.gitignore`, and `graphify hook install` adds `.gitattributes`, a git merge driver and two git hooks. In a shared
+  repository those are changes your colleagues will see — decide before you commit them. The rebuild runs detached,
+  so for a few seconds after a commit the graph still describes the previous one.
 - **Version.** The keys `maxEffortLevel`, `subagentPromptCacheTtl` and `omitClaudeMd` in agents need 2.1.267 / 2.1.271 or later. On an older build Claude Code ignores them silently — so check `claude --version` first.
