@@ -8,7 +8,7 @@ TARGET=${TARGET/#\~/$HOME}
 BIN_DIR=${CC_BIN_DIR:-$HOME/bin}
 STAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP=${CC_BACKUP_DIR:-$HOME/.claude-backup/$STAMP}
-ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh hooks agents skills commands project-template keybindings.json)
+ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template keybindings.json)
 
 command -v jq >/dev/null 2>&1 || { echo "jq is required (brew install jq / apt install jq)" >&2; exit 1; }
 command -v claude >/dev/null 2>&1 || echo "warning: claude not in PATH; installing anyway" >&2
@@ -35,6 +35,7 @@ echo "== install -> $TARGET"
 mkdir -p "$TARGET"/{hooks,agents,skills} "$BIN_DIR"
 cp "$SRC/CLAUDE.md" "$TARGET/CLAUDE.md"
 cp "$SRC/statusline.sh" "$TARGET/statusline.sh"
+cp "$SRC/graph-setup.sh" "$TARGET/graph-setup.sh"
 cp "$SRC"/hooks/* "$TARGET/hooks/"
 cp "$SRC"/agents/*.md "$TARGET/agents/"
 for s in "$SRC"/skills/*/; do
@@ -42,11 +43,11 @@ for s in "$SRC"/skills/*/; do
 done
 rm -rf "$TARGET/project-template"; cp -R "$SRC/project-template" "$TARGET/project-template"
 cp "$SRC/night.sh" "$BIN_DIR/cc-night"
-chmod +x "$TARGET/statusline.sh" "$TARGET"/hooks/* "$BIN_DIR/cc-night"
+chmod +x "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" "$TARGET"/hooks/* "$BIN_DIR/cc-night"
 
 if [ "$TARGET" != "$HOME/.claude" ]; then
   echo "== rewrite ~/.claude -> $TARGET in installed copies"
-  grep -rlE '~/\.claude|\$HOME/\.claude' "$TARGET/hooks" "$TARGET/agents" "$TARGET/skills" "$TARGET/statusline.sh" 2>/dev/null \
+  grep -rlE '~/\.claude|\$HOME/\.claude' "$TARGET/hooks" "$TARGET/agents" "$TARGET/skills" "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" 2>/dev/null \
     | xargs -r sed -i.bak -e "s#~/\.claude#$TARGET#g" -e "s#\$HOME/\.claude#$TARGET#g"
   find "$TARGET" -name '*.bak' -delete
 fi
@@ -81,7 +82,7 @@ rm -f "$NEW"
 jq -e . "$TARGET/settings.json" >/dev/null || { echo "settings.json is not valid JSON" >&2; exit 1; }
 
 echo "== check"
-for f in "$TARGET"/hooks/*.sh "$TARGET/statusline.sh"; do bash -n "$f"; done
+for f in "$TARGET"/hooks/*.sh "$TARGET/statusline.sh" "$TARGET/graph-setup.sh"; do bash -n "$f"; done
 for f in "$TARGET"/hooks/*.py; do [ -e "$f" ] || continue; python3 -c "import ast,sys,pathlib; ast.parse(pathlib.Path(sys.argv[1]).read_text())" "$f"; done
 for f in "$TARGET"/agents/*.md "$TARGET"/skills/*/SKILL.md; do
   head -n 1 "$f" | grep -q '^---$' || { echo "bad frontmatter: $f" >&2; exit 1; }

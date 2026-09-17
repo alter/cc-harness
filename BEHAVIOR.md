@@ -183,7 +183,7 @@ To stop: `touch .claude/plan-pause` or `status: paused` in the plan file. In the
 | Agent | Model / effort | Tools | For what | What `subagent-evidence` checks on return |
 |---|---|---|---|---|
 | `Explore` (built-in, overridden) | haiku, 6 turns, no CLAUDE.md | Read, Grep, Glob | read-only search | at least one Grep/Glob/Read call and a file path in the answer, or an explicit `NOT FOUND` after at least one call |
-| `scout` | haiku, 6 turns, no CLAUDE.md | Read, Grep, Glob | where the code, config or test lives — paths and lines, changes nothing | the same |
+| `scout` | haiku, 6 turns, no CLAUDE.md | Read, Grep, Glob, four `mcp__graphify__*` | where the code, config or test lives — paths and lines, changes nothing | the same |
 | `test-runner` | sonnet low, 8 turns, no CLAUDE.md | Bash, Read, Grep | runs the named command, short failure analysis | Bash was called; the answer contains `COMMAND:` and `PASS`/`FAIL` with counts |
 | `researcher` | sonnet medium, 12 turns, no CLAUDE.md | Read, Grep, Glob, WebFetch, WebSearch | a map of an unfamiliar subsystem, docs for the pinned version | at least one call and an `EVIDENCE` section with path:line or a URL |
 | `reviewer` | opus high, 12 turns | Read, Grep, Glob, Bash | refute the change: bugs, races, edges, contracts | Read was called |
@@ -191,7 +191,13 @@ To stop: `touch .claude/plan-pause` or `status: paused` in the plan file. In the
 | `worker` | sonnet high, 80 turns, `run-task` preloaded | all | one plan task in delegate mode | Edit/Write/Bash was called; the report reads `T## done\|blocked\|open: …` |
 | anything else | — | — | — | at least one tool call behind a claim of "done" |
 
-`Explore` and `scout` may also answer from a code graph when the session exposes one (`mcp__…graph…__*`, see the README's optional section): the evidence hook counts a graph call as a search, but the answer must still name a `path:line`.
+`scout` carries `get_node`, `get_neighbors`, `query_graph` and `shortest_path` in its `tools:` list at all times. Where `/graphify` has not been run, those names match no tool and are ignored by the binary — they only cost something if they were the *only* names, and `Read, Grep, Glob` are there too. The evidence hook counts a graph call as a search, but the answer must still name a `path:line`.
+
+## 10a. The code graph — `/graphify`
+
+`/graphify` builds an AST graph locally (`graphify extract . --code-only`: no API key, no model tokens) and then decides whether it is worth exposing at all. It refuses on submodules, on an empty extraction, under 20 nodes, over 25% `INFERRED` edges, or under 30% of code files reaching the graph — because a thin graph does not stay silent, it answers confidently and wrongly, which is worse than no graph. Only on a pass does it merge a `graphify` server into `.mcp.json`, ignore `graphify-out/`, and install a git post-commit hook so that every `/run-task` commit rebuilds the graph.
+
+Two things the skill must say out loud rather than gloss over: the tools do not exist in the session that ran it (MCP servers start at session start, so a restart is required), and the post-commit rebuild is detached, so for a few seconds after a commit the graph still describes the previous one.
 
 Common to all: the answer ends with `TOOLS USED: <name:count …>`; `NOT DONE: <why>` is always allowed and never checked. The main session's contract adds: a subagent's report is a claim, not a fact; a path from `scout` is Read before use; a test result without `COMMAND:` and an exit code is rerun; a `TOOLS USED` line that does not fit the answer means the answer is discarded.
 

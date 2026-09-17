@@ -20,7 +20,7 @@ check(){ local name=$1 out=$2 pattern=$3; if printf '%s' "$out" | grep -qE "$pat
 check_empty(){ local name=$1 out=$2; if [ -z "$out" ]; then ok "$name"; else bad "$name" "$out"; fi; }
 
 echo "== syntax"
-for f in "$H"/*.sh "$TARGET/statusline.sh"; do
+for f in "$H"/*.sh "$TARGET/statusline.sh" "$TARGET/graph-setup.sh"; do
   if bash -n "$f" 2>/dev/null; then ok "bash -n $(basename "$f")"; else bad "bash -n $(basename "$f")" "syntax error"; fi
 done
 for f in "$H"/*.py; do
@@ -259,6 +259,47 @@ echo "== statusline"
 out=$(jq -n '{model:{display_name:"Sonnet 5"},effort:{level:"medium"},context_window:{used_percentage:42.7},rate_limits:{five_hour:{used_percentage:61,resets_at:(now+5400)},seven_day:{used_percentage:23}},prompt_cache:{warm:false,ttl:"1h",hit_ratio:0.83,last_miss_cause:{causes:["model_changed"]},recache_tokens_if_cold:123456},workspace:{current_dir:"/x/myproj"}}' | "$TARGET/statusline.sh" | sed -E 's/\x1B\[[0-9;]*m//g')
 check "statusline renders dir/model/ctx/5h/7d" "$out" 'myproj  Sonnet 5/medium  ctx 42%  5h 61%/(89|90)m  7d 23%'
 check "statusline shows cold cache cause and recache size" "$out" 'cache cold:model_changed 123k  hit 83%'
+
+echo "== graph-setup"
+G="$TARGET/graph-setup.sh"
+if [ -x "$G" ]; then ok "graph-setup.sh present and executable"; else bad "graph-setup.sh present and executable" "missing or not +x"; fi
+gdir="$TMP/graph"; mkdir -p "$gdir"
+python3 - "$gdir" <<'PYG'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+def w(name, nodes, links, files=1):
+    json.dump({"nodes": [{"id": str(i), "source_file": "f%d.py" % (i % files)} for i in range(nodes)],
+               "links": links}, open(d / name, "w"))
+w("fit.json", 40, [{"confidence": "EXTRACTED"}] * 50, files=4)
+w("thin.json", 5, [{"confidence": "EXTRACTED"}] * 4)
+w("guessy.json", 40, [{"confidence": "INFERRED"}] * 30 + [{"confidence": "EXTRACTED"}] * 20, files=4)
+w("narrow.json", 40, [{"confidence": "EXTRACTED"}] * 50, files=2)
+(d / "broken.json").write_text("not json")
+PYG
+out=$(bash "$G" --stats "$gdir/fit.json" 4 2>&1); rc=$?
+check "graph-setup: a usable graph is FIT" "$out" 'FIT'
+[ "$rc" -eq 0 ] && ok "graph-setup: FIT exits 0" || bad "graph-setup: FIT exits 0" "exit $rc"
+out=$(bash "$G" --stats "$gdir/thin.json" 2>&1); rc=$?
+check "graph-setup: too few nodes is UNFIT" "$out" 'only 5 nodes'
+[ "$rc" -eq 2 ] && ok "graph-setup: UNFIT exits 2" || bad "graph-setup: UNFIT exits 2" "exit $rc"
+out=$(bash "$G" --stats "$gdir/guessy.json" 4 2>&1)
+check "graph-setup: too many INFERRED edges is UNFIT" "$out" '60\.0% of edges are INFERRED'
+out=$(bash "$G" --stats "$gdir/narrow.json" 20 2>&1)
+check "graph-setup: poor file coverage is UNFIT" "$out" 'covers 10% of code files'
+out=$(bash "$G" --stats "$gdir/broken.json" 2>&1); rc=$?
+check "graph-setup: an unreadable graph is reported, not crashed" "$out" 'unreadable graph'
+[ "$rc" -eq 2 ] && ok "graph-setup: unreadable exits 2" || bad "graph-setup: unreadable exits 2" "exit $rc"
+out=$(bash "$G" --stats 2>&1); rc=$?
+[ "$rc" -eq 64 ] && ok "graph-setup: --stats without a path exits 64" || bad "graph-setup: --stats without a path exits 64" "exit $rc"
+mkdir -p "$gdir/umbrella" && touch "$gdir/umbrella/.gitmodules"
+( cd "$gdir/umbrella" && git init -q 2>/dev/null )
+out=$(cd "$gdir/umbrella" && bash "$G" 2>&1); rc=$?
+check "graph-setup: an umbrella repository is refused" "$out" 'has submodules'
+[ "$rc" -eq 2 ] && ok "graph-setup: umbrella refusal exits 2" || bad "graph-setup: umbrella refusal exits 2" "exit $rc"
+out=$(cd "$TMP" && bash "$G" 2>&1)
+check "graph-setup: a non-repository is refused" "$out" 'not a git repository|is not on PATH'
+if grep -q 'mcp__graphify__get_node' "$TARGET/agents/scout.md"; then ok "scout may call the graph tools"; else bad "scout may call the graph tools" "not in tools:"; fi
+if [ -f "$TARGET/skills/graphify/SKILL.md" ]; then ok "graphify skill installed"; else bad "graphify skill installed" "missing"; fi
 
 echo
 echo "passed $pass, failed $fail"

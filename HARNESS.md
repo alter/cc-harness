@@ -10,10 +10,11 @@
 ├── settings.json                   model, effort, cache, ceilings, hooks
 ├── statusline.sh                   status line: limits and cache
 ├── hooks/ (10)                     deterministic guards outside the model's context
-├── skills/ (8)                     /intake /task /plan /run /run-task /test /verify /diagnose
+├── skills/ (9)                     /intake /task /plan /run /run-task /test /verify /diagnose /graphify
 ├── agents/ (7)                     Explore scout test-runner researcher reviewer verifier worker
 ├── night.sh                        the overnight run, one long session
 ├── install.sh selftest.sh uninstall.sh   backup → install → checks → rollback (INSTALL.md)
+├── graph-setup.sh                   builds a code graph, refuses to wire one that would answer wrongly
 ├── advisor-check.sh                 is the advisor actually enabled in this install, and if not, why
 └── advisor-stats.sh                 how often the Opus advisor fired, and on how much context
 
@@ -115,6 +116,7 @@ Only their descriptions live in context (under 1536 characters all together); th
 | `/run-task` | `worker`, or you for a single task | what one task reads, does, verifies, marks and logs — then stops |
 | `/test` | you, or `/plan` when a task needs cover | coverage chosen by risk, every test seen red before it passes, a mutation proving each guard can fail, `scripts/coverage_gate.py` in the gate checks so the floor can only rise, and a one-off `mutmut`/`stryker` audit (by hand, never a gate) whose surviving mutants become tasks |
 | `/verify` | you / `/run` when it finishes | a fresh context (`verifier`): `VERIFY.md` stating what this context did *not* do, reproduction from a clean state, reverse control by mutation, "what was not checked" |
+| `/graphify` | you, once per repository | a local AST graph built with zero model tokens, refused outright when it would answer wrongly (submodules, empty extraction, under 20 nodes, over 25% `INFERRED`, under 30% file coverage), and only then wired into `.mcp.json` with a post-commit rebuild |
 | `/diagnose` | the model after a failure / you | freeze → versions off the machine → the levels (environment, dependencies, logs, trace, state, measurements, debugger) → three hypotheses → documentation for the pinned version → third-party workarounds only in scratch → the advisor on split evidence → one fix plus a regression test |
 
 ### `agents/` — seven roles

@@ -6,7 +6,7 @@ Every mechanism here was verified against the Claude Code 2.1.272 binary.
 ## Install
 
 ```bash
-./selftest.sh                       # 91 checks on the checkout, installs nothing
+./selftest.sh                       # 107 checks on the checkout, installs nothing
 ./install.sh ~/.claude-harness-test # trial copy; CLAUDE_CONFIG_DIR=~/.claude-harness-test claude
 ./install.sh                        # into ~/.claude: backup → files → settings.json merge → checks
 ./selftest.sh ~/.claude             # the same checks against what is now installed
@@ -114,7 +114,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 |---|---|---|
 | `CLAUDE.md` | every session | the working contract: questions, autonomy, debugging, code, cost hygiene |
 | `BEHAVIOR.md` | reading | the whole behaviour step by step: startup, interview, plan, execution, guards, diagnosis, overnight |
-| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 91 checks, rollback |
+| `INSTALL.md`, `install.sh`, `selftest.sh`, `uninstall.sh` | by hand | backup, install with a settings merge, 107 checks, rollback |
 | `skills/intake` | `/intake` | one project-level interview → `docs/PROJECT.md`: capability ledger, "decided by the agent", gate checks, what may run unattended |
 | `skills/task` | `/task` | a new task in the `tasks/<phase>/<NN>-<slug>/` tree: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` starts a new tree |
 | `skills/plan` | `/plan` | interview → plan; for a task directory, a `PLAN.md` inside it built from `task.txt`; `T00` is the baseline |
@@ -123,6 +123,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 | `skills/run-task` | `/run-task <plan> <T##>`, preloaded into `worker` | the procedure for one task: what to read, do, verify, mark and log |
 | `skills/test` | `/test` | coverage by risk, red first, reverse control by mutation, and the ratchet wired into the gate checks |
 | `skills/diagnose` | `/diagnose` | engineering diagnosis |
+| `skills/graphify` + `graph-setup.sh` | `/graphify` | builds a local code graph, judges whether it is worth trusting, and only then wires it into `.mcp.json` as a tool for `scout` |
 | `hooks/stop-guard.sh` | `Stop` | refuses to stop while tasks are open |
 | `hooks/retry-guard.sh` | `PostToolUse(Bash)`, `PostToolUseFailure(Bash)` | catches the same failed command being repeated |
 | `hooks/notify.sh` | `Notification`, and from stop-guard | desktop notification |
@@ -178,7 +179,7 @@ The format is one directory per task, two required files and a validator (`tasks
 
 The bundled `tasks/check.py` is generic: phases come from the `phase:` block in `tasks/README.md`, roles from the table in `ROLES.md`, milestones and gates from `GOAL.md`; `VERIFY.md` and `BLOCKED.md` markers are recognised in two languages. On a real tree it finds real discrepancies: a SCOPE with no `−` lines, a `phase:` outside the vocabulary, `status:blocked` without `BLOCKED.md`, `verify:passed` without `VERIFY.md`, a missing DEPENDS section, DEPENDS prose disagreeing with the label, and `path:line` references that drifted after edits.
 
-## Optional: a code graph as a scout tool
+## Optional: a code graph as a scout tool — `/graphify`
 
 `scout` and `Explore` resolve a symbol with Grep, which searches text. On a large codebase a
 symbol whose name is an ordinary English word costs a fortune in tokens and answers badly:
@@ -186,26 +187,35 @@ measured on a 600k-line repository, `grep -w Cluster` returned 2,827 lines (~73k
 `grep assemble` 114 lines (~3.5k tokens) of mostly prose.
 
 A code graph answers the same two questions — *which definition is this* and *who calls it* —
-from an AST index. [graphify](https://github.com/Graphify-Labs/graphify) builds one locally
-with tree-sitter in seconds and spends no model tokens, and serves it over MCP
-(`get_node`, `get_neighbors`, `query_graph`, `shortest_path`). On the same repository the two
-answers above cost 82 and 39 tokens, with exact `path:line` for every caller and callee.
-
-Wire it as a tool, not as a hook. In the project:
-
-```jsonc
-// .mcp.json
-{ "mcpServers": { "graphify": { "command": "graphify-mcp", "args": ["graphify-out/graph.json"] } } }
-```
+from an AST index. [graphify](https://github.com/Graphify-Labs/graphify) builds one locally with
+tree-sitter in seconds and spends no model tokens, and serves it over MCP. On the same repository
+the two answers above cost 82 and 39 tokens, with exact `path:line` for every caller and callee.
 
 ```bash
-graphify extract . --code-only     # local AST, zero model tokens; rebuild with `graphify update`
-echo 'graphify-out/' >> .gitignore
+pip install graphifyy      # once
+/graphify                  # in the project, once
 ```
 
-Then give the project's own `scout` the graph tools in `.claude/agents/scout.md`
-(`tools: Read, Grep, Glob, mcp__graphify__get_node, mcp__graphify__get_neighbors,
-mcp__graphify__query_graph, mcp__graphify__shortest_path`). `subagent-evidence` accepts a
+`/graphify` runs `graph-setup.sh`, which builds the graph with `graphify extract . --code-only`
+and then **judges it before wiring anything**:
+
+| Refusal | Why |
+|---|---|
+| the repository has submodules | an umbrella repository resolves nearly every cross-repository edge wrongly — measured: 559 of 566 cross-repository edges were false `INFERRED` guesses |
+| extraction produced nothing | the parser does not read these languages |
+| fewer than 20 nodes | nothing here that a grep cannot answer |
+| over 25% `INFERRED` edges | the graph is mostly guessing |
+| under 30% of code files reached the graph | the grammar does not really cover this language |
+
+Only on a pass does it add a `graphify` server to `.mcp.json` (merging, never replacing),
+add `graphify-out/` to `.gitignore`, and install a git post-commit hook that rebuilds the graph
+after every commit — which matters, because `/run-task` commits after each task. Thresholds:
+`CC_GRAPH_MIN_NODES`, `CC_GRAPH_MAX_INFERRED`, `CC_GRAPH_MIN_COVERAGE`.
+
+MCP servers start at session start, so the tools do not exist in the session that ran `/graphify`.
+Restart `claude`, then check one symbol you already know against `grep -n` before trusting the
+rest. `scout` already carries the four graph tools in its `tools:` list; where no graph exists,
+those names resolve to nothing and it falls back to Grep. `subagent-evidence` accepts a
 `mcp__…graph…__*` call as search evidence, so a scout that answered from the graph is not sent
 back for a Grep it did not need.
 
@@ -215,11 +225,11 @@ Bash call — a per-call tax on a long session, and an instruction `scout` canno
 `scout` has no Bash. As a tool the model calls it when it helps and ignores it when it does not.
 
 What the graph is not: it answers symbol questions, not "how does this flow work" — keyword
-seeding picks the wrong entry points for those. About 7% of its edges (9% of call edges) are
-`INFERRED` guesses, and they are the ones that look most interesting; cross-file guesses like
-SQLAlchemy's `select()` pointing at an unrelated local `select()` are normal. Prefer
-`EXTRACTED`, and treat the rest as a lead, not a fact. A graph also goes stale the moment code
-changes: rebuild after edits, or install its git post-commit hook.
+seeding picks the wrong entry points for those. `INFERRED` edges are guesses, and they are the
+ones that look most interesting; cross-file guesses like SQLAlchemy's `select()` pointing at an
+unrelated local `select()` are normal. Prefer `EXTRACTED`, and treat the rest as a lead. The
+post-commit rebuild is detached, so for a few seconds after a commit the graph still describes
+the previous one.
 
 ## A new repository
 

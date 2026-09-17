@@ -7,12 +7,12 @@ TARGET=${2:-$HOME/.claude}
 TARGET=${TARGET/#\~/$HOME}
 SRC=$(cd "$(dirname "$0")" && pwd)
 BIN_DIR=${CC_BIN_DIR:-$HOME/bin}
-ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh hooks agents skills commands project-template keybindings.json)
+ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template keybindings.json)
 
 [ -f "$BACKUP/MANIFEST.txt" ] || { echo "not a harness backup: $BACKUP" >&2; exit 1; }
 
 echo "== remove harness files from $TARGET"
-rm -f "$TARGET/CLAUDE.md" "$TARGET/statusline.sh"
+rm -f "$TARGET/CLAUDE.md" "$TARGET/statusline.sh" "$TARGET/graph-setup.sh"
 for f in "$SRC"/hooks/*.sh; do rm -f "$TARGET/hooks/$(basename "$f")"; done
 for f in "$SRC"/agents/*.md; do rm -f "$TARGET/agents/$(basename "$f")"; done
 for s in "$SRC"/skills/*/; do rm -rf "$TARGET/skills/$(basename "$s")"; done
@@ -39,7 +39,7 @@ missing=0
 while IFS= read -r rel; do
   [ -z "$rel" ] && continue
   case "$rel" in
-    ./settings.json|./settings.local.json|./CLAUDE.md|./statusline.sh|./hooks/*|./agents/*|./skills/*|./commands/*|./project-template/*|./keybindings.json)
+    ./settings.json|./settings.local.json|./CLAUDE.md|./statusline.sh|./graph-setup.sh|./hooks/*|./agents/*|./skills/*|./commands/*|./project-template/*|./keybindings.json)
       [ -e "$TARGET/$rel" ] || { echo "   missing after restore: $rel"; missing=1; } ;;
   esac
 done < "$BACKUP/MANIFEST.txt"

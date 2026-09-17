@@ -27,7 +27,7 @@ du -sh ~/claude-full-*.tgz
 
 Check that the archive is readable: `tar tzf ~/claude-full-*.tgz | head`.
 
-## 2. Checks without installing — 91 checks on synthetic input
+## 2. Checks without installing — 107 checks on synthetic input
 
 ```bash
 git clone https://github.com/alter/cc-harness && cd cc-harness
@@ -49,7 +49,8 @@ What gets checked (nothing is written outside a temporary directory; counter sta
 - `subagent-evidence` also accepts a code-graph call (`mcp__…graph…__*`) as search evidence for scout;
 - `scripts/coverage_gate.py` against synthetic reports: the floor rises when coverage grows, a drop exits non-zero and does not lower the floor, and lcov as well as coverage.py reports are understood;
 - `advisor-stats.sh` against a synthetic transcript counts the advisor calls and the context they forwarded;
-- `statusline` against a sample JSON renders the directory, model, context, 5h, 7d, the cold-cache cause and the hit ratio.
+- `statusline` against a sample JSON renders the directory, model, context, 5h, 7d, the cold-cache cause and the hit ratio;
+- `graph-setup`: a usable graph is `FIT`; too few nodes, too many `INFERRED` edges and poor file coverage are each `UNFIT` with exit 2; an unreadable graph is reported rather than crashed; a repository with submodules and a non-repository are both refused before `graphify` is even required.
 
 `./selftest.sh` with no argument tests the checkout, so the hook paths inside its `settings.json`
 (`~/.claude/hooks/...`) point somewhere else and are reported as `SKIP` — that is the source tree
