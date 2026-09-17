@@ -301,6 +301,28 @@ check "graph-setup: a non-repository is refused" "$out" 'not a git repository|is
 if grep -q 'mcp__graphify__get_node' "$TARGET/agents/scout.md"; then ok "scout may call the graph tools"; else bad "scout may call the graph tools" "not in tools:"; fi
 if [ -f "$TARGET/skills/graphify/SKILL.md" ]; then ok "graphify skill installed"; else bad "graphify skill installed" "missing"; fi
 
+echo "== night.sh"
+N="$SRC/night.sh"
+nd="$TMP/night"; mkdir -p "$nd/docs/plans" "$nd/tasks/10-x/03-y" "$nd/.claude"
+printf '# Analysis\n\n- [ ] look at this\n' > "$nd/docs/plans/notaplan.md"
+printf -- '---\nstatus: paused\ncreated: 2026-09-17\n---\n# P\n## Tasks\n- [!] T01 x\n' > "$nd/tasks/10-x/03-y/PLAN.md"
+printf -- '---\nstatus: running\ncreated: 2026-09-17\n---\n# P\n## Tasks\n- [x] T01 x\n' > "$nd/docs/plans/finished.md"
+printf -- '---\nstatus: running\ncreated: 2026-09-17\n---\n# P\n## Notes\n- [ ] a bullet\n' > "$nd/docs/plans/notasks.md"
+out=$(bash "$N" docs/plans/notaplan.md "$nd" 2>&1); rc=$?
+check "night.sh: a document without front matter is not a plan" "$out" 'has no front matter'
+[ "$rc" -eq 1 ] && ok "night.sh: refusal exits 1" || bad "night.sh: refusal exits 1" "exit $rc"
+out=$(bash "$N" tasks/10-x/03-y "$nd" 2>&1)
+check "night.sh: a task directory resolves to its PLAN.md" "$out" 'plan is paused'
+check "night.sh: paused says why and what to do" "$out" 'NEED_HUMAN'
+out=$(bash "$N" docs/plans/finished.md "$nd" 2>&1)
+check "night.sh: a finished plan is refused" "$out" 'nothing open'
+out=$(bash "$N" docs/plans/notasks.md "$nd" 2>&1)
+check "night.sh: bullets without a T-number are not tasks" "$out" 'no tasks in'
+out=$(bash "$N" docs/plans/missing.md "$nd" 2>&1)
+check "night.sh: a missing plan is named" "$out" 'no such plan'
+out=$(bash "$N" tasks/10-x "$nd" 2>&1)
+check "night.sh: a directory without PLAN.md says so" "$out" 'no PLAN.md in that task directory'
+
 echo
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ]

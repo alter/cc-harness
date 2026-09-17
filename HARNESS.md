@@ -143,7 +143,11 @@ Reads the status-line JSON: `rate_limits.five_hour/seven_day`, `prompt_cache.war
 
 ### `night.sh`
 
-`cc-night tasks/10-x/03-y` → the plan goes `running`, the pause file is cleared, then `claude --dangerously-skip-permissions --effort high --settings '{"autoContinueAtUsageLimit":true}' "/run …"`. Sandbox without production credentials only — your choice, your responsibility.
+`cc-night tasks/10-x/03-y` (a task directory resolves to its `PLAN.md`) or `cc-night docs/plans/<slug>.md` → the plan goes `running`, the pause file is cleared, then `claude --dangerously-skip-permissions --effort high --settings '{"autoContinueAtUsageLimit":true}' "/run …"`. Sandbox without production credentials only — your choice, your responsibility.
+
+It refuses before starting, and says which of these it is: the file has no front matter (a document *about* the work is not a plan *for* it); `status:` is `paused` — a previous run ended with `NEED_HUMAN`, so read `## Log` and `BLOCKED.md` and settle that first; `status:` is `done`; there are no `- [ ] T## … — verify:` lines, only prose bullets; or every task is already `[x]`/`[!]`. Each refusal is exit 1, before a single token is spent.
+
+Why that matters more than it looks: `/run` and the Stop hook count `- [ ] ` lines. Hand them a checklist with no verify commands and the hook has nothing that can ever be closed — it would block the turn until the ceiling, on a file that was never meant to be executed.
 
 ### the standalone scripts
 
@@ -151,7 +155,7 @@ Reads the status-line JSON: `rate_limits.five_hour/seven_day`, `prompt_cache.war
 |---|---|---|
 | `install.sh` | by hand | backup → copy → merge `settings.json` (your `permissions`, `env` and other people's hooks survive; the harness's own keys win, and the diff is printed) → syntax checks. Repeatable: a second run does not duplicate a hook. `CC_BIN_DIR` decides where `cc-night` lands — set it to a directory that is actually in your `PATH`. |
 | `uninstall.sh` | by hand | removes only the files this checkout owns and restores the backup, checked against `MANIFEST.txt` |
-| `selftest.sh` | by hand | 107 checks on a checkout, 119 against an installed copy; writes nothing outside a temporary directory |
+| `selftest.sh` | by hand | 115 checks on a checkout, 127 against an installed copy; writes nothing outside a temporary directory |
 | `graph-setup.sh` | `/graphify`, or by hand | builds the code graph and decides whether it is fit to expose; `--stats <graph.json> [code-files]` prints the verdict for an existing graph without touching anything |
 | `advisor-check.sh` | after installing | one `ping` through `--debug-file`, then `ENABLED — claude-opus-5` or the ordered list of reasons it is off |
 | `advisor-stats.sh` | by hand | how often the advisor fired and how much context each call forwarded, from `~/.claude/projects/*.jsonl` |
