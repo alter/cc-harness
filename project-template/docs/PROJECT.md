@@ -90,7 +90,17 @@ recorded here, with a date and a reason, and never a way to make a check pass.
 | Branch policy | _unanswered_ |
 | Who reviews before merge | _unanswered_ |
 
-## 8. Owning docs
+## 8. Disclosure required by the receiving repository
+
+Read the target's `CONTRIBUTING.md` / `AGENTS.md` before filling this in; the answer belongs to them, not to us. `none` means the repository asks for nothing and nothing is volunteered. A wording means it is inserted verbatim into the pull-request body. `_unanswered_` blocks opening a pull request there.
+
+| Target | What it requires | Wording to use |
+|---|---|---|
+| this repository | _unanswered_ | _unanswered_ |
+
+Whatever this says, a direct question from a person is answered by the owner, not by the session, and the session never writes in his voice outside this machine.
+
+## 9. Owning docs
 
 Read before working in the area. Prefer `.claude/rules/<area>.md` with `paths:` so this loads automatically.
 

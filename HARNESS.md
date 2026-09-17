@@ -51,7 +51,7 @@ Questions are asked at two points — `/intake` and `/task`/`/plan` — and nowh
 
 ### `CLAUDE.md` — the contract (loaded into every session, ~700 tokens)
 
-Seven sections: questions only before the work starts; scope decided by the capability ledger; the task tree as the ledger of work; finish the plan; git and workspace; diagnosis instead of retries; code; cost hygiene. This is the only place where behaviour is set in prose. Everything that could be made deterministic was moved into a hook — prose can be forgotten after compaction, a hook cannot.
+Nine sections: questions only before the work starts; scope decided by the capability ledger; the task tree as the ledger of work; finish the plan; git and workspace; speaking outside the repository; diagnosis instead of retries; code; cost hygiene. This is the only place where behaviour is set in prose. Everything that could be made deterministic was moved into a hook — prose can be forgotten after compaction, a hook cannot.
 
 ### `settings.json` — what and why
 
@@ -155,10 +155,19 @@ Why that matters more than it looks: `/run` and the Stop hook count `- [ ] ` lin
 |---|---|---|
 | `install.sh` | by hand | backup → copy → merge `settings.json` (your `permissions`, `env` and other people's hooks survive; the harness's own keys win, and the diff is printed) → syntax checks. Repeatable: a second run does not duplicate a hook. `CC_BIN_DIR` decides where `cc-night` lands — set it to a directory that is actually in your `PATH`. |
 | `uninstall.sh` | by hand | removes only the files this checkout owns and restores the backup, checked against `MANIFEST.txt` |
-| `selftest.sh` | by hand | 115 checks on a checkout, 127 against an installed copy; writes nothing outside a temporary directory |
+| `selftest.sh` | by hand | 120 checks on a checkout, 132 against an installed copy; writes nothing outside a temporary directory |
 | `graph-setup.sh` | `/graphify`, or by hand | builds the code graph and decides whether it is fit to expose; `--stats <graph.json> [code-files]` prints the verdict for an existing graph without touching anything |
 | `advisor-check.sh` | after installing | one `ping` through `--debug-file`, then `ENABLED — claude-opus-5` or the ordered list of reasons it is off |
 | `advisor-stats.sh` | by hand | how often the advisor fired and how much context each call forwarded, from `~/.claude/projects/*.jsonl` |
+
+### speaking outside the repository
+
+A pull request, an issue, a review reply and a commit message strangers will read are all places where the user's name is on the text. The contract draws one line there and `docs/PROJECT.md` §8 holds the fact behind it:
+
+- **Never in his voice.** The session drafts; the user sends. It does not post, comment or reply on his behalf, so it is never a party to that conversation.
+- **Neither announces nor denies.** Nothing about the tooling goes into a commit, a body or a comment unprompted — and there is nothing to strip: the harness emits no attribution and sets `includeCoAuthoredBy: false`. Asked directly, the session answers nothing and hands the question to the user with its draft. Silence that nobody notices is one thing; an answer engineered to mislead is another, and the harness does not write the second.
+- **Never claims his understanding.** "I reviewed this", "my reasoning was" are his sentences. Where a reason exists in `PLAN.md`, `## Log`, `DECISIONS.md` or `VERIFY.md` it is quoted with its source; where none exists the session says so, which marks exactly the places he has to read the diff before sending anything.
+- **§8 is quoted, not invented.** It records what the receiving repository's own `CONTRIBUTING.md`/`AGENTS.md` demands: `none`, or a wording inserted verbatim. `_unanswered_` on an external target stops a pull request being opened at all — the safe failure.
 
 ### `project-template/`
 

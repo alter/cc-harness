@@ -26,6 +26,7 @@ AskUserQuestion, up to 4 per call, calls back to back, none later. Cover:
 6. **Definition of done for any task**: the exact commands that must exit 0 before a task is `[x]` (tests, lint, type check, architecture check). If the suite is already red, is the baseline accepted as-is?
 7. **Coverage**: is there a coverage command and a report format; what does it measure today (run it, do not ask for the number); should the ratchet (`scripts/coverage_gate.py`, a floor that rises and never falls by itself) be part of the gate checks, and if the suite is slow, per task or per plan?
 8. **Delivery**: commit per task or per plan; branch policy; who reviews.
+9. **Contributing outward**: does work from here go to a repository someone else owns? If so, read that target's `CONTRIBUTING.md`/`AGENTS.md` first and ask only what is not written there: what it requires disclosed, and in what wording. `none` is a valid answer when it requires nothing. Do not ask the user to invent a policy — this row records what the receiving project already demands.
 
 Do not ask about: file layout, naming, library choice when the repo already has one, formatting, hosting-provider comparisons, anything in "Decided by the agent".
 
@@ -37,6 +38,7 @@ Fill the template. Rules:
 - **Decided by the agent** lists decision classes the user does not want to be asked about. Start from the defaults in the template, add project-specific ones from the interview.
 - **Gate checks** lists the commands from question 6 verbatim, plus `python3 scripts/coverage_gate.py --run` when the answer to question 7 put the ratchet there. `/plan` copies them into every task's verify line. The first run of the gate records the coverage floor (`--set-floor`); the floor is where the project is today, not where it should be.
 - **Unattended policy** lists what `/run` may do alone and what must become `[!] BLOCKED`.
+- **Disclosure** (§8) is a fact about the receiving repository, quoted from its own contributing rules, not a preference. Leave `_unanswered_` rather than guess: an unanswered row stops a pull request being opened there, which is the safe failure. It changes nothing about who answers a direct question — that is always the owner.
 - Set `intake: completed <date>`.
 
 ## 4. Wire the repo

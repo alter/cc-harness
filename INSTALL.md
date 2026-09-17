@@ -27,7 +27,7 @@ du -sh ~/claude-full-*.tgz
 
 Check that the archive is readable: `tar tzf ~/claude-full-*.tgz | head`.
 
-## 2. Checks without installing — 115 checks on synthetic input
+## 2. Checks without installing — 120 checks on synthetic input
 
 ```bash
 git clone https://github.com/alter/cc-harness && cd cc-harness

@@ -323,6 +323,14 @@ check "night.sh: a missing plan is named" "$out" 'no such plan'
 out=$(bash "$N" tasks/10-x "$nd" 2>&1)
 check "night.sh: a directory without PLAN.md says so" "$out" 'no PLAN.md in that task directory'
 
+echo "== speaking outside the repository"
+C="$TARGET/CLAUDE.md"; PT="$TARGET/project-template/docs/PROJECT.md"; IN="$TARGET/skills/intake/SKILL.md"
+if grep -q '^## Speaking outside the repository' "$C"; then ok "the contract carries the outward-speech rule"; else bad "the contract carries the outward-speech rule" "section missing from CLAUDE.md"; fi
+if grep -q 'you draft it, the user sends it' "$C"; then ok "the session never writes in the user's voice outside"; else bad "the session never writes in the user's voice outside" "rule missing"; fi
+if grep -q 'never announce what made the change and you never deny it' "$C"; then ok "neither announce nor deny"; else bad "neither announce nor deny" "rule missing"; fi
+if grep -q '^## 8\. Disclosure required by the receiving repository' "$PT"; then ok "PROJECT.md template has the disclosure row"; else bad "PROJECT.md template has the disclosure row" "section missing"; fi
+if grep -q 'Contributing outward' "$IN"; then ok "/intake asks what the receiving repository requires"; else bad "/intake asks what the receiving repository requires" "question missing"; fi
+
 echo
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ]

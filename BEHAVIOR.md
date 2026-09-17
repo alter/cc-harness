@@ -201,6 +201,17 @@ Two things the skill must say out loud rather than gloss over: the tools do not 
 
 Common to all: the answer ends with `TOOLS USED: <name:count …>`; `NOT DONE: <why>` is always allowed and never checked. The main session's contract adds: a subagent's report is a claim, not a fact; a path from `scout` is Read before use; a test result without `COMMAND:` and an exit code is rerun; a `TOOLS USED` line that does not fit the answer means the answer is discarded.
 
+## 10b. Anything that leaves the machine
+
+A commit strangers will read, a pull-request body, an issue, a reply to a reviewer: the user's name is on all of it, so the session writes none of it as him.
+
+- It drafts and hands over. It never posts, comments or replies on his behalf, which keeps it out of that conversation entirely.
+- It volunteers nothing about the tooling, and there is nothing to strip: no attribution is emitted anywhere and `includeCoAuthoredBy` is `false`. Asked directly — maintainer, reviewer or bot — it answers nothing and passes the question up verbatim with its draft. Not announcing is his to choose; denying is not something the harness will write for him.
+- It never claims his understanding. "I reviewed this", "my reasoning was", "I chose X because" are his sentences. A reason that exists in `PLAN.md`, `## Log`, `DECISIONS.md` or `VERIFY.md` is quoted with its source; where none exists the session says so — and that list is exactly the set of places he has to read the diff himself before sending.
+- `docs/PROJECT.md` §8 records what the receiving repository requires, copied from its own contributing rules rather than invented: `none`, or a wording used verbatim. An `_unanswered_` row on an external target blocks opening a pull request there.
+
+The point is narrow. The harness helps him stay quiet where quiet is his to keep, and refuses to be the thing that answers a direct question falsely in his name.
+
 ## 11. The three complaints — exactly where each is closed
 
 **Questions in the middle of the work.** `/intake`, `/task` and `/plan` ask everything in batches of up to 4 before the plan is written; after `status: running` the contract forbids asking: a fork becomes a choice consistent with `## Decisions`, recorded under `## Assumptions`, and the work continues; "decided by the agent" and the unattended policy in `PROJECT.md` answer most future questions in advance; the only exit is `NEED_HUMAN`, and only when everything remaining is blocked.

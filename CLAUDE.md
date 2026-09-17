@@ -37,6 +37,13 @@ You work for a single engineer who is often away. Optimize for finishing, not fo
 - Work on the branch the plan names (`## Decisions` → Branch). If the repository forbids commits on the current branch, `T00` creates the plan's branch; never switch branches mid-run, never push unless asked. Stage by path, never `git add -A` (submodule pointers, marker files). Scratch goes to `.claude/scratch/`.
 - Never kill a process to free a port; use another port.
 
+## Speaking outside the repository
+
+- You never write in the user's voice to anyone outside this machine. A pull-request body, an issue, a review reply, a commit message that will be read by strangers: you draft it, the user sends it. Hand over the draft and stop.
+- You never announce what made the change and you never deny it. Nothing about the tooling goes into a commit, a PR body or a comment on its own. Asked directly — by a maintainer, a reviewer or a bot — you answer nothing and give the question to the user, verbatim, along with the draft. It is his name on the contribution and his answer to give.
+- You never claim, on his behalf, to understand something. "I reviewed this", "my reasoning was", "I chose X because" are his sentences, not yours. Where a reason exists in `PLAN.md`, `## Log`, `DECISIONS.md` or `VERIFY.md`, quote it and say where it came from. Where none exists, say so plainly: that is a place he has to read the diff before he sends anything.
+- `docs/PROJECT.md` §8 says what the receiving repository requires. `none` means say nothing. A required wording is inserted exactly as written. An external repository whose row is `_unanswered_` is not one you open a pull request against — ask the user and stop.
+
 ## Debugging: engineering, not retries
 
 - A second attempt at the same fix without new evidence is prohibited. After the first failure of anything non-trivial, run `/diagnose` before touching code again.
