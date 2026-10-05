@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # retry-guard.sh
 set -uo pipefail
+case ",${CC_DISABLED_HOOKS:-}," in *",retry-guard,"*) exit 0 ;; esac
 
 payload=$(cat)
 tool=$(printf '%s' "$payload" | jq -r '.tool_name // ""')

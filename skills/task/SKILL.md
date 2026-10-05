@@ -32,7 +32,20 @@ Everything derivable from the repo, `GOAL.md`, `DECISIONS.md` is derived, not as
 - what is explicitly out (the `−` lines) and which task owns each excluded piece;
 - which role does it; whether any part needs a human (then that part is its own `role:HUMAN` task, or a numbered VERIFY item marked HUMAN);
 - priority and milestone if not obvious from the phase;
-- hard dependencies.
+- hard dependencies;
+- for every external input the task reads: its type with range or size, whether it may be null, and the one question that matters later — **can this value legitimately contain something an interpreter would execute** (markup, SQL, shell, a URL scheme, an instruction to a model)? Types and limits come from `docs/tech/<name>@<version>.md` or the official documentation of the pinned version, never from memory; ask only what the documentation cannot answer;
+- for every sink the task adds (HTML, push payload, deep link, email, CSV, SQL, shell, log, a model's prompt): which existing fields it consumes.
+
+## 2a. Split by logical parts, not by size
+
+Decide before writing whether the work is one task or several. A part is separable only when it has all three: its own verifiable result, its own write set that overlaps no sibling (function, method, file, config key, migration), and a ready input (interfaces already fixed). Missing any one → indivisible: one task, `indivisible: <why>` in SCOPE, however long its description is.
+
+When it splits, write the children in this order:
+1. `split:contract` — the signatures and the DATA records the parts rely on;
+2. `split:part` — one per separable part, each `depends:` on the contract, each with its own WRITE-SET; two parts may share a file only at different symbols (`file::Class.method`), never the same unit;
+3. `split:assembly` — depends on every part, merges them and runs the fast tier.
+
+Parts with no dependency between them and disjoint write sets are the ones `/run` may give to parallel workers.
 
 ## 3. Write the files
 
@@ -51,18 +64,31 @@ CONTEXT
   Line numbers where they help. Never "read everything".
 
 SCOPE
-  + what is included, one line per item
+  + S1 what is included, one line per item (format:2: every + line carries S<n>)
   − what is deliberately excluded, and which task or document owns it instead
+  indivisible: <why>          (a leaf task that is not split)
+
+WRITE-SET
+  path/to/file.py::Symbol     (default level: the file; a symbol when siblings share a file)
+
+DATA
+  <field>: dir=in|out; type=…; range=…|size=…; null=yes|no; interpretable=yes|no; [validated=<test>;] source=<versioned doc URL>
+  or (none)
+
+SECURITY
+  sink <name>: consumes <field>[, <field>]; protection=<what>; test=<path::test>
+  or (no sinks)
 
 OUTCOME
   The artefact that exists when this is done, by path or by measurable value.
   Not "code written". Not "tests green".
 
 VERIFY (<ROLE>)
-  1. Numbered checks a different context can run or observe.
-  2. At least one reverse-control item: the change that must turn the check
-     red ("обратный контроль" / "reverse control"). A check that was never
-     red proves nothing.
+  1. [fast] Numbered checks a different context can run or observe.
+  2. [fast] reverse control: <the mutation> → <path::test that goes red>
+     ("обратный контроль"). A check that was never red proves nothing.
+  3. [full, heavy] mutation, fuzzing, long integration — run only in the full
+     (night or milestone) run; at most three [fast, heavy] items per task.
   N. Items only a person can judge are marked HUMAN in the item text.
 
 ROLE
@@ -76,6 +102,7 @@ Rules the validator enforces and you must satisfy before running it:
 - all eight sections present, in order; SCOPE has at least one `−` line (the character U+2212, not a hyphen);
 - DEPENDS text and `depends:` label agree; a dependency points at an existing directory and never at a later milestone;
 - `gate:yes` only on the gate tasks named in `GOAL.md`.
+- format 2 (`format:2`, the default for new tasks **when the tree has `tasks/format2.py`**). A tree whose validator predates it — no `format2.py`, no `format` label in its `check.py` — keeps its own format: write the task in the original eight sections, without `format:2`, and offer the upgrade (copy `format2.py`, `scope_check.py`, `tech_check.py` and the new `check.py` from `~/.claude/project-template/tasks/`) as a decision for the owner, because `tasks/README.md` and the tree's own validator outrank this skill. Format 2 rules: every `+` line has `S<n>`; WRITE-SET, DATA and SECURITY present; every DATA record has range or size and a versioned source, `interpretable=no` names its input test; every sink protects and tests each `interpretable=yes` field it consumes; every VERIFY item has a tier; one item names reverse control. The full rules are in the "Format 2" section of `tasks/README.md`.
 
 ### `labels.txt` — one `key:value` per line, values from `tasks/README.md`
 
@@ -89,6 +116,8 @@ verify:pending
 depends:<path>          (only if there is one)
 milestone:<M?>
 gate:yes                (only on gate tasks)
+format:2                (only when tasks/format2.py exists; legacy trees keep the old rules)
+capability:<ledger row> (when the task adds or changes a product capability; the row must be included/available)
 ```
 
 New tasks start `status:todo`, `verify:pending`. Never set `verify:passed` here — that is `/verify`, in another context.

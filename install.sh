@@ -5,7 +5,7 @@ set -euo pipefail
 SRC=$(cd "$(dirname "$0")" && pwd)
 TARGET=${1:-$HOME/.claude}
 TARGET=${TARGET/#\~/$HOME}
-BIN_DIR=${CC_BIN_DIR:-$HOME/bin}
+if [ "$TARGET" = "$HOME/.claude" ]; then BIN_DIR=${CC_BIN_DIR:-$HOME/bin}; else BIN_DIR=${CC_BIN_DIR:-$TARGET/bin}; fi
 STAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP=${CC_BACKUP_DIR:-$HOME/.claude-backup/$STAMP}
 ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template keybindings.json)
@@ -28,6 +28,7 @@ else
 fi
 [ -f "$HOME/.claude.json" ] && cp "$HOME/.claude.json" "$BACKUP/dot-claude.json"
 [ -f "$BIN_DIR/cc-night" ] && cp "$BIN_DIR/cc-night" "$BACKUP/cc-night"
+[ -f "$BIN_DIR/cc-fullrun" ] && cp "$BIN_DIR/cc-fullrun" "$BACKUP/cc-fullrun"
 printf 'source=%s\ntarget=%s\nbin=%s\ndate=%s\n' "$SRC" "$TARGET" "$BIN_DIR" "$STAMP" > "$BACKUP/INFO.txt"
 echo "   $(wc -l < "$BACKUP/MANIFEST.txt" | tr -d ' ') files listed, config copied"
 
@@ -43,11 +44,12 @@ for s in "$SRC"/skills/*/; do
 done
 rm -rf "$TARGET/project-template"; cp -R "$SRC/project-template" "$TARGET/project-template"
 cp "$SRC/night.sh" "$BIN_DIR/cc-night"
-chmod +x "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" "$TARGET"/hooks/* "$BIN_DIR/cc-night"
+cp "$SRC/fullrun.sh" "$BIN_DIR/cc-fullrun"
+chmod +x "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" "$TARGET"/hooks/* "$BIN_DIR/cc-night" "$BIN_DIR/cc-fullrun"
 
 if [ "$TARGET" != "$HOME/.claude" ]; then
   echo "== rewrite ~/.claude -> $TARGET in installed copies"
-  grep -rlE '~/\.claude|\$HOME/\.claude' "$TARGET/hooks" "$TARGET/agents" "$TARGET/skills" "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" 2>/dev/null \
+  grep -rlE '[~]/\.claude|\$HOME/\.claude' "$TARGET/hooks" "$TARGET/agents" "$TARGET/skills" "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" 2>/dev/null \
     | xargs -r sed -i.bak -e "s#~/\.claude#$TARGET#g" -e "s#\$HOME/\.claude#$TARGET#g"
   find "$TARGET" -name '*.bak' -delete
 fi
@@ -69,6 +71,7 @@ if [ -f "$TARGET/settings.json" ] && jq -e . "$TARGET/settings.json" >/dev/null 
                           | with_entries(select(.value | length > 0))) as $kept
     | ($old * $new)
     | .env = (($old.env // {}) + ($new.env // {}))
+    | if ($new.permissions.deny // null) != null then .permissions.deny = ((($old.permissions.deny // []) + $new.permissions.deny) | unique) else . end
     | .hooks = (reduce (($new.hooks // {}) | keys[]) as $k ($kept; .[$k] = ((.[$k] // []) + $new.hooks[$k])))
   ' "$TARGET/settings.json" "$NEW" > "$MERGED"
   echo "   diff (old -> merged):"

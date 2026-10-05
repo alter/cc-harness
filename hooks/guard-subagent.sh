@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # guard-subagent.sh
 set -uo pipefail
+case ",${CC_DISABLED_HOOKS:-}," in *",guard-subagent,"*) exit 0 ;; esac
 
 BUDGET=${CC_SUBAGENT_BUDGET:-12}
 

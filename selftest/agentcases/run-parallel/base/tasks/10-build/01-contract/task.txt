@@ -1,0 +1,33 @@
+TASK: parser contract
+
+GOAL
+  parser contract.
+
+CONTEXT
+  src/parser.py
+
+SCOPE
+  + S1 Parser signatures exist
+  − anything else — sibling tasks
+  indivisible: one method
+
+WRITE-SET
+  src/parser.py::Parser.__init__
+
+DATA
+  (none)
+
+SECURITY
+  (no sinks)
+
+OUTCOME
+  parser contract done.
+
+VERIFY (DEV)
+  1. [fast] python3 -c 'import sys; sys.path.insert(0,"src"); import parser'; reverse control: return an empty value → tests/test_headers.py::Headers
+
+ROLE
+  DEV
+
+DEPENDS
+  (none)

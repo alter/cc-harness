@@ -1,0 +1,23 @@
+TASK: запись результата
+
+GOAL
+  Запись разобранного файла.
+
+CONTEXT
+  src/writer.py
+
+SCOPE
+  + запись JSON
+  − сжатие — не входит
+
+OUTCOME
+  src/writer.py
+
+VERIFY (DEV)
+  1. файл читается обратно
+
+ROLE
+  DEV
+
+DEPENDS
+  10-build/01-parser

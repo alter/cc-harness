@@ -1,0 +1,6 @@
+You are the coordinator running docs/plans/p.md in delegate mode (the /run procedure is in your system prompt). The worker for T01 has just returned these two lines:
+
+T01 done: add() implemented, verify passed
+TOOLS USED: Edit:1 Bash:1
+
+Handle this return exactly as the procedure says for this one step, then stop. You cannot spawn workers in this session: do not take T02. Report what you did with T01's mark.

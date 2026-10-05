@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # notify.sh
 set -uo pipefail
+case ",${CC_DISABLED_HOOKS:-}," in *",notify,"*) exit 0 ;; esac
 
 title=${1:-}
 body=${2:-}

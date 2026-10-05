@@ -1,0 +1,33 @@
+TASK: Parser.headers
+
+GOAL
+  Parser.headers.
+
+CONTEXT
+  src/parser.py
+
+SCOPE
+  + S1 headers() returns the key: value lines before the first empty line as a dict
+  − anything else — sibling tasks
+  indivisible: one method
+
+WRITE-SET
+  src/parser.py::Parser.headers
+
+DATA
+  (none)
+
+SECURITY
+  (no sinks)
+
+OUTCOME
+  Parser.headers done.
+
+VERIFY (DEV)
+  1. [fast] python3 -m unittest tests.test_headers; reverse control: return an empty value → tests/test_headers.py::Headers.test_headers
+
+ROLE
+  DEV
+
+DEPENDS
+  10-build/01-contract

@@ -2,18 +2,32 @@
 
 Shared instructions for every coding agent in this repository. `CLAUDE.md` imports this file (`@AGENTS.md`); do not duplicate rules there. The personal working contract in `~/.claude/CLAUDE.md` still applies on top.
 
+<!-- BOOTSTRAP_ONLY_START -->
+## New repository: run /intake first
+
+`docs/PROJECT.md` is still the template. Run `/intake` before any `/task`, `/plan` or code; it fills the project facts and deletes this section with its markers. `scripts/project_check.py` fails while the intake is completed and this block is still here.
+<!-- BOOTSTRAP_ONLY_END -->
+
 ## Source of truth
 
 - `docs/PROJECT.md` owns scope, the capability ledger, decisions the agent makes alone, the unattended policy and the gate checks. Read it first. A capability with no ledger row is `absent`; dormant code or an old doc is not a requirement.
 - `docs/plans/<slug>.md` owns the current task list. Work from it; update it; never delete tasks.
 - Runbooks in `docs/` own setup and operations. Verify against code, scripts and runtime output rather than trusting a stale doc; update the doc when behavior, contracts, setup or operations change.
 
+## Map
+
+Read the owning guide before changing an area; read only the sections you need. `/intake` fills this table.
+
+| Area | Path | Read first |
+|---|---|---|
+| _unanswered_ | _unanswered_ | _unanswered_ |
+
 ## Engineering
 
 - Fix the owning cause, not a symptom in a caller. A cross-layer bug may have a one-file fix; verify affected callers.
 - Smallest coherent change with clear ownership. Small duplication beats the wrong shared abstraction. Remove workarounds when their cause is fixed.
 - Match investigation to the change: contracts need producer, consumer, serializer and read/write checks; auth and routing need enforcement, guards and state; async work needs retries, idempotency, ordering, cancellation and failure visibility.
-- Architecture rules live in checks, not prose: put layering and import boundaries into a script that exits non-zero (`import-linter` for Python) and list it under gate checks.
+- Architecture rules live in checks, not prose: put layering and import boundaries into a check that exits non-zero and reports `path:line [rule] message` — the tool the project already uses for it (an import contract, a dependency linter, a module-boundary rule of the build), or a short script — and list it under gate checks.
 - Reproducible bug → failing regression test first, then the fix, then the original reproduction again.
 - A behaviour change carries its test, and that test was seen failing before the change. Coverage may not fall: the floor in `.coverage-gate.json` rises by itself and is lowered only as a recorded decision. A check that has never been red does not count — break the code in a scratch copy once and keep the red output.
 
@@ -31,6 +45,7 @@ Shared instructions for every coding agent in this repository. `CLAUDE.md` impor
 - Commit per finished task when `docs/PROJECT.md` says so; message `T##: <what changed>`. Never push unless asked.
 - Scratch goes to `.claude/scratch/`, never the repo root. Remove your own scratch when done.
 - Never stop or kill processes to free a port; use another port.
+- Parallel copies of this repository (worktrees of parallel workers, a night run beside a day session) share nothing mutable. Derive every local resource from the copy's path: ports, Compose project names, test database names, temporary directories, local buckets. A test database name ends in `_test` and a test refuses to run against any other; tearing down a database another copy may be using is never done.
 - Secrets, tokens, cookies, customer data and raw `.env` values never appear in logs, tests, fixtures or replies. Never weaken auth, validation, rate limits or auditability to pass a check.
 - Generated files change through their generator (schema → migration), never by hand.
 

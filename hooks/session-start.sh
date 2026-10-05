@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # session-start.sh
 set -uo pipefail
+case ",${CC_DISABLED_HOOKS:-}," in *",session-start,"*) exit 0 ;; esac
 
 payload=$(cat)
 cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty')

@@ -1,0 +1,33 @@
+TASK: push payload
+
+GOAL
+  A push notification shows the reminder.
+
+CONTEXT
+  app/push.py
+
+SCOPE
+  + S1 build the push payload from a stored reminder
+  − sending — the push provider
+  indivisible: one function
+
+WRITE-SET
+  app/push.py
+
+DATA
+  (none)
+
+SECURITY
+  sink push.payload: consumes reminder.text, reminder.user_id; protection=escaped for the client; test=tests/test_push.py::Push.test_payload
+
+OUTCOME
+  app/push.py
+
+VERIFY (DEV)
+  1. [fast] tests pass; reverse control: return {} → tests/test_push.py::Push.test_payload
+
+ROLE
+  DEV
+
+DEPENDS
+  (none)

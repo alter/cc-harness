@@ -1,0 +1,1 @@
+Verify the task directory tasks/10-build/01-rates. Follow agents rules: write VERIFY.md and set the verify: label. Return the verdict line.

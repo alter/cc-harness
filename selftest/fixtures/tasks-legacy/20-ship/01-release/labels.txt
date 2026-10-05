@@ -1,0 +1,7 @@
+phase:ship
+role:HUMAN
+type:chore
+priority:P3
+status:todo
+verify:pending
+milestone:M2

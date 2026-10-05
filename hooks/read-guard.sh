@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # read-guard.sh
 set -uo pipefail
+case ",${CC_DISABLED_HOOKS:-}," in *",read-guard,"*) exit 0 ;; esac
 
 LIMIT=${CC_READ_GUARD_LINES:-500}
 

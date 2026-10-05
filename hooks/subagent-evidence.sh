@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # subagent-evidence.sh
 set -uo pipefail
+case ",${CC_DISABLED_HOOKS:-}," in *",subagent-evidence,"*) exit 0 ;; esac
 
 payload=$(cat)
 active=$(printf '%s' "$payload" | jq -r '.stop_hook_active // false')

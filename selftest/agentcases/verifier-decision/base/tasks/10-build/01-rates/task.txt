@@ -1,0 +1,24 @@
+TASK: rate storage
+
+GOAL
+  Store the current exchange rate for a currency in the local database.
+
+CONTEXT
+  app/rates.py
+  tests/test_rates.py
+
+SCOPE
+  + S1 store_rate fetches the rate from the client and writes one row
+  − rate history — not part of this project
+
+OUTCOME
+  app/rates.py with store_rate; tests/test_rates.py green.
+
+VERIFY (DEV)
+  1. python3 -m unittest discover -s tests exits 0; reverse control: return 0 from fetch_rate, the test goes red
+
+ROLE
+  DEV
+
+DEPENDS
+  (none)

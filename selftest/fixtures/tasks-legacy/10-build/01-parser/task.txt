@@ -1,0 +1,23 @@
+TASK: парсер
+
+GOAL
+  Разбор входного файла (D1).
+
+CONTEXT
+  README.md:3
+
+SCOPE
+  + разбор заголовков
+  − запись результата — 10-build/02-writer
+
+OUTCOME
+  src/parser.py
+
+VERIFY (DEV)
+  1. тесты зелёные; обратный контроль: убрать цикл заголовков
+
+ROLE
+  DEV
+
+DEPENDS
+  (нет)

@@ -1,0 +1,22 @@
+TASK: выпуск
+
+GOAL
+  Подписанная сборка.
+
+CONTEXT
+  README.md:999
+
+SCOPE
+  + сборка
+
+OUTCOME
+  подписанный архив у владельца
+
+VERIFY (HUMAN)
+  1. владелец открыл архив
+
+ROLE
+  HUMAN
+
+DEPENDS
+  (нет)

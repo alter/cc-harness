@@ -18,17 +18,18 @@ for f in "$SRC"/agents/*.md; do rm -f "$TARGET/agents/$(basename "$f")"; done
 for s in "$SRC"/skills/*/; do rm -rf "$TARGET/skills/$(basename "$s")"; done
 rm -rf "$TARGET/project-template"
 rm -f "$TARGET/settings.json"
-rm -f "$BIN_DIR/cc-night"
+rm -f "$BIN_DIR/cc-night" "$BIN_DIR/cc-fullrun"
 
 echo "== restore from $BACKUP"
 for item in "${ITEMS[@]}"; do
   if [ -e "$BACKUP/$item" ]; then
-    rm -rf "$TARGET/$item"
+    rm -rf "${TARGET:?}/$item"
     cp -R "$BACKUP/$item" "$TARGET/$item"
     echo "   restored $item"
   fi
 done
 [ -f "$BACKUP/cc-night" ] && cp "$BACKUP/cc-night" "$BIN_DIR/cc-night" && echo "   restored cc-night"
+[ -f "$BACKUP/cc-fullrun" ] && cp "$BACKUP/cc-fullrun" "$BIN_DIR/cc-fullrun" && echo "   restored cc-fullrun"
 
 for d in hooks agents skills; do
   [ -d "$TARGET/$d" ] && [ -z "$(ls -A "$TARGET/$d")" ] && rmdir "$TARGET/$d"

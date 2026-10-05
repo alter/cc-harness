@@ -1,0 +1,1 @@
+Run /attack on tasks/30-notify/01-push with the default catalogs. The procedure is in .claude/skills/attack/SKILL.md and the catalogs in .claude/skills/attack/catalogs.md (there is no ~/.claude copy in this environment). Non-interactive: do not ask anything.

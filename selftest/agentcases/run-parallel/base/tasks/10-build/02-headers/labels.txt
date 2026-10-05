@@ -1,0 +1,10 @@
+phase:build
+role:DEV
+type:feature
+priority:P1
+status:todo
+verify:pending
+milestone:M1
+format:2
+split:part
+depends:10-build/01-contract

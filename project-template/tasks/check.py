@@ -3,12 +3,16 @@ from __future__ import annotations
 
 import pathlib
 import re
+import importlib
 import sys
+
+sys.dont_write_bytecode = True
+format2 = importlib.import_module("format2")
 
 ROOT = pathlib.Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parent
 SECTIONS = ["TASK:", "GOAL", "CONTEXT", "SCOPE", "OUTCOME", "VERIFY", "ROLE", "DEPENDS"]
-LABELS = {"phase", "role", "type", "priority", "status", "verify", "depends", "milestone", "gate"}
+LABELS = {"phase", "role", "type", "priority", "status", "verify", "depends", "milestone", "gate", "format", "split", "attack", "capability"}
 PHASES: set[str] = set()
 ROLES: set[str] = {"HUMAN"}
 TYPES = {"feature", "fix", "research", "decision", "chore"}
@@ -16,6 +20,7 @@ PRIORITIES = {"P0", "P1", "P2", "P3"}
 MILESTONES: dict[str, int] = {}
 STATUSES = {"todo", "in_progress", "review", "done", "blocked"}
 VERIFIES = {"pending", "passed", "failed"}
+FORMATS = {"1", "2"}
 GATES_EXPECTED: int | None = None
 VERIFY_REQUIRED = (("Verifier:", "Проверил:"), ("## How to reproduce", "## Как воспроизвести"), ("## What was not checked", "## Что не проверено"))
 BLOCKED_REQUIRED = (("Blocked:", "Заблокировано:"), ("Missing:", "Чего не хватает:"), ("Done before stopping:", "Что сделано до остановки:"))
@@ -59,6 +64,20 @@ def load_vocab() -> None:
                 PHASES.add(d.name.split("-", 1)[1])
 
 
+def ledger() -> dict[str, str]:
+    path = REPO / "docs" / "PROJECT.md"
+    if not path.is_file():
+        return {}
+    text = path.read_text(encoding="utf-8")
+    body = text.split("## 3. Capability ledger", 1)[1].split("\n## ", 1)[0] if "## 3. Capability ledger" in text else ""
+    rows = {}
+    for line in body.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if line.startswith("|") and len(cells) >= 2 and cells[0] not in ("Capability", "") and not set(cells[0]) <= set("-"):
+            rows[cells[0].lower()] = cells[1]
+    return rows
+
+
 def check_line_refs(rel: str, body: str, problems: list[str]) -> None:
     for m in LINE_REF.finditer(body):
         path, start = m.group(1), int(m.group(2))
@@ -76,9 +95,11 @@ def check_line_refs(rel: str, body: str, problems: list[str]) -> None:
 
 def main() -> int:
     load_vocab()
+    format2.REPO = REPO
     problems: list[str] = []
     tasks: dict[str, dict[str, str]] = {}
     gates: list[str] = []
+    format2_tasks: dict[str, tuple[str, dict[str, str]]] = {}
 
     for task_txt in sorted(ROOT.rglob("task.txt")):
         d = task_txt.parent
@@ -132,14 +153,32 @@ def main() -> int:
             problems.append(f"{rel}: verify={kv.get('verify')}")
         if kv.get("gate") == "yes":
             gates.append(rel)
+        if kv.get("capability"):
+            state = ledger().get(kv["capability"].strip().lower())
+            if state not in ("included", "available"):
+                problems.append(
+                    f"{rel}: capability:{kv['capability']} has no included/available row in the docs/PROJECT.md ledger"
+                    f" (found: {state or 'no row'}) — a direct request is recorded there first"
+                )
+        if "attack" in kv and kv["attack"] not in VERIFIES:
+            problems.append(f"{rel}: attack={kv['attack']}")
+        if kv.get("attack") in ("passed", "failed") and not (d / "ATTACK.md").exists():
+            problems.append(f"{rel}: attack:{kv['attack']} without ATTACK.md")
+        if "format" in kv and kv["format"] not in FORMATS:
+            problems.append(f"{rel}: format={kv['format']}")
+        if kv.get("format") == "2":
+            format2.check_task(rel, d, body, problems)
+            format2_tasks[rel] = (body, kv)
 
-        dep = kv.get("depends")
-        if dep and not (ROOT / dep).is_dir():
-            problems.append(f"{rel}: depends points nowhere: {dep}")
+        deps = [x.strip() for x in kv.get("depends", "").split(",") if x.strip()]
+        for dep in deps:
+            if not (ROOT / dep).is_dir():
+                problems.append(f"{rel}: depends points nowhere: {dep}")
         m = re.search(r"(?ms)^DEPENDS\n\s+(.+?)\s*$", body)
         txt = m.group(1).strip() if m else ""
-        if dep and dep not in txt:
-            problems.append(f"{rel}: DEPENDS prose '{txt}' does not contain the label '{dep}'")
+        for dep in deps:
+            if dep not in txt:
+                problems.append(f"{rel}: DEPENDS prose '{txt}' does not contain the label '{dep}'")
 
         if kv.get("status") == "blocked":
             bp = d / "BLOCKED.md"
@@ -161,11 +200,18 @@ def main() -> int:
                         problems.append(f"{rel}: VERIFY.md without '{need[0]}'")
         if kv.get("status") == "done" and kv.get("gate") == "yes" and kv.get("verify") != "passed":
             problems.append(f"{rel}: a gate task is closed without verify:passed")
+        runs = sorted(d.glob("FULLRUN-*.tsv"))
+        if kv.get("status") == "done" and kv.get("gate") == "yes" and runs:
+            red = [line.split("\t", 1)[1] for line in runs[-1].read_text(encoding="utf-8").splitlines() if line.startswith(("fail\t", "stale\t"))]
+            if red:
+                problems.append(f"{rel}: the milestone is closed while its latest full run ({runs[-1].name}) is red: {red}")
         plan = d / "PLAN.md"
         if plan.exists() and kv.get("status") in {"done", "blocked"}:
             head = plan.read_text(encoding="utf-8")[:400]
             if "status: running" in head:
                 problems.append(f"{rel}: PLAN.md is still running while status:{kv.get('status')}")
+
+    format2.check_tree(format2_tasks, problems)
 
     for rel, kv in tasks.items():
         dep = kv.get("depends")

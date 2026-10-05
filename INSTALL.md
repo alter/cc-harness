@@ -2,7 +2,7 @@
 
 The order: back up → run the checks without installing → install a trial copy into a separate directory → run it live in a sandbox → install into `~/.claude` → roll back if anything is wrong. Every step is one command, and every step is reversible.
 
-You need `jq`, `bash` ≥ 4, and `claude` ≥ 2.1.267 (for `maxEffortLevel`). On macOS nothing else (notifications go through `osascript`); on Linux, `notify-send` if you want them.
+You need `jq`, `bash` ≥ 4, `python3` ≥ 3.11 (the guards, `check.py` and `integrity-check.py`; 3.11 for `tomllib`), `git`, and `claude` ≥ 2.1.267 (for `maxEffortLevel`; the deny-rule and `--agent` behaviour in `HARNESS.md` was checked on 2.1.289). These are runtime dependencies of the harness, not of your projects: a project in Go, Rust or shell needs no Python of its own. On macOS nothing else (notifications go through `osascript`); on Linux, `notify-send` if you want them.
 
 ## 0. What Claude Code keeps where — so you know what is being touched
 
@@ -27,7 +27,7 @@ du -sh ~/claude-full-*.tgz
 
 Check that the archive is readable: `tar tzf ~/claude-full-*.tgz | head`.
 
-## 2. Checks without installing — 120 checks on synthetic input
+## 2. Checks without installing — ~290 checks on synthetic input
 
 ```bash
 git clone https://github.com/alter/cc-harness && cd cc-harness

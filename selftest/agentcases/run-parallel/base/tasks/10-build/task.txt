@@ -1,0 +1,32 @@
+TASK: parser
+
+GOAL
+  Parse headers and body.
+
+CONTEXT
+  src/parser.py
+
+SCOPE
+  + S1 child tasks
+  − writing output — not planned
+
+WRITE-SET
+  src/parser.py
+
+DATA
+  (none)
+
+SECURITY
+  (no sinks)
+
+OUTCOME
+  src/parser.py with headers() and body().
+
+VERIFY (DEV)
+  1. [fast] python3 -m unittest discover -s tests; reverse control: return {} from headers → tests/test_headers.py::Headers.test_headers
+
+ROLE
+  DEV
+
+DEPENDS
+  (none)

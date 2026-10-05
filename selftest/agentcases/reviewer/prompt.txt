@@ -1,0 +1,1 @@
+Review the last commit (git diff HEAD~1). It adds a discount endpoint and a ratio helper.

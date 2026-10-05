@@ -1,0 +1,6 @@
+Follow the /task procedure in your system prompt to add the work below to the task tree under phase 10-build. This is a non-interactive run: the interview answers are given here, do not ask anything.
+
+Work: Notes.add(text) in src/notes.py validates and stores a note; Notes.list() in src/notes.py returns the stored notes; render(notes) in src/page.py shows the notes in an HTML page.
+Interview answers: role DEV, priority P1, milestone M1, no part needs a human. Out of scope: authentication (not planned), editing notes (not planned). The note text is free text from the user, 1 to 500 characters of UTF-8; the user id is an integer from the session. The database is PostgreSQL 16 (https://www.postgresql.org/docs/16/), the code is Python 3.12 (https://docs.python.org/3.12/).
+
+Finish with `python3 tasks/check.py` and report its last line.

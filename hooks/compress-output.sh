@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # compress-output.sh
 set -uo pipefail
+case ",${CC_DISABLED_HOOKS:-}," in *",compress-output,"*) exit 0 ;; esac
 
 MIN_LINES=${CC_COMPRESS_MIN_LINES:-40}
 HEAD=${CC_COMPRESS_HEAD:-120}
@@ -38,7 +39,7 @@ trim() {
   local n; n=$(printf '%s\n' "$text" | wc -l)
   if [ "$n" -le $(( HEAD + TAIL + 20 )) ]; then printf '%s' "$text"; return; fi
   local dir="$cwd/.claude/scratch"; mkdir -p "$dir"
-  local f="$dir/bash-$(date +%s)-$label.log"
+  local f; f="$dir/bash-$(date +%s)-$label.log"
   printf '%s\n' "$text" > "$f"
   printf '%s\n' "$text" | head -n "$HEAD"
   printf '\n[... %d lines omitted; full %s saved to %s ...]\n\n' $(( n - HEAD - TAIL )) "$label" "${f#"$cwd"/}"

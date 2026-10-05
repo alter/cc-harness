@@ -14,6 +14,9 @@ WINDOWED = {"head", "tail"}
 EXEMPT_SUFFIX = {".md", ".json", ".toml", ".yaml", ".yml", ".lock", ".txt"}
 EXEMPT_PART = ("/docs/plans/", "/.claude/")
 PROCESSED = ("|", ">", "<", "$(", "`")
+READERS = WHOLE_FILE | WINDOWED | {"grep", "egrep", "rg", "sed", "awk", "cut", "sort", "uniq", "base64", "xxd", "od", "strings", "source", ".", "cp", "scp", "tac", "diff", "jq", "env-cmd", "dotenv"}
+SECRET_NAMES = {".netrc", ".pgpass", ".git-credentials", "credentials"}
+TEMPLATE_SUFFIXES = (".example", ".sample", ".template", ".dist", ".defaults")
 
 
 def segments(command: str) -> list[list[str]]:
@@ -76,6 +79,49 @@ def too_long(path: pathlib.Path) -> int | None:
     return lines if lines > LIMIT else None
 
 
+def is_secret(word: str) -> bool:
+    path = os.path.expanduser(word)
+    name = os.path.basename(path)
+    if name.endswith(TEMPLATE_SUFFIXES) or name.endswith(".pub"):
+        return False
+    if name == ".env" or name.startswith(".env."):
+        return True
+    if "/.ssh/" in path and name not in ("known_hosts", "config", "authorized_keys"):
+        return True
+    if name == "credentials" and "/.aws/" not in path:
+        return False
+    return name in SECRET_NAMES or path.endswith("/.docker/config.json")
+
+
+def secret_read(command: str) -> str | None:
+    for part in command.replace("&&", ";").replace("||", ";").replace("|", ";").replace("&", ";").split(";"):
+        try:
+            words = shlex.split(part)
+        except ValueError:
+            words = part.split()
+        if words and os.path.basename(words[0]) in READERS:
+            sources = words[1:]
+            if os.path.basename(words[0]) in ("cp", "scp"):
+                sources = [w for w in words[1:] if not w.startswith("-")][:-1]
+            for word in sources:
+                if is_secret(word):
+                    return word
+    return None
+
+
+def deny_secret(word: str) -> None:
+    reason = (
+        f"{word} holds secrets. Secrets never enter the context, logs, tests or replies. "
+        "Read the template (.env.example) to learn which variables exist; if the task needs a real value, "
+        "mark it [!] BLOCKED: missing credentials."
+    )
+    json.dump(
+        {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason}},
+        sys.stdout,
+    )
+    sys.stdout.write("\n")
+
+
 def deny(name: str, lines: int) -> None:
     reason = (
         f"{name} has {lines} lines (limit {LIMIT}). Reading a whole file through the shell fills the "
@@ -91,6 +137,8 @@ def deny(name: str, lines: int) -> None:
 
 
 def main() -> int:
+    if "bash-read-guard" in os.environ.get("CC_DISABLED_HOOKS", "").split(","):
+        return 0
     try:
         payload = json.load(sys.stdin)
     except Exception:
@@ -98,6 +146,10 @@ def main() -> int:
     if payload.get("tool_name") != "Bash":
         return 0
     command = (payload.get("tool_input") or {}).get("command") or ""
+    secret = secret_read(command) if command else None
+    if secret:
+        deny_secret(secret)
+        return 0
     if not command or any(token in command for token in PROCESSED):
         return 0
 

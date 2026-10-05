@@ -1,0 +1,23 @@
+TASK: build
+
+GOAL
+  The notes feature.
+
+CONTEXT
+  src/notes.py
+
+SCOPE
+  + child tasks of this phase
+  − release — not planned
+
+OUTCOME
+  the child tasks are done
+
+VERIFY (DEV)
+  1. every child task is done
+
+ROLE
+  DEV
+
+DEPENDS
+  (none)

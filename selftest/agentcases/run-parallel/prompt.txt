@@ -1,0 +1,1 @@
+Run tasks/10-build in delegate mode by the /run procedure in your system prompt ("Parallel parts of a split task"). This is a non-interactive run: do not ask anything. When the assembly is done, report each part's result and the merges you made.

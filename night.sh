@@ -21,7 +21,7 @@ if [ "$(head -n 1 "$plan")" != "---" ]; then
   exit 1
 fi
 
-status=$(sed -n '1,8{/^status:/{s/^status:[[:space:]]*//;s/[[:space:]]*$//;p;q;}}' "$plan")
+status=$(awk 'NR > 8 { exit } /^status:/ { sub(/^status:[[:space:]]*/, ""); sub(/[[:space:]]*$/, ""); print; exit }' "$plan")
 case "$status" in
   draft|running) ;;
   paused)
@@ -57,9 +57,41 @@ name="night:$(basename "$(dirname "$plan")")"
 plural=s; [ "$open" -eq 1 ] && plural=""
 echo "starting $name — $open open task$plural in $plan"
 
-exec claude \
+rc=0
+claude \
   --dangerously-skip-permissions \
   --effort high \
   --name "$name" \
   --settings '{"autoContinueAtUsageLimit":true}' \
-  "/run $plan"
+  "/run $plan" || rc=$?
+
+fullrun=${CC_FULLRUN:-}
+if [ -z "$fullrun" ]; then
+  here=$(cd "$(dirname "$0")" && pwd)
+  if [ -x "$here/fullrun.sh" ]; then fullrun="$here/fullrun.sh"; else fullrun=$(command -v cc-fullrun || true); fi
+fi
+if [ -n "$fullrun" ] && [ -f docs/PROJECT.md ] && grep -q '^### Full tier' docs/PROJECT.md; then
+  echo "full run: every command of the full tier, report next to the plan"
+  bash "$fullrun" --project "$project" --out "$(cd "$(dirname "$plan")" && pwd)" || true
+else
+  echo "full run skipped: no full tier in docs/PROJECT.md §6 or no fullrun.sh/cc-fullrun found"
+fi
+
+if [ "${CC_NIGHT_PGSQL:-1}" != 0 ] && grep -rqlIE --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv 'psycopg|asyncpg|pg8000|jackc/pgx|lib/pq|sqlx::Postgres|tokio-postgres|org\.postgresql|node-postgres|"pg":|postgres(ql)?://' . 2>/dev/null; then
+  echo "pgsql: /pgsql-slow-queries project"
+  claude \
+    --dangerously-skip-permissions \
+    --effort high \
+    --name "$name:pgsql" \
+    -p "/pgsql-slow-queries project" < /dev/null || true
+fi
+
+if [ "${CC_NIGHT_ATTACK:-1}" != 0 ]; then
+  echo "attack: /attack milestone, every catalog; ATTACK.md next to the plan"
+  claude \
+    --dangerously-skip-permissions \
+    --effort high \
+    --name "$name:attack" \
+    -p "/attack milestone" < /dev/null || true
+fi
+exit "$rc"

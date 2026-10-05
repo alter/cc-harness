@@ -54,8 +54,12 @@ because they are the cheapest ones that satisfy the ratchet.
 A mutation run finds them mechanically: it breaks the code by patterns and reports which broken
 versions the suite failed to catch. A surviving mutant is a named blind spot with a line number.
 
-**Not a gate check.** A full run re-executes the suite once per mutant — hours on a real project. This
-is a deliberate audit, run by hand, on a module at a time.
+**Not a gate check, and never in the fast tier.** A full run re-executes the suite once per mutant —
+hours on a real project. Mutation runs and fuzzing belong to the **full tier** in `docs/PROJECT.md` §6:
+the night run (`cc-night` → `fullrun.sh`) and the end of a milestone execute them, and the report lands
+next to the plan. By hand, it is a deliberate audit on one module at a time. A task may declare as many
+`[full, heavy]` checks as it needs; the fast tier carries unit tests and at most three heavy ones, or the
+day goes to waiting for tests instead of writing code.
 
 Pick the module by consequence, not by size: where a silently wrong value is worse than a crash —
 money and fees, sizes and limits, boundaries and rounding, retry and idempotency, permissions. One
@@ -76,7 +80,10 @@ Both write a report of survivors. Read it as a list of findings, not as a score:
 - A **timeout** or an **error** mutant is usually an infinite loop the mutation triggered; it counts as
   killed, not as a finding.
 - The mutation score itself goes nowhere near the gate checks and nowhere near `.coverage-gate.json`.
-  Nobody optimises it; the survivors are the output.
+  Nobody optimises it; the survivors are the output. Survivors do not hold a milestone; a red full run
+  (a test that fails) does.
+- Fuzzing follows the same rules: a crash or a hang it finds is a red full run and a task with the
+  reproducing input attached; the corpus and the time budget live in the full-tier command, not here.
 
 What comes out of an audit is a short list of tests worth writing, already justified. What must not
 come out of it is a rewrite of the suite to please the tool, or a new number to chase.

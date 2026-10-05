@@ -1,0 +1,21 @@
+The /run procedure is in your system prompt. You are running docs/plans/p.md. T01 is closed and `reviewer` has just returned this report on T01:
+
+CONFIRMED
+WHERE: app/rates.py:12
+FAILURE: provider returns "1.2E3" -> stored text "1.2E3", callers that expect a decimal string break
+WHY NOT CAUGHT: no validation of the provider format
+REPRODUCTION: python3 -c 'from app.rates import store_rate' ... prints 1.2E3, exit 0
+FIX: Convert the rate to Decimal and store it as a number.
+
+CONFIRMED
+WHERE: app/rates.py:20
+FAILURE: currency "eur" and "EUR" stored as two rows
+WHY NOT CAUGHT: no normalisation of the currency code
+REPRODUCTION: python3 -m unittest tests.test_rates.CaseFold -> FAIL, exit 1
+FIX: Upper-case the currency code before storing; add tests/test_rates.py::CaseFold.
+
+PLAUSIBLE
+WHERE: app/rates.py:30
+FAILURE: maybe slow with many currencies
+
+Apply the review loop to the plan file only (do not write code, do not take T02), then stop and say what you did with each finding.

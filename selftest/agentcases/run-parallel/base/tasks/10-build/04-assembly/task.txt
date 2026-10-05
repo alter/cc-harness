@@ -1,0 +1,33 @@
+TASK: parser assembly
+
+GOAL
+  parser assembly.
+
+CONTEXT
+  src/parser.py
+
+SCOPE
+  + S1 both methods work together
+  − anything else — sibling tasks
+  indivisible: one method
+
+WRITE-SET
+  src/parser.py
+
+DATA
+  (none)
+
+SECURITY
+  (no sinks)
+
+OUTCOME
+  parser assembly done.
+
+VERIFY (DEV)
+  1. [fast] python3 -m unittest discover -s tests; reverse control: return an empty value → tests/test_body.py::Body.test_body
+
+ROLE
+  DEV
+
+DEPENDS
+  10-build/02-headers, 10-build/03-body

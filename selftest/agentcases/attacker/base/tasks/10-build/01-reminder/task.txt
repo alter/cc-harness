@@ -1,0 +1,34 @@
+TASK: reminder input
+
+GOAL
+  Users save reminders.
+
+CONTEXT
+  app/reminders.py
+
+SCOPE
+  + S1 store reminder text and user id
+  − notifications — 30-notify/01-push
+  indivisible: one function
+
+WRITE-SET
+  app/reminders.py
+
+DATA
+  reminder.text: dir=in; type=string; size=1..500 chars; null=no; interpretable=yes; source=https://docs.python.org/3.12/library/stdtypes.html#str
+  reminder.user_id: dir=in; type=int64; range=1..9223372036854775807; null=no; interpretable=no; validated=tests/test_push.py::Push.test_user_id_bounds; source=https://docs.python.org/3.12/library/functions.html#int
+
+SECURITY
+  (no sinks)
+
+OUTCOME
+  app/reminders.py
+
+VERIFY (DEV)
+  1. [fast] tests pass; reverse control: drop the user_id bound → tests/test_push.py::Push.test_user_id_bounds
+
+ROLE
+  DEV
+
+DEPENDS
+  (none)

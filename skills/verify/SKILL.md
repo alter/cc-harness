@@ -11,7 +11,8 @@ Independence is the whole point. If this session wrote any of the code or tests 
 ## 1. Read, do not trust
 
 - `tasks/README.md` (the `verify:passed` rule), `tasks/PROTOCOL.md` if present, `tasks/GOAL.md`.
-- The task's `task.txt` — every VERIFY item, every `−` line in SCOPE, the OUTCOME.
+- The task's `task.txt` — every VERIFY item, every `+` and `−` line in SCOPE, the OUTCOME. With `format:2` every `+` line is an id `S<n>` and every VERIFY item `n.` is `V<n>`.
+- The decisions the work had to follow: `D<n>` in the task's `PLAN.md`, `tasks/DECISIONS.md` entries the task cites, `## Decisions` of the plan. A decision says *how*; it is checked as strictly as *what*.
 - `NOTES.md`, existing `VERIFY.md`, commit messages — as claims to test, not as evidence.
 
 ## 2. Does the OUTCOME exist?
@@ -21,6 +22,18 @@ For each artefact named in OUTCOME: `test -f`, `git cat-file -e HEAD:<path>` (on
 ## 3. Reproduce from a clean state
 
 Every VERIFY item gets a command a third party can run with a fresh checkout, empty environment, no variables exported by hand. Run them yourself. Prefer a throwaway location (`.claude/scratch/`, `/tmp`) and never modify the repository. If a check depends on the author's shell state, it fails — that is exactly the incident this rule was written against.
+
+Items marked `[full]` are not run here: they belong to the full run. Take their result from the latest `FULLRUN-*.md` next to the task (or its plan), cite the file and the row. No report, or a report older than the last commit of the task → `cannot verify here`, never `pass`. A milestone (`gate:yes`) is not passed while that report is red.
+
+## 3a. Every requirement, one by one
+
+Tests passing is not the same as the requirement being met. For each id — every `S<n>`, every `V<n>`, every `D<n>` the work had to follow — find the evidence yourself and write it down:
+
+- the `path:line` where the requirement is implemented, read in this session; or
+- the command you ran and its exit code; or
+- the test that covers it, as `path:line`, and the command that ran it.
+
+A decision is met only when the code does it the way the decision says. "Use a short transaction after the API call" is failed by code that calls the API inside the transaction, even with every test green. A requirement that you cannot point at is `fail` or `cannot verify here` — never `pass` by inference.
 
 ## 4. Reverse control
 
@@ -36,6 +49,11 @@ Language of the tree. Required parts, in the tree's wording (Russian trees: `П�
 
 ## Per-item verdict
 | # | Item | Result |   pass / fail / cannot verify here (why)
+
+## Requirement evidence
+- S1: <path:line> — <what is there>
+- V2: `<command>` exit <code>
+- D1: <path:line> — <how the code follows the decision>, or fail: <where it does not>
 
 ## <Reproduce from a clean state>
 commands, from an empty environment, with the expected output stated

@@ -28,10 +28,10 @@ The effect: after any interruption — compaction, a usage limit, a restart — 
 | `promptCacheTtl`, `subagentPromptCacheTtl` | `1h` | a pause of up to an hour between turns (subagents included) does not drop the prompt prefix from cache |
 | `workflowKeywordTriggerEnabled`, `ultracode`, `workflowSizeGuideline` | `false`, `false`, `small` | multi-agent workflows are not triggered by a keyword in a prompt; agent teams (~7× tokens) are off |
 | `includeCoAuthoredBy` | `false` | commits without a co-author line |
-| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `3` | no more than three subagents at once |
+| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `5` | no more than five subagents at once |
 | `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | `2` | a subagent may spawn a subagent, but no deeper |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | `sonnet` | a subagent without an explicit model runs on Sonnet, it does not inherit Opus |
-| `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` | `60` | a ceiling on searches per session |
+| `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` | `300` | a ceiling on searches per session |
 | `MAX_MCP_OUTPUT_TOKENS` | `8000` | an MCP tool's answer is cut at 8k tokens |
 | `CC_*` | see §6 | thresholds for the hooks |
 
@@ -108,10 +108,13 @@ All of them are commands outside the model's context; their decisions cannot be 
 | `read-guard` | `PreToolUse(Read)` | a text file over `CC_READ_GUARD_LINES`=500 lines, without `offset`/`limit`; exempt: `docs/plans/*`, `CLAUDE.md`, `.claude/*`, `*.json/toml/yaml/yml/lock/md`, binaries | **refuse**, with the text "Grep -n first, then Read a window; if you need the whole file, give it to `scout`/`researcher` and ask for a summary" |
 | `compress-output` | `PostToolUse(Bash)` | output of at least `CC_COMPRESS_MIN_LINES`=40 lines | strips ANSI and trailing spaces, collapses identical consecutive lines into `(xN)`, squeezes blank lines; above 260 lines the full output goes to `.claude/scratch/bash-<ts>-stdout.log` and the model gets the first 120 and last 120 lines with a note saying how many were omitted and where the file is. It replaces the tool output (`updatedToolOutput`) |
 | `retry-guard` | `PostToolUse(Bash)`, `PostToolUseFailure(Bash)` | the same command (after whitespace normalisation) exiting non-zero; a success resets the counter | 2nd failure in a row → into the context: "a third attempt is forbidden, switch to `/diagnose`: save the error to a file, pin the versions, read the trace bottom-up, three hypotheses, ROOT CAUSE with evidence before any edit"; 3rd and later → "you are in a trial-and-error loop; stop; write `ROOT CAUSE:` and `EVIDENCE:` before the next call; split evidence → the advisor; outside your control → `[!] BLOCKED`". This is an instruction into the context, not a mechanical ban: a mechanical ban here would break legitimate repeats, such as waiting for a port |
-| `guard-subagent` | `PreToolUse(Agent\|Task)` | subagent spawns this session ≥ `CC_SUBAGENT_BUDGET`=40 | **refuse**: "do it in the main thread, or ask the user to raise the ceiling" |
+| `guard-subagent` | `PreToolUse(Agent\|Task)` | subagent spawns this session ≥ `CC_SUBAGENT_BUDGET`=240 | **refuse**: "do it in the main thread, or ask the user to raise the ceiling" |
 | `subagent-evidence` | `SubagentStop` | reads the subagent's transcript, counts `tool_use` entries by name, and compares them with the report (§10) | mismatch → **send the subagent back to work** with "EVIDENCE GUARD: … use the tools now and end with a `TOOLS USED:` line, or say `NOT DONE: <why>`". Once only: on `stop_hook_active` it steps aside so nothing loops |
 | `guard-model-switch` | `PreModelSwitch` | context over `CC_SWITCH_CTX_LIMIT`=40,000 tokens | **ask the user**: "the switch will re-cache N tokens; use a subagent with an explicit model, or `/clear`" |
+| `git-guard` | `PreToolUse(Bash)` | git stash, `reset --hard`, `clean` (not `-n`), checkout/restore over the working tree, force push, `--no-verify`, `core.hooksPath`; a prefix from `PROJECT.md` §5 ` ```deny ` | **refuse**: "never done to make progress; BLOCK the task or let the owner run it" |
 | `stop-guard` | `Stop` | a `running` plan with open `- [ ]`; no `.claude/plan-pause`; no `NEED_HUMAN` in the last message; continuations this session below `CC_STOP_GUARD_CAP`=300; and the open-task count has moved within the last `CC_STOP_GUARD_STALL`=3 blocks | **refuses to let the turn end**: "the plan has N open tasks, next are …, continue; `[x]` only after the check passes; `[!] BLOCKED` only for irreversible actions, missing credentials or a missing dependency". Desktop notification on every exit: `NEED_HUMAN` ("Claude needs you"), zero open ("Plan finished"), ceiling reached ("Stop-guard cap reached"), nothing closed across three blocks ("Plan not advancing" — the plan is stale or everything left is waiting on something) |
+| `stop-guard` (freeze) | `Stop` | a line of `## Acceptance criteria` or a task's `verify:` differs from the plan when it started running (checkboxes ignored, appended lines allowed) | **refuses**: restore the line; only the owner changes acceptance (deletes the freeze file) |
+| `stop-guard` (integrity) | `Stop` | `integrity-check.py` against the commit the plan started from finds an undeclared shortcut | **refuses**, naming each file and why; undo it or declare it under `## Assumptions` |
 | `notify` | `Notification` | `permission_prompt`, `idle_prompt`, `usage_limit`, `elicitation_dialog` | a notification through `osascript` (macOS) or `notify-send`, with the project directory and the first 200 characters of the text |
 | `session-start` | `SessionStart` | an active plan with open tasks | see §1 |
 
@@ -186,9 +189,11 @@ To stop: `touch .claude/plan-pause` or `status: paused` in the plan file. In the
 | `scout` | haiku, 6 turns, no CLAUDE.md | Read, Grep, Glob, four `mcp__graphify__*` | where the code, config or test lives — paths and lines, changes nothing | the same |
 | `test-runner` | sonnet low, 8 turns, no CLAUDE.md | Bash, Read, Grep | runs the named command, short failure analysis | Bash was called; the answer contains `COMMAND:` and `PASS`/`FAIL` with counts |
 | `researcher` | sonnet medium, 12 turns, no CLAUDE.md | Read, Grep, Glob, WebFetch, WebSearch | a map of an unfamiliar subsystem, docs for the pinned version | at least one call and an `EVIDENCE` section with path:line or a URL |
-| `reviewer` | opus high, 12 turns | Read, Grep, Glob, Bash | refute the change: bugs, races, edges, contracts | Read was called |
-| `verifier` | sonnet high, 40 turns | Bash, Read, Grep, Glob, Write, Edit | independent verification, writes `VERIFY.md` | Bash and Write/Edit were called |
-| `worker` | sonnet high, 80 turns, `run-task` preloaded | all | one plan task in delegate mode | Edit/Write/Bash was called; the report reads `T## done\|blocked\|open: …` |
+| `reviewer` | opus high, 12 turns | Read, Grep, Glob, Bash | refute the change: bugs, races, edges, contracts; every CONFIRMED finding reproduced and handed over as a directive (WHERE / FAILURE / WHY NOT CAUGHT / REPRODUCTION / FIX) | Read was called |
+| `verifier` | sonnet high, 240 turns | Bash, Read, Grep, Glob, Write, Edit | independent verification, writes `VERIFY.md` | Bash and Write/Edit were called |
+| `worker` | sonnet high, 80 turns, `run-task` preloaded | all | one plan task in delegate mode, or one part of a split task in its own worktree | Edit/Write/Bash was called; the report reads `T## done\|blocked\|open: …` |
+| `attacker` | opus high, 60 turns | Read, Grep, Glob, Bash, Write, Edit | `/attack`: source → sink map, mandatory minimum, catalogs, reproduction with inert probes, `ATTACK.md` | Bash was called |
+| `pg-checker` | sonnet high, 40 turns | Read, Grep, Glob, Bash | `/pgsql-slow-queries`: held transactions, missing indexes, read-only | Read or Grep was called |
 | anything else | — | — | — | at least one tool call behind a claim of "done" |
 
 `scout` carries `get_node`, `get_neighbors`, `query_graph` and `shortest_path` in its `tools:` list at all times. Where `/graphify` has not been run, those names match no tool and are ignored by the binary — they only cost something if they were the *only* names, and `Read, Grep, Glob` are there too. The evidence hook counts a graph call as a search, but the answer must still name a `path:line`.

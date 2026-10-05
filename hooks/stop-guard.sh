@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # stop-guard.sh
 set -uo pipefail
+case ",${CC_DISABLED_HOOKS:-}," in *",stop-guard,"*) exit 0 ;; esac
 
 CAP=${CC_STOP_GUARD_CAP:-300}
 STALL=${CC_STOP_GUARD_STALL:-3}
@@ -31,14 +32,48 @@ if printf '%s' "$last" | grep -q 'NEED_HUMAN'; then
   exit 0
 fi
 
-if [ "$open" -eq 0 ]; then
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/cc-stop-guard"
+mkdir -p "$state_dir"
+find "$state_dir" -type f -name '*' ! -name 'freeze-*' -mtime +2 -delete 2>/dev/null || true
+
+frozen_lines() {
+  awk '
+    /^## / { ac = ($0 ~ /^## Acceptance criteria/) ; next }
+    ac && /^- \[[ x!]\] / { sub(/^- \[[ x!]\] /, ""); print "AC|" $0; next }
+    /^- \[[ x!]\] T[0-9]+/ && / — verify: / {
+      match($0, /T[0-9]+/); id = substr($0, RSTART, RLENGTH); v = $0; sub(/^.* — verify: /, "", v); print id "|" v
+    }
+  ' "$1"
+}
+
+created=$(awk 'NR > 8 { exit } /^created:/ { print; exit }' "$plan")
+freeze="$state_dir/freeze-$(printf '%s|%s' "$plan" "$created" | cksum | cut -d' ' -f1)"
+guard_reason=""
+if [ ! -f "$freeze" ]; then
+  frozen_lines "$plan" > "$freeze"
+  git -C "$cwd" rev-parse HEAD > "$freeze.base" 2>/dev/null || rm -f "$freeze.base"
+else
+  current=$(frozen_lines "$plan")
+  changed=""
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    printf '%s\n' "$current" | grep -qxF -- "$line" || changed="$changed; ${line%%|*}: ${line#*|}"
+  done < "$freeze"
+  if [ -n "$changed" ]; then
+    guard_reason="Plan $rel: acceptance criteria or verify commands changed since the plan started running (${changed#; }). The executor may not weaken or rewrite what proves the work; restore those lines exactly. Splitting a task adds lines, it does not rewrite them. Only the owner changes acceptance: they edit the plan and change its 'created:' line, or delete $freeze."
+  fi
+fi
+
+integrity="$(dirname "$0")/integrity-check.py"
+if [ -z "$guard_reason" ] && [ -f "$freeze.base" ] && [ -f "$integrity" ]; then
+  report=$(cd "$cwd" && python3 "$integrity" --base "$(cat "$freeze.base")" --plan "$plan" 2>&1)
+  [ $? -eq 1 ] && guard_reason="Plan $rel: $report"
+fi
+
+if [ -z "$guard_reason" ] && [ "$open" -eq 0 ]; then
   [ -x "$NOTIFY" ] && "$NOTIFY" "Plan finished" "$rel: all tasks done or blocked ($blocked blocked)" || true
   exit 0
 fi
-
-state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/cc-stop-guard"
-mkdir -p "$state_dir"
-find "$state_dir" -type f -mtime +2 -delete 2>/dev/null || true
 counter="$state_dir/$session"
 count=0
 [ -f "$counter" ] && count=$(cat "$counter" 2>/dev/null || echo 0)
@@ -56,21 +91,27 @@ fi
 stall_file="$state_dir/$session.open"
 prev=""
 [ -f "$stall_file" ] && prev=$(cat "$stall_file" 2>/dev/null || echo "")
-prev_open=${prev%%:*}
+key="$open/$(printf '%s' "$guard_reason" | cksum | cut -d' ' -f1)"
+prev_key=${prev%%:*}
 prev_state=${prev#*:}
 stalls=0
-if [ -n "$prev" ] && [ "$prev_open" = "$open" ]; then
+if [ -n "$prev" ] && [ "$prev_key" = "$key" ]; then
   # Already released on this count: stay out of the way until the plan moves.
   [ "$prev_state" = "stalled" ] && exit 0
   case "$prev_state" in ''|*[!0-9]*) stalls=0 ;; *) stalls=$prev_state ;; esac
 fi
 if [ "$stalls" -ge "$STALL" ]; then
-  echo "$open:stalled" > "$stall_file"
-  [ -x "$NOTIFY" ] && "$NOTIFY" "Plan not advancing" "$rel: $open open, unchanged after $STALL continuations" || true
+  echo "$key:stalled" > "$stall_file"
+  [ -x "$NOTIFY" ] && "$NOTIFY" "Plan not advancing" "$rel: $open open, unchanged after $STALL continuations${guard_reason:+ (a guard finding is still open)}" || true
   exit 0
 fi
-echo "$open:$(( stalls + 1 ))" > "$stall_file"
+echo "$key:$(( stalls + 1 ))" > "$stall_file"
 echo $(( count + 1 )) > "$counter"
+
+if [ -n "$guard_reason" ]; then
+  jq -n --arg r "$guard_reason" '{decision:"block",reason:$r}'
+  exit 0
+fi
 
 next=$(grep -E '^- \[ \] ' "$plan" | head -n 3 | sed -E 's/^- \[ \] //' | tr '\n' ';' | sed 's/;$//')
 

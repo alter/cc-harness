@@ -1,0 +1,33 @@
+TASK: Parser.body
+
+GOAL
+  Parser.body.
+
+CONTEXT
+  src/parser.py
+
+SCOPE
+  + S1 body() returns the lines after the first empty line joined by newlines
+  − anything else — sibling tasks
+  indivisible: one method
+
+WRITE-SET
+  src/parser.py::Parser.body
+
+DATA
+  (none)
+
+SECURITY
+  (no sinks)
+
+OUTCOME
+  Parser.body done.
+
+VERIFY (DEV)
+  1. [fast] python3 -m unittest tests.test_body; reverse control: return an empty value → tests/test_body.py::Body.test_body
+
+ROLE
+  DEV
+
+DEPENDS
+  10-build/01-contract

@@ -75,7 +75,126 @@ verify:     pending | passed | failed
 depends:    <path to a task>
 milestone:  <from GOAL.md>
 gate:       yes — only on tasks that measure the goal
+format:     2 — the rules in "Format 2" below apply; absent means the original format
+capability: <ledger row> — the task adds or changes this capability; check.py requires an included/available row in docs/PROJECT.md
+attack:     pending | passed | failed — set by /attack, with ATTACK.md next to it
 ```
+
+## Format 2
+
+A task with `format:2` in `labels.txt` names every requirement so that a claim
+of "done" can be checked line by line.
+
+- Every `+` line in SCOPE starts with an id: `+ S1 …`, `+ S2 …`. Ids are unique
+  within the task.
+- Every numbered VERIFY item is a requirement too: item `1.` is `V1`.
+- `VERIFY.md` carries a `## Requirement evidence` section with one line per id:
+
+  ```
+  - S1: src/parser.py:12 — the header loop
+  - V2: `pytest -k body` exit 0
+  ```
+
+  The evidence is a `path:line` or a command with its exit code. "Done", "looks
+  fine" or a paraphrase of the requirement is not evidence; `check.py` rejects an
+  id without one.
+
+### Splitting: by logical parts, not by size
+
+A task is split when its parts are separable; the length of its description
+says nothing either way. A part is separable when it has all three:
+
+1. its own verifiable result — a check that goes red independently of the
+   other parts;
+2. its own write set — the functions, methods, files, config keys or migrations
+   it changes — that does not overlap with any sibling;
+3. a ready input — it needs only interfaces already fixed, never a sibling's
+   half-written code.
+
+If one of the three is missing the task is indivisible and stays whole; SCOPE
+then carries `indivisible: <why>`. Two agents never work on the same unit:
+different methods of one class may go to different tasks, one method may not.
+A split runs as: a **contract** part (signatures, the DATA records) first, then
+the **parts** in parallel, each depending on the contract, then an **assembly**
+part that merges them and runs the fast tier. Children carry
+`split:contract`, `split:part` or `split:assembly` in `labels.txt`.
+
+### Sections added by format 2
+
+Order: TASK, GOAL, CONTEXT, SCOPE, WRITE-SET, DATA, SECURITY, OUTCOME, VERIFY,
+ROLE, DEPENDS.
+
+- **WRITE-SET** — one unit per line: a file (`src/parser.py`), a symbol in it
+  (`src/parser.py::Parser.headers`) or a directory (`tests/`). The default
+  level is the file; a symbol is named when two tasks share a file.
+  `scope_check.py` holds every commit of the task to this list.
+- **DATA** — one record per external input or output the task touches, as
+  `key=value` pairs separated by `;`:
+  `dir` (in/out), `type`, `range` or `size`, `null` (yes/no), `interpretable`
+  (yes/no — can the value legitimately contain something an interpreter would
+  execute: markup, SQL, shell, a URL scheme, an instruction to a model),
+  `source` (the documentation of the version in use, a URL). A field that is
+  `interpretable=no` is validated at the input and names that test in
+  `validated=`. A field that is `interpretable=yes` is stored as is and every
+  sink that consumes it must protect it.
+- **SECURITY** — one line per sink this task adds or changes (HTML, push
+  payload, deep link, email, CSV, SQL, shell, log, a model's prompt):
+  `sink <name>: consumes <field>[, <field>]; protection=<what>; test=<path:line or path::test>`,
+  or `(no sinks)`. Every consumed field must exist in some task's DATA; every
+  `interpretable=yes` field needs `protection=` and `test=` here. That is how a
+  sink added months later meets the decision taken at the input.
+- **VERIFY tiers** — every item starts with `[fast]` or `[full]`; a heavy test
+  (mutation, fuzzing, long integration) adds `heavy`: `[full, heavy]`. At most
+  three `[fast, heavy]` items per task; `[full]` items run only in the full
+  (night or milestone) run. One item is reverse control and names the mutation
+  and the test that must go red:
+  `reverse control: <the mutation> → <path::test or path:line>`.
+
+### Example
+
+```task.txt format:2
+TASK: reminder text input
+
+GOAL
+  Users save a reminder text that is shown back to them later.
+
+CONTEXT
+  src/reminders/api.py
+  docs/tech/fastapi@0.115.md
+
+SCOPE
+  + S1 accept and store the reminder text
+  + S2 reject ids outside the int64 range
+  − showing reminders in notifications — 30-notify/01-push
+  indivisible: one endpoint and its validation share one invariant
+
+WRITE-SET
+  src/reminders/api.py::create_reminder
+  tests/test_reminders.py
+
+DATA
+  reminder.text: dir=in; type=string; size=1..500 chars UTF-8; null=no; interpretable=yes; source=https://docs.python.org/3.12/library/stdtypes.html#str
+  reminder.user_id: dir=in; type=int64; range=1..9223372036854775807; null=no; interpretable=no; validated=tests/test_reminders.py::test_user_id_bounds; source=https://www.postgresql.org/docs/16/datatype-numeric.html
+
+SECURITY
+  (no sinks)
+
+OUTCOME
+  POST /reminders stores the text; tests/test_reminders.py green.
+
+VERIFY (DEV)
+  1. [fast] tests/test_reminders.py passes
+  2. [fast] reverse control: drop the int64 bound check → tests/test_reminders.py::test_user_id_bounds
+  3. [full, heavy] mutation run over src/reminders/api.py, survivors listed
+
+ROLE
+  DEV
+
+DEPENDS
+  (none)
+```
+
+Tasks without `format:2` are validated by the original rules unchanged.
 
 ## Order of work
 

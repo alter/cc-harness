@@ -1,0 +1,8 @@
+phase:build
+role:DEV
+type:feature
+priority:P2
+status:blocked
+verify:pending
+milestone:M1
+depends:10-build/01-parser

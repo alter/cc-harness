@@ -1,0 +1,1 @@
+Run /pgsql-slow-queries with scope project (the whole repository). The procedure and the reference are in .claude/skills/pgsql-slow-queries/ (no ~/.claude copy here). Non-interactive.

@@ -74,9 +74,9 @@ Nine sections: questions only before the work starts; scope decided by the capab
 
 | Variable | Value | Claude Code default | Why |
 |---|---|---|---|
-| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | 3 | **20** | the concurrency ceiling — the main protection for the rate-limit pool |
+| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | 5 | **20** | the concurrency ceiling — the main protection for the rate-limit pool |
 | `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | 2 | 3 | a subagent may spawn one child, not a tree |
-| `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` | 60 | 200 | researcher cannot wander off into endless search |
+| `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` | 300 | 200 | above the default on purpose: researching a technology before it is used (docs for the pinned version, issues, known pitfalls) takes more searches than the default allows |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | sonnet | = main model | a subagent without an explicit model does not inherit Opus |
 | `MAX_MCP_OUTPUT_TOKENS` | 8000 | — | an MCP server's answer cannot flood the window |
 | `CC_*` | — | — | thresholds for the hooks below |
@@ -96,7 +96,9 @@ Hooks run as processes outside the model's window: they cost no tokens, they are
 | `compress-output.sh` | `PostToolUse(Bash)` | strips ANSI, collapses repeats into `(x30)`, saves long output to `.claude/scratch/`, gives the model head and tail through `updatedToolOutput` | 4000 lines of log living in the window on every later turn |
 | `read-guard.sh` | `PreToolUse(Read)` | a file over 500 lines without `offset/limit` is refused: "Grep first, then Read a window" | reading a whole file for one function — the most common window leak |
 | `bash-read-guard.py` | `PreToolUse(Bash)` | the same limit for the shell, parsed with `shlex`: `cat`/`less`/`nl` and an explicit `head -n 900` on a large file are refused; a pipe, a redirect, a substitution and a real window (`tail -5`, `head -n 20`) pass; each `;`/`&&` segment is judged on its own | the obvious way around `read-guard` — `cat` in Bash |
-| `guard-subagent.sh` | `PreToolUse(Agent\|Task)` | a per-session ceiling on subagent spawns (40) | unattended fan-out |
+| `guard-subagent.sh` | `PreToolUse(Agent\|Task)` | a per-session ceiling on subagent spawns (240) | unattended fan-out |
+| `git-guard.py` | `PreToolUse(Bash)` | destructive git and the project's ` ```deny ` prefixes, parsed per segment | `git stash` / `reset --hard` / force push to "make progress"; a prefix deny rule alone misses `git -C . stash` |
+| `integrity-check.py` | from `stop-guard.sh` | shortcuts in the diff since the plan started: suppressions, weakened configs, deleted tests, a lowered floor | "all green" bought by switching the checks off |
 | `subagent-evidence.sh` | `SubagentStop` | reads the subagent's transcript and counts real tool calls by name; "found it in src/x.py:12" with no Grep/Read, "12 passed" with no Bash and no `COMMAND:`, "NOT FOUND" with no search → `decision: block` and the agent goes back to work; one retry, then it steps aside | "I did it" with zero tool calls — a subagent's lie is caught by its transcript, not by its wording |
 | `guard-model-switch.sh` | `PreModelSwitch` | asks for confirmation when the context is over 40k tokens | `/model` mid-session means rebuilding the whole prompt cache |
 | `notify.sh` | `Notification`, and from stop-guard | desktop notification | you learn when the model is genuinely stuck or genuinely finished |
@@ -155,7 +157,7 @@ Why that matters more than it looks: `/run` and the Stop hook count `- [ ] ` lin
 |---|---|---|
 | `install.sh` | by hand | backup → copy → merge `settings.json` (your `permissions`, `env` and other people's hooks survive; the harness's own keys win, and the diff is printed) → syntax checks. Repeatable: a second run does not duplicate a hook. `CC_BIN_DIR` decides where `cc-night` lands — set it to a directory that is actually in your `PATH`. |
 | `uninstall.sh` | by hand | removes only the files this checkout owns and restores the backup, checked against `MANIFEST.txt` |
-| `selftest.sh` | by hand | 120 checks on a checkout, 132 against an installed copy; writes nothing outside a temporary directory |
+| `selftest.sh` | by hand | ~290 checks on a checkout (more against an installed copy); writes nothing outside a temporary directory |
 | `graph-setup.sh` | `/graphify`, or by hand | builds the code graph and decides whether it is fit to expose; `--stats <graph.json> [code-files]` prints the verdict for an existing graph without touching anything |
 | `advisor-check.sh` | after installing | one `ping` through `--debug-file`, then `ENABLED — claude-opus-5` or the ordered list of reasons it is off |
 | `advisor-stats.sh` | by hand | how often the advisor fired and how much context each call forwarded, from `~/.claude/projects/*.jsonl` |
@@ -212,7 +214,7 @@ The cost model: **context is rent, paid on every turn.** Whatever entered the wi
 | Memory instead of a compaction threshold | `autoCompactWindow` unset; one session per plan | in tokens, a turn at 900k costs three times a turn at 300k even from cache — but losing the thread after compaction costs more, in rework. The context is kept small not by a threshold but by noise going to subagents and hooks trimming output |
 | What gets into the window at all | `read-guard` (a window, not a whole file), `compress-output` (logs collapsed, long output to a file), `MAX_MCP_OUTPUT_TOKENS`, subagents with `omitClaudeMd` for noise | every line of output lives in the window until `/clear` |
 | Cheap models where they suffice | `Explore`/`scout` on Haiku; `test-runner` and `researcher` on Sonnet; `SUBAGENT_MODEL=sonnet` | since 2.1.198 the built-in Explore would otherwise run on the session's model |
-| Fan-out under control | `MAX_CONCURRENT_SUBAGENTS=3` (was 20), depth 2, `guard-subagent` at 40/session, workflows `small`, ultracode off, keyword trigger off | `subagent_heavy` and `high_parallel` are two more of the five |
+| Fan-out under control | `MAX_CONCURRENT_SUBAGENTS=5` (was 20), depth 2, `guard-subagent` at 240/session, workflows `small`, ultracode off, keyword trigger off | `subagent_heavy` and `high_parallel` are two more of the five |
 | A reasoning ceiling | `maxEffortLevel: high`, `effortLevel: medium` | "Higher effort … uses your limits faster" — Claude Code's own wording |
 | Not Opus by default | Sonnet plus an Opus advisor | the separate weekly Opus window is not burned on routine |
 | Observability | the status line, `/usage` (five behaviours with a 10 % threshold, top subagents/skills/MCP, and the weekly Opus window the status line cannot show), `/cost`, `/skill-doctor`, `/insights`, `advisor-stats.sh` | measure first, then tune. Without this, tuning is guessing |
@@ -235,3 +237,13 @@ What this harness does **not** do, stated plainly: it does not compress the mode
 - `read-guard` and `bash-read-guard` cover Read and the plain shell read; a file can still arrive through a language runtime (`python -c 'print(open(...).read())'`), and then `compress-output` is what trims it. There is no full impermeability and there will not be — hooks lower the frequency, they do not eliminate.
 - The overnight `--dangerously-skip-permissions` is not a harness without a sandbox; it is a risk.
 - Everything was measured on 2.1.272. Later releases change hooks and caching every week (2.1.257–2.1.271 carried more than twenty cache changes); after an upgrade, run `/skill-doctor` and check hook status in `/hooks`.
+
+## Deny rules and the git guard (checked 2026-10-05, Claude Code 2.1.289)
+
+| Question | Answer | Evidence |
+|---|---|---|
+| Do `permissions.deny` rules hold under `--dangerously-skip-permissions`? | yes | `claude -p "… git stash list" --dangerously-skip-permissions --settings '{"permissions":{"deny":["Bash(git stash:*)"]}}'` → "Permission to use Bash with command git stash list has been denied." |
+| Is a prefix rule enough? | no | the same run with `git -C . stash list` was allowed: the rule matches the start of the command |
+| What closes the gap | `hooks/git-guard.py` (`PreToolUse(Bash)`) | parses every segment of the command, skips `-C`/`-c` and other global options, env assignments and wrappers; refuses stash, `reset --hard`, `clean` (but `-n`), `checkout -- …`/`restore .`, force pushes (`-f`, `--force*`, `+ref`), `--no-verify`/`commit -n`, `core.hooksPath`; plus the prefixes a project lists in a ```` ```deny ```` block of `docs/PROJECT.md` §5 |
+
+The deny list in `settings.json` stays as the first layer: it costs nothing and holds even when hooks are disabled. `install.sh` merges it into an existing `permissions.deny` (union), never replaces the owner's rules.
