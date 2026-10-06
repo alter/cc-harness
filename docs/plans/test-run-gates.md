@@ -1,5 +1,5 @@
 ---
-status: running
+status: done
 created: 2026-10-06
 ---
 # Test run gates: budgets, a canary shard, a run census, a periodic test audit
@@ -8,16 +8,16 @@ created: 2026-10-06
 A full or fast test run can no longer burn hours proving nothing. Every command of a tier may carry a time budget, a postcondition on its result, a shard count and the report and list it produces. `fullrun.sh` runs one shard first and fans out only when that shard passed its budget, its postcondition and its census. The census proves each test ran exactly once and every test ran. The integrity guard flags repetition added to the code. The contract forbids re-running tests for confidence and requires restarting a run whose cause is fixed. `/test-audit` periodically reviews the suite: why it is slow, what is redundant, what to speed up, what may run in parallel. Everything stays language-neutral: JUnit XML and the project's own commands, declared in `docs/PROJECT.md` §6.
 
 ## Acceptance criteria
-- [ ] AC1 A command over its budget is stopped with its process group and reported `timeout` within budget + 5 s — `./selftest.sh` (fullrun-timeout)
-- [ ] AC2 Exit 0 with a failed `expect=` is `empty`, not `pass` — `./selftest.sh` (fullrun-empty)
-- [ ] AC3 With `shards=N`, a canary shard that is not `pass` stops the fan-out: the other N−1 shards are reported `skipped: same cause` and never start — `./selftest.sh` (fullrun-canary-stops-fanout)
-- [ ] AC4 The census reports duplicate executions, shard overlap, tests listed but never run, and zero tests; a canary shard that ran more than its share stops the fan-out — `./selftest.sh` (census-*, fullrun-census-dup-stops)
-- [ ] AC5 A declared `repeat=N` with a reason is not a duplicate; an undeclared one is — `./selftest.sh` (census-repeat-declared)
-- [ ] AC6 Added repetition (`-count=N`, `--reruns`, `--count`, `--repeat-each`, a loop around a test command, a CI matrix over the same suite) is an integrity finding; existing repetition is not — `./selftest.sh` (integrity-added-repeat-*)
-- [ ] AC7 A milestone does not close while its latest full run has `fail`, `stale`, `timeout`, `empty` or `dup` — `./selftest.sh` (milestone-*-holds)
-- [ ] AC8 `fullrun.sh --stop` stops the running full run of this checkout and its children — `./selftest.sh` (fullrun-stop)
-- [ ] AC9 `/test-audit` on a fixture with a slow test, a duplicated test and an order-dependent pair names all three in TEST-AUDIT.md — `./agenttest.sh test-audit`
-- [ ] AC10 No regression: every selftest check green at T00 is green at the finish; a trial install passes `./selftest.sh <target>` — `./selftest.sh`
+- [x] AC1 A command over its budget is stopped with its process group and reported `timeout` within budget + 5 s — `./selftest.sh` (fullrun-timeout)
+- [x] AC2 Exit 0 with a failed `expect=` is `empty`, not `pass` — `./selftest.sh` (fullrun-empty)
+- [x] AC3 With `shards=N`, a canary shard that is not `pass` stops the fan-out: the other N−1 shards are reported `skipped: same cause` and never start — `./selftest.sh` (fullrun-canary-stops-fanout)
+- [x] AC4 The census reports duplicate executions, shard overlap, tests listed but never run, and zero tests; a canary shard that ran more than its share stops the fan-out — `./selftest.sh` (census-*, fullrun-census-dup-stops)
+- [x] AC5 A declared `repeat=N` with a reason is not a duplicate; an undeclared one is — `./selftest.sh` (census-repeat-declared)
+- [x] AC6 Added repetition (`-count=N`, `--reruns`, `--count`, `--repeat-each`, a loop around a test command, a CI matrix over the same suite) is an integrity finding; existing repetition is not — `./selftest.sh` (integrity-added-repeat-*)
+- [x] AC7 A milestone does not close while its latest full run has `fail`, `stale`, `timeout`, `empty` or `dup` — `./selftest.sh` (milestone-*-holds)
+- [x] AC8 `fullrun.sh --stop` stops the running full run of this checkout and its children — `./selftest.sh` (fullrun-stop)
+- [x] AC9 `/test-audit` on a fixture with a slow test, a duplicated test and an order-dependent pair names all three in TEST-AUDIT.md — `./agenttest.sh test-audit`
+- [x] AC10 No regression: every selftest check green at T00 is green at the finish; a trial install passes `./selftest.sh <target>` — `./selftest.sh`
 
 ## Stack
 bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, git; Claude Code 2.1.289. No new dependency.
@@ -61,7 +61,7 @@ bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, 
 - [x] T12 `project-template/scripts/test_timing.py`: slowest tests, setup vs call share from JUnit; per-test outcomes of every census kept; flaky = tests whose outcome flips across the last N runs — verify: unit tests `timing-slowest`, `timing-flaky`
 - [x] T13 `/test-audit` skill + `test-auditor` agent (Opus): timing, census, flakiness, redundancy (mutation report where available), parallel safety (static shared-resource scan + declared `audit-shuffle=`/`audit-parallel=` runs), TEST-AUDIT.md with the four sections, findings into the review loop — verify: `./agenttest.sh test-audit` (AC9)
 - [x] T14 Triggers: `cc-night` runs `/test-audit` when the last TEST-AUDIT is 7+ days old or the latest full run has `fast_doubled=1`/`full_over_budget=1`; `/run` runs it when it closes a milestone — verify: selftest `night-runs-test-audit`, `night-skips-fresh-test-audit`
-- [ ] T15 Finish: README/BEHAVIOR/HARNESS; `./selftest.sh` against T00; `./agenttest.sh` complete; trial install and `./selftest.sh <target>` — verify: `./selftest.sh && ./agenttest.sh`
+- [x] T15 Finish: README/BEHAVIOR/HARNESS; `./selftest.sh` against T00; `./agenttest.sh` complete; trial install and `./selftest.sh <target>` — verify: `./selftest.sh && ./agenttest.sh`
 
 ## Log
 - 2026-10-05 T00: baseline: selftest 302/0, agenttest --self-check ok.
@@ -79,3 +79,4 @@ bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, 
 - 2026-10-05 T12: fullrun/timing.py: slowest --report GLOB --top N (время по тестам из JUnit, доля верхних N в общем времени; отдельного setup в JUnit нет — меряется полное время теста), flaky --dir --runs N (тесты, у которых в последних N прогонах были и pass, и fail); census.outcomes() и движок пишет FULLRUN-<stamp>.tests.json с исходом каждого теста. 3 теста красные до реализации. selftest 350, failed 0.
 - 2026-10-05 T13: skills/test-audit + agents/test-auditor.md (Opus, только TEST-AUDIT.md): данные сначала (нет полного прогона — запустить его), timing slowest/flaky, перепись, пробы порядка и параллельности из PROJECT.md §6 (новые строки шаблона «Audit: run in another order/parallel»); четыре раздела с path:line, замером и CONFIRMED/PLAUSIBLE; ничего не удаляет. agenttest test-audit (sleep 3 s, дубль test_add, пара через state.txt): PASS за 133 s — медленный тест CONFIRMED замером, дубль PLAUSIBLE (нет отчёта мутаций), зависимость порядка CONFIRMED пробой; тесты и код не изменены. agenttest копирует fullrun/ в заготовку по файлу with-fullrun. selftest 350, failed 0.
 - 2026-10-05 T14: night.sh: после полного прогона /test-audit <каталог плана>, если TEST-AUDIT.md нет или ему 7+ дней, либо последний FULLRUN показывает fast_doubled=1/full_over_budget=1 (CC_NIGHT_TEST_AUDIT=0 выключает); skills/run: при закрытии вехи — полный ярус и /test-audit, красный/timeout/empty/dup держит веху; README Tuning. Проверки night-runs-test-audit ×2 красные до правки, night-skips-fresh-test-audit зелёный и раньше. HUMAN pending: текст /run. selftest 353/0.
+- 2026-10-05 T15: README/BEHAVIOR/HARNESS описывают атрибуты полного яруса, перепись, --stop, /test-audit и test-auditor. Финиш: selftest 354/0; против T00 (f60d902, имена без временных путей) ни одна проверка не потеряна; agenttest 10/10 за 21 мин 44 с; пробная установка — 368/0, cc-fullrun из установки находит движок, ~/bin не тронут. По ходу финиша найдены и исправлены 2 дефекта: (1) нестабильная проверка night-runs-test-audit — имена отчётов в одну секунду сортировались не по порядку (FULLRUN-…-1.md раньше FULLRUN-….md), это ломало выбор последнего отчёта в night.sh, движке и check.py; теперь отметка с микросекундами, тест test_reports_sort_in_run_order_within_one_second красный до правки; (2) install.sh не копировал fullrun/ и не переписывал путь в bin-обёртках — selftest против установки это маскировал, теперь проверяет («installed: …» красные до правки).
