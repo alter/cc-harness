@@ -496,6 +496,14 @@ out=$(cd "$fa" && bash "$FR" --out "$fa/r" 2>&1)
 check "fullrun-attrs-parsed: an attribute line is not run as a command" "$out" 'fullrun: total=2 pass=2 '
 check "fullrun-unknown-attr: an unknown attribute key is a finding" "$(cat "$fa"/r/FULLRUN-*.md 2>/dev/null)" 'colour'
 awk -F'\t' 'NF >= 3 && $3 ~ /^[0-9]+$/ {ok=1} END {exit !ok}' "$fa"/r/FULLRUN-*.tsv 2>/dev/null && ok "fullrun-duration-recorded: the tsv carries seconds per command" || bad "fullrun-duration-recorded: the tsv carries seconds per command" "$(cat "$fa"/r/FULLRUN-*.tsv 2>/dev/null)"
+ft="$TMP/fullrun-timeout"; mkdir -p "$ft/docs"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\n#: budget=1s\nbash -c "sleep 31.25 & wait"\nsleep ${FR_SLEEP:-1}\n```\n\n## 7. Delivery\n' > "$ft/docs/PROJECT.md"
+t0=$(date +%s); out=$(cd "$ft" && bash "$FR" --out "$ft/r" 2>&1); el=$(( $(date +%s) - t0 ))
+check "fullrun-timeout: a command over its budget is reported timeout" "$out" 'timeout=1 '
+[ "$el" -le 9 ] && ok "fullrun-timeout: stopped within budget + 5 s (${el}s)" || bad "fullrun-timeout: stopped within budget + 5 s" "${el}s"
+pgrep -f 'sleep 31.25' >/dev/null && bad "fullrun-timeout: the process group is gone" "$(pgrep -fl 'sleep 31.25')" || ok "fullrun-timeout: the process group is gone"
+out=$(cd "$ft" && FR_SLEEP=6 FULLRUN_MIN_BUDGET=1 bash "$FR" --out "$ft/r" 2>&1)
+check "fullrun-default-budget-from-history: twice the last pass, then timeout" "$out" 'timeout=2 '
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"

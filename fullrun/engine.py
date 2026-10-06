@@ -164,7 +164,7 @@ def main() -> int:
         log = logs / f"{i}.log"
         budget = seconds(c.attrs.get("budget"))
         if budget is None and prev.get(c.text, ("", None))[0] == "pass" and prev[c.text][1]:
-            budget = max(2 * prev[c.text][1], 60)
+            budget = max(2 * prev[c.text][1], int(os.environ.get("FULLRUN_MIN_BUDGET", "60")))
         rc, secs, timed_out = run(c.text, log, budget)
         status = classify(rc, log, timed_out)
         counts[status] += 1
