@@ -130,13 +130,14 @@ printf '## 6. Gate checks\n\nyamllint .\n' > "$ir/docs/PROJECT.md"; out=$(ic); c
 mkdir -p "$ir/scripts" "$ir/.github/workflows"
 printf '#!/bin/sh\ngo test ./...\n' > "$ir/scripts/test.sh"; printf 'name: ci\njobs:\n  t:\n    runs-on: x\n    steps:\n      - run: pytest\n' > "$ir/.github/workflows/ci.yml"
 (cd "$ir" && git add scripts .github && git -c user.name=t -c user.email=t@t commit -qm scripts); base=$(git -C "$ir" rev-parse HEAD)
-for change in 's|go test ./...|go test -count=3 ./...|' 's|go test ./...|pytest --reruns 2|' 's|go test ./...|pytest --count 3|' 's|go test ./...|for i in 1 2 3; do go test ./...; done|' 's|go test ./...|seq 16 \| xargs -I{} pytest|' 's|go test ./...|npx playwright test --repeat-each=3|'; do
+for change in 's|go test ./...|go test -count=3 ./...|' 's|go test ./...|pytest --reruns 2|' 's|go test ./...|pytest --count 3|' 's|go test ./...|for i in 1 2 3; do go test ./...; done|' 's|go test ./...|seq 16 \| xargs -I{} pytest|' 's|go test ./...|npx playwright test --repeat-each=3|' 's|go test ./...|for s in 1 2 3; do mutmut run; done|'; do
   sed -i.bak "$change" "$ir/scripts/test.sh"; out=$(ic); check "integrity-added-repeat: $change" "$out" 'integrity: [1-9]'; (cd "$ir" && git checkout -q -- scripts); rm -f "$ir/scripts/test.sh.bak"
 done
 printf 'name: ci\njobs:\n  t:\n    runs-on: x\n    strategy:\n      matrix:\n        n: [1, 2, 3, 4]\n    steps:\n      - run: pytest\n' > "$ir/.github/workflows/ci.yml"
 out=$(ic); check "integrity-added-repeat: a CI matrix that runs the same suite on every cell" "$out" 'integrity: [1-9]'; (cd "$ir" && git checkout -q -- .github)
 printf 'name: ci\njobs:\n  t:\n    runs-on: x\n    strategy:\n      matrix:\n        shard: [1, 2]\n    steps:\n      - run: pytest --shard ${{ matrix.shard }}/2\n' > "$ir/.github/workflows/ci.yml"
 out=$(ic); check "integrity-matrix-that-splits-is-fine" "$out" 'integrity: 0 finding'; (cd "$ir" && git checkout -q -- .github)
+sed -i.bak 's|go test ./...|seq 0 7 \| xargs -I{} cargo mutants --shard {}/8|' "$ir/scripts/test.sh"; out=$(ic); check "integrity-loop-that-shards-is-fine: a loop feeding --shard is a partition" "$out" 'integrity: 0 finding'; (cd "$ir" && git checkout -q -- scripts); rm -f "$ir/scripts/test.sh.bak"
 printf '#!/bin/sh\ngo test -count=1 ./...\n' > "$ir/scripts/test.sh"; (cd "$ir" && git add scripts && git -c user.name=t -c user.email=t@t commit -qm count1); base=$(git -C "$ir" rev-parse HEAD)
 printf '#!/bin/sh\ngo test -count=1 ./...\necho done\n' > "$ir/scripts/test.sh"; out=$(ic); check "integrity-existing-repeat-ignored: an old -count flag does not count" "$out" 'integrity: 0 finding'; (cd "$ir" && git checkout -q -- scripts)
 

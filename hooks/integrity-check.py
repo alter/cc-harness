@@ -22,7 +22,8 @@ MARKERS = [
     r"checkov:skip", r"tfsec:ignore", r"@SuppressWarnings", r"@Disabled\b", r"@Ignore\b", r"#pragma\s+warning\s+disable",
     r"rubocop:disable", r"\bnosec\b", r"NOLINT",
 ]
-TEST_WORD = r"(test|tests|pytest|jest|vitest|mocha|playwright|cargo|nextest|tox|nox|go|rspec|phpunit|ctest|bats)"
+TEST_WORD = r"(test|tests|pytest|jest|vitest|mocha|playwright|cargo|nextest|tox|nox|go|rspec|phpunit|ctest|bats|mutmut|stryker|pitest|mutants|go-mutesting|infection|mull)"
+SHARDED = re.compile(r"(shard|splits?|group|partition|chunk)\S*[ =]\S*(\$\{?\w+\}?|\{\})", re.I)
 REPEATS = [
     r"-count=(?!1\b)\d+", r"--reruns\b", r"--count[ =]\d+", r"--repeat-each", r"--runs[ =]\d+", r"pytest-repeat",
     r"--flake-finder", r"--retries[ =][1-9]", r"^\s*retries:\s*[1-9]", r"^\s*retry:\s*[1-9]",
@@ -51,6 +52,16 @@ def old_text(base: str, path: str) -> str:
 def new_text(path: str) -> str:
     p = pathlib.Path(path)
     return p.read_text(encoding="utf-8", errors="ignore") if p.is_file() else ""
+
+
+def repetitions(rx: re.Pattern, text: str) -> int:
+    count = 0
+    for m in rx.finditer(text):
+        start = text.rfind("\n", 0, m.start()) + 1
+        end = text.find("\n", m.end())
+        if not SHARDED.search(text[start:end if end != -1 else len(text)]):
+            count += 1
+    return count
 
 
 def project_markers() -> list[str]:
@@ -124,7 +135,7 @@ def findings(base: str) -> list[tuple[str, str]]:
             if len(list(rx.finditer(after))) > len(list(rx.finditer(before))):
                 out.append((path, f"a suppression was added ({rx.pattern})"))
         for rx in repeats:
-            if len(list(rx.finditer(after))) > len(list(rx.finditer(before))):
+            if repetitions(rx, after) > repetitions(rx, before):
                 out.append((path, f"test repetition was added ({rx.pattern}): a run is not repeated for confidence; a declared repeat= with a reason lives in PROJECT.md §6"))
         if CI_FILE.search(path) and after.count("matrix:") > before.count("matrix:"):
             runs = re.findall(r"run:\s*(.*)", after)
