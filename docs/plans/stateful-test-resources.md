@@ -37,7 +37,7 @@ bash 5.3, python 3.14 (stdlib), jq 1.6, git; Claude Code 2.1.289. Memory samplin
 
 ## Tasks
 - [x] T00 Baseline: `./selftest.sh`, counts in Log — verify: `./selftest.sh`
-- [ ] T01 Peak memory per command: sample the process group's RSS each second, record MiB in the tsv and the report — verify: selftest `fullrun-peak-mem`
+- [x] T01 Peak memory per command: sample the process group's RSS each second, record MiB in the tsv and the report — verify: selftest `fullrun-peak-mem`
 - [ ] T02 `mem=` budget (`512M`, `2G`) and the 75%-of-RAM default; over it → stop the group, status `mem`; `check.py` holds a milestone on `mem` — verify: selftest `fullrun-mem-budget`, `fullrun-mem-default`, unit `milestone-mem-holds`
 - [ ] T03 `leftover=`: count before and after each command; growth → finding naming the command and the delta — verify: selftest `fullrun-leftover`, `fullrun-leftover-not-a-number`
 - [ ] T04 Template: `AGENTS.md` and `PROJECT.md` rules for stateful test resources (read-only connection for read-only tests, equivalence test for a fast world builder, a sweeper for process-named resources, distribution mode with per-module databases), PostgreSQL examples; §6 rows for the audit probes — verify: unit `test_project_template_full_tier_attrs` still passes + HUMAN
@@ -46,3 +46,4 @@ bash 5.3, python 3.14 (stdlib), jq 1.6, git; Claude Code 2.1.289. Memory samplin
 
 ## Log
 - 2026-10-05 T00: baseline: selftest 363, failed 0.
+- 2026-10-05 T01: engine.run опрашивает ps -A -o pgid=,rss= каждые 0,5 с и суммирует RSS группы процессов команды; пик в МиБ — 4-я колонка tsv и столбец «peak memory (sampled)» в отчёте. Проверка fullrun-peak-mem (bytearray 160 МиБ → 174 МиБ) красная до правки. По ходу 27 проверок упали из-за разбора tsv на 3 колонки в сравнении с прошлым прогоном — исправлено. selftest 364/0.

@@ -622,6 +622,11 @@ out=$(cd "$ff" && bash "$FR" --tier fast --out "$ff/r" 2>&1); rc=$?
 check "fastrun-census-dup: the fast tier is censused too" "$out" 'dup=1 '
 [ "$rc" -ne 0 ] && ok "fastrun-census-dup: a duplicated fast run exits non-zero" || bad "fastrun-census-dup: a duplicated fast run exits non-zero" "exit $rc"
 ls "$ff"/r/FASTRUN-*.tsv >/dev/null 2>&1 && ! ls "$ff"/r/FULLRUN-* >/dev/null 2>&1 && ok "fastrun-separate-history: fast runs keep their own reports" || bad "fastrun-separate-history: fast runs keep their own reports" "$(ls "$ff/r" 2>&1)"
+fm="$TMP/fullrun-mem"; mkdir -p "$fm/docs"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\npython3 -c "import time; b = bytearray(160 * 1024 * 1024); b[::4096] = b\\"x\\" * len(b[::4096]); time.sleep(2.5)"\n```\n\n## 7. Delivery\n' > "$fm/docs/PROJECT.md"
+out=$(cd "$fm" && bash "$FR" --out "$fm/r" 2>&1)
+peak=$(awk -F'\t' 'NF >= 4 {print $4}' "$fm"/r/FULLRUN-*.tsv 2>/dev/null | head -1)
+[ -n "$peak" ] && [ "$peak" -ge 120 ] && ok "fullrun-peak-mem: the peak of the process group is recorded (${peak} MiB)" || bad "fullrun-peak-mem: the peak of the process group is recorded" "tsv: $(cat "$fm"/r/FULLRUN-*.tsv 2>/dev/null)"
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"

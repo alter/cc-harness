@@ -22,8 +22,8 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 census = importlib.import_module("census")
 
-KEYS = {"budget", "expect", "report", "list", "shards", "parallel", "repeat", "reason"}
-RED = ("fail", "stale", "timeout", "empty", "dup")
+KEYS = {"budget", "expect", "report", "list", "shards", "parallel", "repeat", "reason", "mem", "leftover"}
+RED = ("fail", "stale", "timeout", "empty", "dup", "mem")
 PROJECT = pathlib.Path("docs/PROJECT.md")
 STATE = pathlib.Path(".claude/scratch/fullrun")
 CHILDREN: set[int] = set()
@@ -106,6 +106,38 @@ def tier(text: str, name: str) -> list[Command]:
     return out
 
 
+def physical_ram_mib() -> int | None:
+    override = os.environ.get("FULLRUN_RAM_BYTES")
+    if override and override.isdigit():
+        return int(override) // (1024 * 1024)
+    try:
+        if sys.platform == "darwin":
+            return int(subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True).stdout.strip()) // (1024 * 1024)
+        for line in pathlib.Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemTotal:"):
+                return int(line.split()[1]) // 1024
+    except (OSError, ValueError):
+        return None
+    return None
+
+
+def mebibytes(value: str | None) -> int | None:
+    if not value:
+        return None
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([KMG]?)i?B?", value.strip(), re.I)
+    if not m:
+        return None
+    return int(float(m.group(1)) * {"": 1, "K": 1 / 1024, "M": 1, "G": 1024}[m.group(2).upper()])
+
+
+def mem_limit(attrs: dict[str, str]) -> int | None:
+    explicit = mebibytes(attrs.get("mem"))
+    if explicit:
+        return explicit
+    ram = physical_ram_mib()
+    return int(ram * 0.75) if ram else None
+
+
 def seconds(value: str | None) -> int | None:
     if not value:
         return None
@@ -115,35 +147,62 @@ def seconds(value: str | None) -> int | None:
     return int(m.group(1)) * {"": 1, "s": 1, "m": 60, "h": 3600}[m.group(2)]
 
 
-def run(cmd: str, log: pathlib.Path, budget: int | None) -> tuple[int, int, bool]:
+def group_rss_mib(pgid: int) -> int:
+    try:
+        out = subprocess.run(["ps", "-A", "-o", "pgid=,rss="], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return 0
+    total = 0
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] == str(pgid) and parts[1].isdigit():
+            total += int(parts[1])
+    return total // 1024
+
+
+def stop_group(proc: subprocess.Popen) -> None:
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+        proc.wait(timeout=5)
+    except (ProcessLookupError, subprocess.TimeoutExpired):
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()
+
+
+def run(cmd: str, log: pathlib.Path, budget: int | None, mem_budget: int | None = None) -> tuple[int, int, str | None, int]:
     t0 = time.monotonic()
+    peak = 0
+    stopped: str | None = None
     with log.open("w") as fh:
         proc = subprocess.Popen(["bash", "-c", cmd], stdout=fh, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
         with CHILDREN_LOCK:
             CHILDREN.add(proc.pid)
-        try:
-            rc = proc.wait(timeout=budget)
-            timed_out = False
-        except subprocess.TimeoutExpired:
-            timed_out = True
+        while True:
             try:
-                os.killpg(proc.pid, signal.SIGTERM)
-                proc.wait(timeout=5)
-            except (ProcessLookupError, subprocess.TimeoutExpired):
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                proc.wait()
-            rc = -1
+                rc = proc.wait(timeout=0.5)
+                break
+            except subprocess.TimeoutExpired:
+                pass
+            peak = max(peak, group_rss_mib(proc.pid))
+            if mem_budget and peak > mem_budget:
+                stopped = "mem"
+            elif budget is not None and time.monotonic() - t0 > budget:
+                stopped = "timeout"
+            if stopped:
+                stop_group(proc)
+                rc = -1
+                break
     with CHILDREN_LOCK:
         CHILDREN.discard(proc.pid)
-    return rc, int(round(time.monotonic() - t0)), timed_out
+    return rc, int(round(time.monotonic() - t0)), stopped, peak
 
 
-def classify(rc: int, log: pathlib.Path, timed_out: bool) -> str:
-    if timed_out:
-        return "timeout"
+def classify(rc: int, log: pathlib.Path, stopped: str | None) -> str:
+    if stopped:
+        return stopped
     if rc == 0:
         return "pass"
     text = log.read_text(errors="ignore")
@@ -208,9 +267,10 @@ def main() -> int:
         return 2
 
     started = time.monotonic()
-    counts = {k: 0 for k in ("pass", "fail", "stale", "timeout", "empty", "dup", "skipped")}
+    counts = {k: 0 for k in ("pass", "fail", "stale", "timeout", "empty", "dup", "mem", "skipped")}
     rows, findings, tsv_lines, censuses = [], [], [], []
     test_outcomes: dict[str, str] = {}
+    peaks: dict[str, int] = {}
     seq = iter(range(1, 1_000_000))
     lock = threading.Lock()
 
@@ -238,8 +298,13 @@ def main() -> int:
         budget = seconds(attrs.get("budget"))
         if budget is None and prev.get(text, ("", None))[0] == "pass" and prev[text][1]:
             budget = max(2 * prev[text][1], int(os.environ.get("FULLRUN_MIN_BUDGET", "60")))
-        rc, secs, timed_out = run(text, log, budget)
-        status = classify(rc, log, timed_out)
+        rc, secs, stopped, peak = run(text, log, budget, mem_limit(attrs))
+        with lock:
+            peaks[text] = peak
+        status = classify(rc, log, stopped)
+        if stopped == "mem":
+            with lock:
+                findings.append(f"`{text}` passed its memory budget ({mem_limit(attrs)} MiB, peak {peak} MiB sampled) and was stopped with its process group")
         if status == "pass" and attrs.get("expect"):
             check = subprocess.run(["bash", "-c", attrs["expect"]], capture_output=True, text=True, stdin=subprocess.DEVNULL)
             if check.returncode != 0:
@@ -261,8 +326,9 @@ def main() -> int:
 
     def record(text: str, status: str, rc: int | str, secs: int, log: pathlib.Path | str) -> None:
         counts[status] += 1
-        tsv_lines.append(f"{status}\t{text}\t{secs}")
-        rows.append(f"| {len(rows) + 1} | {status} | {rc} | {secs}s | `{text}` | {log} |")
+        peak = peaks.get(text, 0)
+        tsv_lines.append(f"{status}\t{text}\t{secs}\t{peak}")
+        rows.append(f"| {len(rows) + 1} | {status} | {rc} | {secs}s | {peak} MiB | `{text}` | {log} |")
 
     for c in commands:
         for key in c.unknown:
@@ -328,7 +394,7 @@ def main() -> int:
     new_red = still_red = fixed = 0
     compare = []
     for line in tsv_lines:
-        status, cmd, _ = line.split("\t")
+        status, cmd = line.split("\t")[:2]
         before = prev.get(cmd, ("", None))[0]
         if status in RED and before in RED:
             still_red += 1
@@ -369,10 +435,10 @@ def main() -> int:
     summary = (
         f"{'fullrun' if args.tier == 'full' else 'fastrun'}: total={total} pass={counts['pass']} fail={counts['fail']} stale={counts['stale']} "
         f"new_red={new_red} still_red={still_red} fixed={fixed} fast_doubled={fast_doubled} "
-        f"timeout={counts['timeout']} empty={counts['empty']} dup={counts['dup']} skipped={counts['skipped']} full_over_budget={full_over_budget}"
+        f"timeout={counts['timeout']} empty={counts['empty']} dup={counts['dup']} mem={counts['mem']} skipped={counts['skipped']} full_over_budget={full_over_budget}"
     )
     report = [f"# {'Full' if args.tier == 'full' else 'Fast'} run {stamp}", "", summary, "", f"Compared with: {'the previous run' if prev else 'nothing (first run)'}", "",
-              "| # | status | exit | time | command | log |", "|---|---|---|---|---|---|", *rows, "",
+              "| # | status | exit | time | peak memory (sampled) | command | log |", "|---|---|---|---|---|---|---|", *rows, "",
               "## Changes since the previous run", *(compare or ["- none"]), "", "## Time", full_note, fast_note]
     if counts["stale"]:
         report += ["", "## Stale declarations",
