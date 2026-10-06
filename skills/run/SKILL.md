@@ -82,6 +82,7 @@ Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.
 - `NOTES.md`: dated heading (`# NOTES — <what> (<YYYY-MM-DD>)`), rationale, measurements with sources, rejected alternatives, and this session's assumptions. Numbers carry a source or are not written.
 - Reverse control: VERIFY items that say so are executed, and the red output is kept in `NOTES.md` (the verifier will need it for `VERIFY.md`).
 - Before finishing: `python3 tasks/check.py` from the repository root — zero problems or the task is not closed.
+- Closing a milestone (a `gate:yes` task): run the full tier (`cc-fullrun --out <task dir>`) and `/test-audit <task dir>`; a red, `timeout`, `empty` or `dup` full run holds the milestone, the audit's CONFIRMED findings enter the review loop.
 - Commit messages: the repository's own convention (`tasks/PROTOCOL.md`); submodules per its order.
 
 ## Finish

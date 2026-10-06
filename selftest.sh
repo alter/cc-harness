@@ -451,6 +451,18 @@ printf '## 6. Gate checks\n\n### Fast tier\n\n```\ntrue\n```\n\n### Full tier\n\
 printf 'import psycopg\n' > "$nr/db.py"
 out=$(PATH="$fb:$PATH" bash "$N" docs/plans/p.md "$nr" 2>&1)
 check "night-runs-pgsql: a repository that talks to PostgreSQL gets /pgsql-slow-queries project" "$(cat "$TMP/claude-calls.log" 2>/dev/null)" '/pgsql-slow-queries project'
+check "night-runs-test-audit: no audit yet, so /test-audit runs" "$(cat "$TMP/claude-calls.log" 2>/dev/null)" '/test-audit'
+na="$TMP/night-audit"; mkdir -p "$na/docs/plans"
+printf -- '---\nstatus: draft\ncreated: 2026-10-06\n---\n# P\n## Tasks\n- [ ] T01 x — verify: `true`\n## Log\n' > "$na/docs/plans/p.md"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\ntrue\n```\n\n## 7. Delivery\n' > "$na/docs/PROJECT.md"
+printf 'Auditor: x\n' > "$na/docs/plans/TEST-AUDIT.md"; cp "$TMP/claude-calls.log" "$TMP/claude-calls.saved" 2>/dev/null; : > "$TMP/claude-calls.log"
+PATH="$fb:$PATH" CC_NIGHT_ATTACK=0 bash "$N" docs/plans/p.md "$na" >/dev/null 2>&1
+grep -q '/test-audit' "$TMP/claude-calls.log" && bad "night-skips-fresh-test-audit: a fresh audit and a quiet run skip it" "$(cat "$TMP/claude-calls.log")" || ok "night-skips-fresh-test-audit: a fresh audit and a quiet run skip it"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\nsleep 2\n```\n\n| Question | Answer |\n|---|---|\n| Full tier budget, minutes, whole run | 0.01 |\n\n## 7. Delivery\n' > "$na/docs/PROJECT.md"; : > "$TMP/claude-calls.log"
+sed -i.bak 's/^- \[x\] T01/- [ ] T01/' "$na/docs/plans/p.md"
+PATH="$fb:$PATH" CC_NIGHT_ATTACK=0 bash "$N" docs/plans/p.md "$na" >/dev/null 2>&1
+check "night-runs-test-audit: a full run over budget triggers it even with a fresh audit" "$(cat "$TMP/claude-calls.log" 2>/dev/null)" '/test-audit'
+cp "$TMP/claude-calls.saved" "$TMP/claude-calls.log" 2>/dev/null
 check "night-runs-attack: /attack milestone follows the full run" "$(cat "$TMP/claude-calls.log" 2>/dev/null)" '/attack milestone'
 ls "$nr"/docs/plans/FULLRUN-*.md >/dev/null 2>&1 && ok "night-runs-full-tier: the full run follows /run, report next to the plan" || bad "night-runs-full-tier: the full run follows /run, report next to the plan" "$out"
 

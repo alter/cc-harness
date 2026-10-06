@@ -77,6 +77,21 @@ else
   echo "full run skipped: no full tier in docs/PROJECT.md §6 or no fullrun.sh/cc-fullrun found"
 fi
 
+plan_dir=$(cd "$(dirname "$plan")" && pwd)
+audit="$plan_dir/TEST-AUDIT.md"
+last_run=$(ls "$plan_dir"/FULLRUN-*.md 2>/dev/null | sort | tail -n 1)
+audit_due=""
+if [ ! -f "$audit" ] || [ -n "$(find "$audit" -mtime +6 2>/dev/null)" ]; then audit_due="the last audit is 7+ days old or missing"; fi
+if [ -n "$last_run" ] && grep -qE 'fast_doubled=1|full_over_budget=1' "$last_run"; then audit_due="the full run reports fast_doubled or full_over_budget"; fi
+if [ "${CC_NIGHT_TEST_AUDIT:-1}" != 0 ] && [ -n "$audit_due" ]; then
+  echo "test audit: $audit_due"
+  claude \
+    --dangerously-skip-permissions \
+    --effort high \
+    --name "$name:test-audit" \
+    -p "/test-audit $plan_dir" < /dev/null || true
+fi
+
 if [ "${CC_NIGHT_PGSQL:-1}" != 0 ] && grep -rqlIE --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv 'psycopg|asyncpg|pg8000|jackc/pgx|lib/pq|sqlx::Postgres|tokio-postgres|org\.postgresql|node-postgres|"pg":|postgres(ql)?://' . 2>/dev/null; then
   echo "pgsql: /pgsql-slow-queries project"
   claude \

@@ -170,6 +170,7 @@ CC_SUBAGENT_BUDGET=240    subagent spawns per session (more at night than by day
 CC_SWITCH_CTX_LIMIT=40000 context size above which /model asks for confirmation
 CC_READ_GUARD_LINES=500   file size above which whole-file reads are refused, through Read and through the shell alike
 CC_COMPRESS_MIN_LINES=40  output size above which Bash output is compressed
+CC_NIGHT_TEST_AUDIT=1     cc-night runs /test-audit when the last TEST-AUDIT.md is 7+ days old or the full run reports fast_doubled/full_over_budget; 0 turns it off
 CC_NIGHT_PGSQL=1          cc-night runs /pgsql-slow-queries project when the repository uses PostgreSQL; 0 turns it off
 CC_NIGHT_ATTACK=1         cc-night runs /attack milestone after the full run; 0 turns it off
 CC_DISABLED_HOOKS=        comma-separated hook ids to switch off for a run, e.g. retry-guard,read-guard (id = script name without extension)
