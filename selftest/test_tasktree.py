@@ -391,6 +391,13 @@ class MilestoneFullRun(TreeCase):
         r = self.gate_task("dup\tpytest -n 16 [census of 16 shards]\t0\n")
         self.assertNotEqual(r.returncode, 0)
 
+    def test_milestone_empty_tsv_does_not_hide_red(self):
+        d = self.root / "10-build" / "01-parser"
+        r = self.gate_task("fail\tpytest -m slow\t30\n")
+        (d / "FULLRUN-2026-10-07-000000000000.tsv").write_text("", encoding="utf-8")
+        r = run_check(self.root)
+        self.assertNotEqual(r.returncode, 0, r.stdout)
+
     def test_milestone_green_full_run_closes(self):
         r = self.gate_task("pass\tpytest -m slow\npass\tmutmut run\n")
         self.assertEqual(r.returncode, 0, r.stdout)

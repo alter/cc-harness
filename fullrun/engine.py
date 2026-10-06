@@ -160,7 +160,7 @@ def signature(log: pathlib.Path) -> str:
 
 
 def previous(out: pathlib.Path, current: pathlib.Path) -> dict[str, tuple[str, int | None]]:
-    runs = sorted(p for p in out.glob("FULLRUN-*.tsv") if p != current)
+    runs = sorted(p for p in out.glob("FULLRUN-*.tsv") if p != current and p.stat().st_size > 0)
     if not runs:
         return {}
     data = {}
@@ -193,7 +193,6 @@ def main() -> int:
     logs = pathlib.Path(".claude/scratch/fullrun") / stamp
     logs.mkdir(parents=True, exist_ok=True)
     tsv, md = out / f"FULLRUN-{stamp}.tsv", out / f"FULLRUN-{stamp}.md"
-    tsv.write_text("")
     prev = previous(out, tsv)
     STATE.mkdir(parents=True, exist_ok=True)
     commit = subprocess.run(["git", "rev-parse", "--short=12", "HEAD"], capture_output=True, text=True).stdout.strip() or "none"
@@ -317,7 +316,9 @@ def main() -> int:
             sig = max(signatures, key=signatures.get)
             findings.append(f"`{c.text}`: two shards failed with the same cause ({sig!r}); the rest were not started")
 
-    tsv.write_text("".join(line + "\n" for line in tsv_lines))
+    partial = tsv.with_name(tsv.name + ".partial")
+    partial.write_text("".join(line + "\n" for line in tsv_lines))
+    os.replace(partial, tsv)
     if test_outcomes:
         (out / f"FULLRUN-{stamp}.tests.json").write_text(json.dumps(test_outcomes, indent=1, sort_keys=True))
 

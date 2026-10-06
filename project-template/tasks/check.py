@@ -200,7 +200,7 @@ def main() -> int:
                         problems.append(f"{rel}: VERIFY.md without '{need[0]}'")
         if kv.get("status") == "done" and kv.get("gate") == "yes" and kv.get("verify") != "passed":
             problems.append(f"{rel}: a gate task is closed without verify:passed")
-        runs = sorted(d.glob("FULLRUN-*.tsv"))
+        runs = sorted(p for p in d.glob("FULLRUN-*.tsv") if p.stat().st_size > 0)
         if kv.get("status") == "done" and kv.get("gate") == "yes" and runs:
             red = [line.split("\t")[1] for line in runs[-1].read_text(encoding="utf-8").splitlines() if line.startswith(("fail\t", "stale\t", "timeout\t", "empty\t", "dup\t"))]
             if red:

@@ -152,6 +152,45 @@ class ReportOrder(unittest.TestCase):
             shutil.rmtree(tmp)
 
 
+class AtomicReport(unittest.TestCase):
+    def setUp(self):
+        self.tmp = pathlib.Path(tempfile.mkdtemp())
+        (self.tmp / "docs").mkdir()
+
+    def tearDown(self):
+        subprocess.run(["pkill", "-f", "sleep 37.25"], capture_output=True)
+        shutil.rmtree(self.tmp)
+
+    def project(self, block):
+        (self.tmp / "docs" / "PROJECT.md").write_text(f"## 6. Gate checks\n\n### Full tier\n\n```\n{block}\n```\n\n## 7. x\n", encoding="utf-8")
+
+    def engine(self, *args, background=False):
+        cmd = [sys.executable, str(ENGINE_DIR / "engine.py"), "--out", "r", *args]
+        if background:
+            return subprocess.Popen(cmd, cwd=self.tmp, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return subprocess.run(cmd, cwd=self.tmp, capture_output=True, text=True)
+
+    def test_fullrun_stop_keeps_last_red(self):
+        self.project("false")
+        self.engine()
+        self.project('bash -c "sleep 37.25 & wait"')
+        proc = self.engine(background=True)
+        import time
+        time.sleep(1.5)
+        self.engine("--stop")
+        proc.wait(timeout=20)
+        tsvs = sorted((self.tmp / "r").glob("FULLRUN-*.tsv"))
+        newest = [p for p in tsvs if p.read_text().strip()][-1]
+        self.assertTrue(newest.read_text().startswith("fail\t"), [p.read_text() for p in tsvs])
+        self.assertFalse([p for p in tsvs if not p.read_text().strip()], "an empty tsv was left behind")
+
+    def test_fullrun_unanswered_tier_no_tsv(self):
+        self.project("_unanswered_")
+        r = self.engine()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(list((self.tmp / "r").glob("FULLRUN-*.tsv")) if (self.tmp / "r").exists() else [], [])
+
+
 PROJECT_TEMPLATE = pathlib.Path(os.environ.get("PROJECT_TEMPLATE", HERE.parent / "project-template" / "docs" / "PROJECT.md"))
 
 
