@@ -8,7 +8,7 @@ TARGET=${TARGET/#\~/$HOME}
 if [ "$TARGET" = "$HOME/.claude" ]; then BIN_DIR=${CC_BIN_DIR:-$HOME/bin}; else BIN_DIR=${CC_BIN_DIR:-$TARGET/bin}; fi
 STAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP=${CC_BACKUP_DIR:-$HOME/.claude-backup/$STAMP}
-ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template keybindings.json)
+ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template fullrun keybindings.json)
 
 command -v jq >/dev/null 2>&1 || { echo "jq is required (brew install jq / apt install jq)" >&2; exit 1; }
 command -v claude >/dev/null 2>&1 || echo "warning: claude not in PATH; installing anyway" >&2

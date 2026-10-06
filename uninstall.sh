@@ -7,7 +7,7 @@ TARGET=${2:-$HOME/.claude}
 TARGET=${TARGET/#\~/$HOME}
 SRC=$(cd "$(dirname "$0")" && pwd)
 BIN_DIR=${CC_BIN_DIR:-$HOME/bin}
-ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template keybindings.json)
+ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template fullrun keybindings.json)
 
 [ -f "$BACKUP/MANIFEST.txt" ] || { echo "not a harness backup: $BACKUP" >&2; exit 1; }
 

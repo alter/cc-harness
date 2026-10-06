@@ -36,6 +36,7 @@ bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, 
 - Canary share check: the canary shard may execute at most `ceil(listed / shards) × 1.5` tests and at least one.
 - Same-signature short-circuit with `parallel>1`: the first two failures of a sharded command with the same first error line stop the remaining shards.
 - A timeout is enforced by a Python wrapper that starts the command in its own session and kills the process group; bash has no portable process-group timeout on macOS.
+- The engine of `fullrun.sh` moves to Python (`fullrun/engine.py`, with `census.py` and `timing.py` beside it), installed as `~/.claude/fullrun/`; `fullrun.sh` stays the entry point (`cc-fullrun`). The census and timing scripts named under `project-template/scripts/` in T05/T12 live there instead: the runner needs them in every project, a project does not need its own copy.
 - The test audit's redundancy finding needs per-test kill data from a mutation report; where the tool does not provide it, the finding is PLAUSIBLE from reading, never CONFIRMED.
 
 ## Out of scope
@@ -46,7 +47,7 @@ bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, 
 
 ## Tasks
 - [x] T00 Baseline: `./selftest.sh` and `./agenttest.sh --self-check`, counts in Log — verify: `./selftest.sh; ./agenttest.sh --self-check`
-- [ ] T01 `fullrun.sh`: parse `#: key=value` attribute lines; record duration per command in the tsv; unknown keys are a finding — verify: selftest `fullrun-attrs-parsed`, `fullrun-unknown-attr`
+- [x] T01 `fullrun.sh`: parse `#: key=value` attribute lines; record duration per command in the tsv; unknown keys are a finding — verify: selftest `fullrun-attrs-parsed`, `fullrun-unknown-attr`
 - [ ] T02 `budget=` (and the default from history) through a process-group timeout wrapper; status `timeout` — verify: selftest `fullrun-timeout`, `fullrun-default-budget-from-history`
 - [ ] T03 `expect=` postcondition; status `empty` — verify: selftest `fullrun-empty`
 - [ ] T04 `shards=N` with `{shard}`/`{shards}`: canary first, fan-out only after a `pass`, `parallel=K` for the rest, same-signature short-circuit — verify: selftest `fullrun-canary-stops-fanout`, `fullrun-shards-run`, `fullrun-same-signature-stops`
@@ -64,3 +65,4 @@ bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, 
 
 ## Log
 - 2026-10-05 T00: baseline: selftest 302/0, agenttest --self-check ok.
+- 2026-10-05 T01: ядро fullrun.sh перенесено в fullrun/engine.py (fullrun.sh — обёртка, ищет движок рядом или в ~/.claude/fullrun; install/uninstall ставят каталог fullrun); строки #: key=value прикрепляются к следующей команде, неизвестный ключ — находка в отчёте; tsv: статус, команда, секунды. Все прежние проверки fullrun-* и night-runs-* зелёные; fullrun-unknown-attr и fullrun-duration-recorded красные до правки (attrs-parsed был зелёным: # строки и раньше пропускались). selftest 305, failed 0.

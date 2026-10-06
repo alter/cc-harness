@@ -490,6 +490,12 @@ out=$(fr); check "fullrun-stale-command: a missing command is stale, not a test 
 check "fullrun-fast-tier-within-budget" "$out" 'fast_doubled=0'
 sed -i.bak 's/^true$/sleep 3/' "$frp/docs/PROJECT.md"
 out=$(fr); check "fullrun-fast-tier-doubled: a fast tier past twice its T00 time is a finding" "$out" 'fast_doubled=1'
+fa="$TMP/fullrun-attrs"; mkdir -p "$fa/docs"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\n#: budget=30s reason=x\necho one\n#: colour=blue\necho two\n```\n\n## 7. Delivery\n' > "$fa/docs/PROJECT.md"
+out=$(cd "$fa" && bash "$FR" --out "$fa/r" 2>&1)
+check "fullrun-attrs-parsed: an attribute line is not run as a command" "$out" 'fullrun: total=2 pass=2 '
+check "fullrun-unknown-attr: an unknown attribute key is a finding" "$(cat "$fa"/r/FULLRUN-*.md 2>/dev/null)" 'colour'
+awk -F'\t' 'NF >= 3 && $3 ~ /^[0-9]+$/ {ok=1} END {exit !ok}' "$fa"/r/FULLRUN-*.tsv 2>/dev/null && ok "fullrun-duration-recorded: the tsv carries seconds per command" || bad "fullrun-duration-recorded: the tsv carries seconds per command" "$(cat "$fa"/r/FULLRUN-*.tsv 2>/dev/null)"
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"
@@ -525,7 +531,7 @@ if command -v shellcheck >/dev/null; then
   sc=$(shellcheck -S warning "$H"/*.sh "$SRC"/*.sh 2>&1); [ -z "$sc" ] && ok "lint-shell: shellcheck, warnings and above" || bad "lint-shell: shellcheck, warnings and above" "$sc"
 else echo "  SKIP  lint-shell: shellcheck not installed"; fi
 if command -v ruff >/dev/null; then
-  rf=$(ruff check --no-cache --extend-exclude "$SRC/selftest/agentcases" "$H" "$SRC/project-template" "$SRC/selftest" 2>&1); printf '%s' "$rf" | grep -q 'All checks passed' && ok "lint-python: ruff" || bad "lint-python: ruff" "$rf"
+  rf=$(ruff check --no-cache --extend-exclude "$SRC/selftest/agentcases" "$H" "$SRC/project-template" "$SRC/selftest" "$SRC/fullrun" 2>&1); printf '%s' "$rf" | grep -q 'All checks passed' && ok "lint-python: ruff" || bad "lint-python: ruff" "$rf"
 else echo "  SKIP  lint-python: ruff not installed"; fi
 if command -v gitleaks >/dev/null && [ -d "$SRC/.git" ]; then
   gl=$(gitleaks git --no-banner --redact "$SRC" 2>&1); [ $? -eq 0 ] && ok "no-secrets: gitleaks over the history" || bad "no-secrets: gitleaks over the history" "$gl"
