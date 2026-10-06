@@ -1,5 +1,5 @@
 ---
-status: running
+status: done
 created: 2026-10-06
 ---
 # Stateful test resources: memory budget, leftovers, audit lens, template rules
@@ -8,12 +8,12 @@ created: 2026-10-06
 A test command that shares a machine without swap can no longer take the runner down unnoticed: `cc-fullrun` measures the peak memory of every command's process group, stops it when it passes its budget (declared `mem=`, or 75% of physical RAM) and reports `mem`, which holds a milestone. A command can declare a `leftover=` count (databases, temp dirs, containers) and the run reports what it left behind. `/test-audit` looks at tests that use an external stateful resource: isolation between parallel workers, calls to the resource per test, the time spent building the shared world, and a distribution mode that clones a database per worker for every module. The project template tells tests that only read a shared world to use a read-only connection, requires an equivalence test when a fast world builder bypasses the service layer, and a sweeper for resources named after a process. Everything stays language-neutral, with PostgreSQL as the worked example.
 
 ## Acceptance criteria
-- [ ] AC1 Every command's peak memory (sum over its process group) is in the report and the tsv — `./selftest.sh` (fullrun-peak-mem)
-- [ ] AC2 A command over its `mem=` budget is stopped with its group and reported `mem`; `mem` holds a milestone — `./selftest.sh` (fullrun-mem-budget), unit `milestone-mem-holds`
-- [ ] AC3 Without `mem=`, the budget is 75% of physical RAM — `./selftest.sh` (fullrun-mem-default, with the RAM size overridden)
-- [ ] AC4 `leftover=` counted before and after a command; growth is a finding, not a red status — `./selftest.sh` (fullrun-leftover)
-- [ ] AC5 `/test-audit` names the test with the most calls to the resource and reports the isolation probe when §6 declares them — `./agenttest.sh test-audit`
-- [ ] AC6 No regression against T00; a trial install passes `./selftest.sh <target>` — `./selftest.sh`
+- [x] AC1 Every command's peak memory (sum over its process group) is in the report and the tsv — `./selftest.sh` (fullrun-peak-mem)
+- [x] AC2 A command over its `mem=` budget is stopped with its group and reported `mem`; `mem` holds a milestone — `./selftest.sh` (fullrun-mem-budget), unit `milestone-mem-holds`
+- [x] AC3 Without `mem=`, the budget is 75% of physical RAM — `./selftest.sh` (fullrun-mem-default, with the RAM size overridden)
+- [x] AC4 `leftover=` counted before and after a command; growth is a finding, not a red status — `./selftest.sh` (fullrun-leftover)
+- [x] AC5 `/test-audit` names the test with the most calls to the resource and reports the isolation probe when §6 declares them — `./agenttest.sh test-audit`
+- [x] AC6 No regression against T00; a trial install passes `./selftest.sh <target>` — `./selftest.sh`
 
 ## Stack
 bash 5.3, python 3.14 (stdlib), jq 1.6, git; Claude Code 2.1.289. Memory sampling through `ps` (BSD and procps both support `-o pgid=,rss=`).
@@ -42,7 +42,7 @@ bash 5.3, python 3.14 (stdlib), jq 1.6, git; Claude Code 2.1.289. Memory samplin
 - [x] T03 `leftover=`: count before and after each command; growth → finding naming the command and the delta — verify: selftest `fullrun-leftover`, `fullrun-leftover-not-a-number`
 - [x] T04 Template: `AGENTS.md` and `PROJECT.md` rules for stateful test resources (read-only connection for read-only tests, equivalence test for a fast world builder, a sweeper for process-named resources, distribution mode with per-module databases), PostgreSQL examples; §6 rows for the audit probes — verify: unit `test_project_template_full_tier_attrs` still passes + HUMAN
 - [x] T05 `/test-audit` lens for external stateful resources: isolation probe, calls per test from a declared command, world-building share, distribution mode; memory per worker from the run report to recommend a worker count — verify: `./agenttest.sh test-audit` (AC5)
-- [ ] T06 Finish: README/BEHAVIOR/HARNESS; `./selftest.sh` against T00; `./agenttest.sh test-audit`; trial install — verify: `./selftest.sh`
+- [x] T06 Finish: README/BEHAVIOR/HARNESS; `./selftest.sh` against T00; `./agenttest.sh test-audit`; trial install — verify: `./selftest.sh`
 
 ## Log
 - 2026-10-05 T00: baseline: selftest 363, failed 0.
@@ -51,3 +51,4 @@ bash 5.3, python 3.14 (stdlib), jq 1.6, git; Claude Code 2.1.289. Memory samplin
 - 2026-10-05 T03: leftover=: команда-счётчик до и после команды; рост — находка «leaves N resource(s) behind (before → after)» с советом про уборщик ресурсов с pid в имени; не число — находка; статус не красный. 3 проверки leftover красные до правки; проверку «уборка не названа» дважды сужал — она цеплялась за строку команды в таблице и за census SKIP. selftest 372, failed 0.
 - 2026-10-05 T04: шаблон AGENTS.md (Validation): тесты с внешним ресурсом — общий мир для читающих тестов через read-only соединение (PostgreSQL default_transaction_read_only / роль с SELECT), тест равенства быстрого построителя мира и сервисного слоя в полном ярусе + по тесту на сущность через сервисы, уборщик ресурсов с pid в имени + leftover=, распределение по воркерам с ресурсом на модуль (xdist loadfile/loadscope), сначала меньше обращений, число воркеров — из замера памяти. PROJECT.md §6: mem= и leftover= в описании атрибутов и в примере (разбирается без неизвестных ключей, кавычки leftover проверены), строки проб «isolation between parallel workers» и «calls … per test». AGENTS.md 960 слов (лимит 1500). HUMAN pending: эти тексты. selftest 372, failed 0.
 - 2026-10-05 T05: skills/test-audit: раздел «Tests that use an external stateful resource» — проба изоляции воркеров, обращения на тест из объявленной команды, доля построения мира и тест равенства, число воркеров = (RAM×0,75 − память ресурса) / пик на воркер, режим распределения xdist при ресурсе на модуль, остатки leftover; test-auditor читает новые пробы и пик памяти. Заготовка расширена (131 обращение у test_add, проба изоляции падает на общем state.txt): PASS за 162 s. Различающего красного нет — прежний навык тоже прошёл расширенную заготовку: агент сам запустил объявленные в §6 пробы; кейс оставлен как регрессия. selftest без изменений.
+- 2026-10-05 T06: README/HARNESS: mem=, leftover=, линза ресурсов в /test-audit. Финиш: selftest 372/0; против T00 (21c40d1, имена без временных путей) ни одна проверка не потеряна (267 → 372); agenttest test-audit PASS (T05); пробная установка 387/0, установленный cc-fullrun находит движок, ~/bin не тронут.
