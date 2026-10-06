@@ -158,6 +158,7 @@ def main() -> int:
         print(f"no full tier declared in {PROJECT} §6 (### Full tier)", file=sys.stderr)
         return 2
 
+    started = time.monotonic()
     counts = {k: 0 for k in ("pass", "fail", "stale", "timeout", "empty", "dup", "skipped")}
     rows, findings, tsv_lines, censuses = [], [], [], []
     seq = iter(range(1, 1_000_000))
@@ -281,6 +282,14 @@ def main() -> int:
             fixed += 1
             compare.append(f"- fixed: `{cmd}`")
 
+    full_minutes = (time.monotonic() - started) / 60
+    m = re.search(r"^\| Full tier budget[^|]*\|\s*([0-9.]+)", text, re.M)
+    full_budget = float(m.group(1)) if m else None
+    full_over_budget = int(bool(full_budget and full_minutes > full_budget))
+    full_note = (f"full tier: {full_minutes:.1f} min against a budget of {full_budget:g} min" if full_budget
+                 else f"full tier: {full_minutes:.1f} min (no budget declared in §6)")
+    if full_over_budget:
+        full_note += " — **over budget**; /test-audit is due"
     fast_note, fast_doubled = "fast tier: not declared", 0
     fast = tier(text, "Fast")
     if fast:
@@ -302,11 +311,11 @@ def main() -> int:
     summary = (
         f"fullrun: total={total} pass={counts['pass']} fail={counts['fail']} stale={counts['stale']} "
         f"new_red={new_red} still_red={still_red} fixed={fixed} fast_doubled={fast_doubled} "
-        f"timeout={counts['timeout']} empty={counts['empty']} dup={counts['dup']} skipped={counts['skipped']}"
+        f"timeout={counts['timeout']} empty={counts['empty']} dup={counts['dup']} skipped={counts['skipped']} full_over_budget={full_over_budget}"
     )
     report = [f"# Full run {stamp}", "", summary, "", f"Compared with: {'the previous run' if prev else 'nothing (first run)'}", "",
               "| # | status | exit | time | command | log |", "|---|---|---|---|---|---|", *rows, "",
-              "## Changes since the previous run", *(compare or ["- none"]), "", "## Fast tier", fast_note]
+              "## Changes since the previous run", *(compare or ["- none"]), "", "## Time", full_note, fast_note]
     if counts["stale"]:
         report += ["", "## Stale declarations",
                    "A command in §6 no longer exists or points at a missing path: the declaration in docs/PROJECT.md is out of date, not a test failure. Fix §6 (/intake refresh)."]

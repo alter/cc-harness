@@ -98,6 +98,7 @@ _unanswered_
 |---|---|
 | How a test is marked full-only here (marker, build tag, `#[ignore]`, a directory, a separate command) | _unanswered_ |
 | Fast tier wall time at `T00`, seconds, from the run | _unanswered_ |
+| Full tier budget, minutes, whole run (over it: a finding, and `/test-audit` is due) | _unanswered_ |
 
 Baseline accepted as-is (pre-existing failures tolerated): _unanswered_
 

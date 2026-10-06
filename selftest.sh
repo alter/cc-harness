@@ -560,6 +560,12 @@ out=$(cd "$fc" && bash "$FR" --out "$fc/r" 2>&1)
 check "fullrun-census-dup: three executions per test is dup" "$out" 'dup=2 '
 check "fullrun-census-clean: one execution per test passes" "$out" 'pass=2 '
 check "fullrun-census-skip-finding: a command without report= is reported unverifiable" "$(cat "$fc"/r/FULLRUN-*.md 2>/dev/null)" 'census SKIP'
+fb2="$TMP/fullrun-budget-total"; mkdir -p "$fb2/docs"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\nsleep 2\nsleep 1\n```\n\n| Question | Answer |\n|---|---|\n| Full tier budget, minutes, whole run | 0.03 |\n\n## 7. Delivery\n' > "$fb2/docs/PROJECT.md"
+out=$(cd "$fb2" && bash "$FR" --out "$fb2/r" 2>&1)
+check "fullrun-over-budget: a full run longer than its declared budget is a finding" "$out" 'full_over_budget=1'
+sed -i.bak 's/| 0.03 |/| 60 |/' "$fb2/docs/PROJECT.md"; out=$(cd "$fb2" && bash "$FR" --out "$fb2/r" 2>&1)
+check "fullrun-within-budget" "$out" 'full_over_budget=0'
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"
