@@ -542,6 +542,17 @@ for ref in "$TARGET/skills/attack/catalogs.md" "$TARGET/skills/pgsql-slow-querie
   grep -qE 'retrieved [0-9]{4}-[0-9]{2}-[0-9]{2}' "$ref" && ok "$name reference: dated" || bad "$name reference: dated" "no 'retrieved YYYY-MM-DD'"
 done
 
+echo "== full run engine (census, timing)"
+fr_dir="$TARGET/fullrun"; [ -d "$fr_dir" ] || fr_dir="$SRC/fullrun"
+ft=$(FULLRUN_DIR="$fr_dir" python3 -m unittest -v "$SRC/selftest/test_fullrun.py" 2>&1)
+while IFS= read -r line; do
+  case "$line" in
+    "test_"*" ... ok") ok "${line%% *}" ;;
+    "test_"*" ... FAIL"|"test_"*" ... ERROR") bad "${line%% *}" "$(printf '%s' "$ft" | grep -A12 "^[A-Z]*: ${line%% *}" | tail -n +3)" ;;
+  esac
+done <<< "$ft"
+printf '%s' "$ft" | grep -qE '^Ran [1-9]' || bad "full run engine tests ran" "$ft"
+
 echo "== agenttest"
 if [ -x "$SRC/agenttest.sh" ]; then
   at=$(AGENTTEST_OUT="$TMP/agenttest" "$SRC/agenttest.sh" --self-check 2>&1)
