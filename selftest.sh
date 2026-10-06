@@ -504,6 +504,10 @@ check "fullrun-timeout: a command over its budget is reported timeout" "$out" 't
 pgrep -f 'sleep 31.25' >/dev/null && bad "fullrun-timeout: the process group is gone" "$(pgrep -fl 'sleep 31.25')" || ok "fullrun-timeout: the process group is gone"
 out=$(cd "$ft" && FR_SLEEP=6 FULLRUN_MIN_BUDGET=1 bash "$FR" --out "$ft/r" 2>&1)
 check "fullrun-default-budget-from-history: twice the last pass, then timeout" "$out" 'timeout=2 '
+fe="$TMP/fullrun-empty"; mkdir -p "$fe/docs"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\n#: expect="test -s mutants.json"\necho "mutation run produced nothing" > mutants.log\n#: expect="grep -q killed mutants2.json"\necho killed > mutants2.json\n```\n\n## 7. Delivery\n' > "$fe/docs/PROJECT.md"
+out=$(cd "$fe" && bash "$FR" --out "$fe/r" 2>&1)
+check "fullrun-empty: exit 0 with a failed expect= is empty, not pass" "$out" 'pass=1 .*empty=1 '
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"

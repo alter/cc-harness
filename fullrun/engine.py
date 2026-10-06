@@ -167,6 +167,11 @@ def main() -> int:
             budget = max(2 * prev[c.text][1], int(os.environ.get("FULLRUN_MIN_BUDGET", "60")))
         rc, secs, timed_out = run(c.text, log, budget)
         status = classify(rc, log, timed_out)
+        if status == "pass" and c.attrs.get("expect"):
+            check = subprocess.run(["bash", "-c", c.attrs["expect"]], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+            if check.returncode != 0:
+                status = "empty"
+                findings.append(f"`{c.text}` exited 0 but its result is empty: `{c.attrs['expect']}` failed — the run proved nothing")
         counts[status] += 1
         tsv_lines.append(f"{status}\t{c.text}\t{secs}")
         rows.append(f"| {i} | {status} | {rc} | {secs}s | `{c.text}` | {log} |")
