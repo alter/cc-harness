@@ -206,6 +206,25 @@ class TemplateAttrs(unittest.TestCase):
         for c in cmds:
             self.assertEqual(c.unknown, [])
         self.assertTrue(any("{shard}" in c.text and c.attrs.get("shards") for c in cmds))
+        mutation = [c for c in cmds if "mutant" in c.text]
+        self.assertTrue(mutation, "the example shows a mutation command")
+        for c in mutation:
+            self.assertNotIn("report", c.attrs, "census attributes do not belong on a mutation command")
+            self.assertNotIn("list", c.attrs)
+            self.assertIn("expect", c.attrs)
+        runner = [c for c in cmds if c.attrs.get("report")]
+        self.assertTrue(runner and all(c.attrs.get("list") for c in runner))
+
+    def test_shard0_is_zero_based(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        try:
+            (tmp / "docs").mkdir()
+            (tmp / "docs" / "PROJECT.md").write_text(
+                "## 6. Gate checks\n\n### Full tier\n\n```\n#: shards=3\necho {shard0}/{shards} >> idx.txt\n```\n\n## 7. x\n", encoding="utf-8")
+            subprocess.run([sys.executable, str(ENGINE_DIR / "engine.py"), "--out", "r"], cwd=tmp, capture_output=True, text=True)
+            self.assertEqual(sorted((tmp / "idx.txt").read_text().split()), ["0/3", "1/3", "2/3"])
+        finally:
+            shutil.rmtree(tmp)
 
 
 class ShardExpansion(unittest.TestCase):

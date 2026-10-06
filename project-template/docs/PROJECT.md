@@ -94,12 +94,18 @@ Run by the night full run and at the end of a milestone, never before a single `
 _unanswered_
 ```
 
-A command may carry attributes on a `#:` line directly above it. Keys: `budget` (`40m`; over it the command is stopped with its children and reported `timeout`; without it, twice the last passing time), `expect` (a postcondition on the result; exit 0 with a failed `expect` is `empty`), `report` (JUnit XML the command writes), `list` (a command that lists the tests without running them — `pytest --collect-only -q`, `go test -list .`, `cargo nextest list`, `jest --listTests`), `shards` and `parallel` (the command uses `{shard}`/`{shards}`; shard 1 runs alone first and the rest start only after it passed its budget, its `expect` and its census), `repeat` with `reason` (a declared repetition; anything else that runs a test twice is a duplicate). With `report` and `list` the run is censused: each test ran exactly once, every listed test ran, shards are disjoint.
+A command may carry attributes on a `#:` line directly above it. Keys: `budget` (`40m`; over it the command is stopped with its children and reported `timeout`; without it, twice the last passing time), `expect` (a postcondition on the result; exit 0 with a failed `expect` is `empty`), `report` (JUnit XML the command writes), `list` (a command that lists the tests without running them — `pytest --collect-only -q`, `go test -list .`, `cargo nextest list`, `jest --listTests`), `shards` and `parallel` (the command uses `{shard}`/`{shards}`; shard 1 runs alone first and the rest start only after it passed its budget, its `expect` and its census), `repeat` with `reason` (a declared repetition; anything else that runs a test twice is a duplicate). With `report` and `list` the run is censused: each test ran exactly once, every listed test ran, shards are disjoint. `{shard}` counts from 1, `{shard0}` from 0 — tools differ, check yours.
+
+Census attributes belong on **test-runner** commands only, and `list=` must list exactly the selection the command runs (`pytest -m slow` pairs with `pytest --collect-only -q -m slow`, not with the whole suite). A mutation run executes the tests many times on purpose and reports mutants, not test cases: give it `budget`, `expect` on its own result files and `shards`, never `report`/`list`.
 
 ```text example-full-tier
-#: budget=40m shards=16 parallel=4 report=reports/mut-{shard}.xml list="pytest --collect-only -q -m mutation" expect="test -s reports/mut-{shard}.xml"
-mutmut run --shard {shard}/{shards}
+#: budget=20m shards=4 parallel=4 report=reports/junit-{shard}.xml list="pytest --collect-only -q"
+pytest --splits {shards} --group {shard} --junitxml=reports/junit-{shard}.xml
+#: budget=60m shards=8 parallel=4 expect="cat mutants-{shard}/mutants.out/caught.txt mutants-{shard}/mutants.out/missed.txt mutants-{shard}/mutants.out/timeout.txt | grep -q ."
+cargo mutants --shard {shard0}/{shards} --baseline=skip --output mutants-{shard}
 ```
+
+The first line uses pytest-split (`--splits N --group k`, groups from 1 — https://jerry-git.github.io/pytest-split/); the second cargo-mutants (`--shard k/n`, k from 0; `caught.txt`/`missed.txt`/`timeout.txt` in `mutants.out` — https://mutants.rs/shards.html, https://mutants.rs/mutants-out.html). Replace both with your project's own tools.
 
 | Question | Answer |
 |---|---|

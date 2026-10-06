@@ -267,7 +267,7 @@ def main() -> int:
         shards = int(c.attrs.get("shards", "1") or 1)
 
         def expand(value: str, k: int) -> str:
-            return value.replace("{shard}", str(k)).replace("{shards}", str(shards))
+            return value.replace("{shard0}", str(k - 1)).replace("{shard}", str(k)).replace("{shards}", str(shards))
 
         texts = [expand(c.text, k) for k in range(1, shards + 1)]
         reports = [expand(c.attrs["report"], k) for k in range(1, shards + 1)] if c.attrs.get("report") else [None] * shards
