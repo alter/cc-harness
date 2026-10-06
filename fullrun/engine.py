@@ -138,6 +138,13 @@ def mem_limit(attrs: dict[str, str]) -> int | None:
     return int(ram * 0.75) if ram else None
 
 
+def leftover_count(command: str | None) -> int | None:
+    if not command:
+        return None
+    out = subprocess.run(["bash", "-c", command], capture_output=True, text=True, stdin=subprocess.DEVNULL).stdout.strip()
+    return int(out) if re.fullmatch(r"\d+", out) else None
+
+
 def seconds(value: str | None) -> int | None:
     if not value:
         return None
@@ -298,7 +305,15 @@ def main() -> int:
         budget = seconds(attrs.get("budget"))
         if budget is None and prev.get(text, ("", None))[0] == "pass" and prev[text][1]:
             budget = max(2 * prev[text][1], int(os.environ.get("FULLRUN_MIN_BUDGET", "60")))
+        before = leftover_count(attrs.get("leftover"))
         rc, secs, stopped, peak = run(text, log, budget, mem_limit(attrs))
+        after = leftover_count(attrs.get("leftover"))
+        if attrs.get("leftover"):
+            with lock:
+                if before is None or after is None:
+                    findings.append(f"`{text}`: leftover command `{attrs['leftover']}` did not print a number")
+                elif after > before:
+                    findings.append(f"`{text}` leaves {after - before} resource(s) behind ({before} → {after} by `{attrs['leftover']}`): clean up, or add a sweeper for resources named after a dead process")
         with lock:
             peaks[text] = peak
         status = classify(rc, log, stopped)

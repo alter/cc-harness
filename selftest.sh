@@ -635,6 +635,28 @@ check "fullrun-mem-budget: a command over mem= is reported mem" "$out" 'mem=1 '
 sed -i.bak 's/^#: mem=60M$//' "$fmb/docs/PROJECT.md"
 out=$(cd "$fmb" && FULLRUN_RAM_BYTES=$((100 * 1024 * 1024)) bash "$FR" --out "$fmb/r" 2>&1)
 check "fullrun-mem-default: without mem= the budget is 75% of RAM" "$out" 'mem=1 '
+fl="$TMP/fullrun-leftover"; mkdir -p "$fl/docs" "$fl/dbs"
+cat > "$fl/docs/PROJECT.md" <<'EOF'
+## 6. Gate checks
+
+### Full tier
+
+```
+#: leftover="ls dbs | wc -l"
+touch dbs/test_$$_a dbs/test_$$_b
+#: leftover="ls dbs | wc -l"
+touch dbs/tmp_x && rm dbs/tmp_x
+#: leftover="echo none"
+true
+```
+
+## 7. Delivery
+EOF
+out=$(cd "$fl" && bash "$FR" --out "$fl/r" 2>&1); rep=$(cat "$fl"/r/FULLRUN-*.md 2>/dev/null)
+check "fullrun-leftover: a command that leaves resources behind is named with the delta" "$rep" 'leaves 2 '
+printf '%s' "$rep" | sed -n '/^## Findings/,$p' | grep -q 'tmp_x.*leaves' && bad "fullrun-leftover: a command that cleans up is not named" "$rep" || ok "fullrun-leftover: a command that cleans up is not named"
+check "fullrun-leftover-not-a-number: a leftover command must print a number" "$rep" 'did not print a number'
+check "fullrun-leftover: leftovers are a finding, not a red status" "$out" 'fail=0 .*mem=0'
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"
