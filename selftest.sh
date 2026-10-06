@@ -508,6 +508,29 @@ fe="$TMP/fullrun-empty"; mkdir -p "$fe/docs"
 printf '## 6. Gate checks\n\n### Full tier\n\n```\n#: expect="test -s mutants.json"\necho "mutation run produced nothing" > mutants.log\n#: expect="grep -q killed mutants2.json"\necho killed > mutants2.json\n```\n\n## 7. Delivery\n' > "$fe/docs/PROJECT.md"
 out=$(cd "$fe" && bash "$FR" --out "$fe/r" 2>&1)
 check "fullrun-empty: exit 0 with a failed expect= is empty, not pass" "$out" 'pass=1 .*empty=1 '
+fs="$TMP/fullrun-shards"; mkdir -p "$fs/docs"
+cat > "$fs/docs/PROJECT.md" <<'EOF'
+## 6. Gate checks
+
+### Full tier
+
+```
+#: shards=4
+echo {shard} >> canary-started.log; exit 1
+#: shards=3 parallel=3
+sleep 2; echo {shard}/{shards} >> parallel-done.log
+#: shards=6 parallel=1
+echo {shard} >> sig-started.log; [ {shard} -eq 1 ] || { echo "ERROR: database is locked (attempt {shard})"; exit 1; }
+```
+
+## 7. Delivery
+EOF
+t0=$(date +%s); out=$(cd "$fs" && bash "$FR" --out "$fs/r" 2>&1); el=$(( $(date +%s) - t0 ))
+[ "$(cat "$fs/canary-started.log" 2>/dev/null)" = "1" ] && ok "fullrun-canary-stops-fanout: only the canary shard started" || bad "fullrun-canary-stops-fanout: only the canary shard started" "$(cat "$fs/canary-started.log" 2>/dev/null | tr '\n' ' ')"
+[ "$(sort "$fs/parallel-done.log" 2>/dev/null | tr '\n' ' ')" = "1/3 2/3 3/3 " ] && ok "fullrun-shards-run: every shard ran once with its index" || bad "fullrun-shards-run: every shard ran once with its index" "$(cat "$fs/parallel-done.log" 2>/dev/null)"
+[ "$el" -le 9 ] && ok "fullrun-shards-run: the fan-out runs in parallel (${el}s)" || bad "fullrun-shards-run: the fan-out runs in parallel" "${el}s for canary 2s + 2 shards of 2s in parallel"
+[ "$(tr '\n' ' ' < "$fs/sig-started.log" 2>/dev/null)" = "1 2 3 " ] && ok "fullrun-same-signature-stops: two failures with one cause stop the rest" || bad "fullrun-same-signature-stops: two failures with one cause stop the rest" "$(tr '\n' ' ' < "$fs/sig-started.log" 2>/dev/null)"
+check "fullrun-shards: skipped shards are counted" "$out" 'skipped=6'
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"

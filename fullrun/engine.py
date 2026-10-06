@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import datetime
+import threading
 import importlib
 import os
 import pathlib
@@ -156,25 +158,67 @@ def main() -> int:
 
     counts = {k: 0 for k in ("pass", "fail", "stale", "timeout", "empty", "dup", "skipped")}
     rows, findings, tsv_lines = [], [], []
-    i = 0
+    seq = iter(range(1, 1_000_000))
+    lock = threading.Lock()
+
+    def execute(text: str, attrs: dict[str, str]) -> tuple[str, int, int, pathlib.Path]:
+        with lock:
+            log = logs / f"{next(seq)}.log"
+        budget = seconds(attrs.get("budget"))
+        if budget is None and prev.get(text, ("", None))[0] == "pass" and prev[text][1]:
+            budget = max(2 * prev[text][1], int(os.environ.get("FULLRUN_MIN_BUDGET", "60")))
+        rc, secs, timed_out = run(text, log, budget)
+        status = classify(rc, log, timed_out)
+        if status == "pass" and attrs.get("expect"):
+            check = subprocess.run(["bash", "-c", attrs["expect"]], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+            if check.returncode != 0:
+                status = "empty"
+                with lock:
+                    findings.append(f"`{text}` exited 0 but its result is empty: `{attrs['expect']}` failed — the run proved nothing")
+        return status, rc, secs, log
+
+    def record(text: str, status: str, rc: int | str, secs: int, log: pathlib.Path | str) -> None:
+        counts[status] += 1
+        tsv_lines.append(f"{status}\t{text}\t{secs}")
+        rows.append(f"| {len(rows) + 1} | {status} | {rc} | {secs}s | `{text}` | {log} |")
+
     for c in commands:
         for key in c.unknown:
             findings.append(f"unknown attribute `{key}` on `{c.text}` (known: {', '.join(sorted(KEYS))})")
-        i += 1
-        log = logs / f"{i}.log"
-        budget = seconds(c.attrs.get("budget"))
-        if budget is None and prev.get(c.text, ("", None))[0] == "pass" and prev[c.text][1]:
-            budget = max(2 * prev[c.text][1], int(os.environ.get("FULLRUN_MIN_BUDGET", "60")))
-        rc, secs, timed_out = run(c.text, log, budget)
-        status = classify(rc, log, timed_out)
-        if status == "pass" and c.attrs.get("expect"):
-            check = subprocess.run(["bash", "-c", c.attrs["expect"]], capture_output=True, text=True, stdin=subprocess.DEVNULL)
-            if check.returncode != 0:
-                status = "empty"
-                findings.append(f"`{c.text}` exited 0 but its result is empty: `{c.attrs['expect']}` failed — the run proved nothing")
-        counts[status] += 1
-        tsv_lines.append(f"{status}\t{c.text}\t{secs}")
-        rows.append(f"| {i} | {status} | {rc} | {secs}s | `{c.text}` | {log} |")
+        shards = int(c.attrs.get("shards", "1") or 1)
+        texts = [c.text.replace("{shard}", str(k)).replace("{shards}", str(shards)) for k in range(1, shards + 1)]
+        status, rc, secs, log = execute(texts[0], c.attrs)
+        record(texts[0], status, rc, secs, log)
+        if shards == 1:
+            continue
+        if status != "pass":
+            for t in texts[1:]:
+                record(t, "skipped", "-", 0, "not started: the canary shard was " + status)
+            findings.append(f"`{c.text}`: canary shard 1/{shards} was {status}; {shards - 1} shards not started — same cause")
+            continue
+        stop = threading.Event()
+        signatures: dict[str, int] = {}
+
+        def shard(text: str) -> tuple[str, str, int | str, int, pathlib.Path | str]:
+            if stop.is_set():
+                return text, "skipped", "-", 0, "not started: two shards already failed with the same cause"
+            st, code, sec, lg = execute(text, c.attrs)
+            if st != "pass":
+                sig = signature(lg) if isinstance(lg, pathlib.Path) else ""
+                with lock:
+                    signatures[sig] = signatures.get(sig, 0) + 1
+                    if sig and signatures[sig] >= 2:
+                        stop.set()
+            return text, st, code, sec, lg
+
+        workers = max(1, int(c.attrs.get("parallel", "1") or 1))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            results = list(pool.map(shard, texts[1:]))
+        for text, st, code, sec, lg in results:
+            record(text, st, code, sec, lg)
+        if stop.is_set():
+            sig = max(signatures, key=signatures.get)
+            findings.append(f"`{c.text}`: two shards failed with the same cause ({sig!r}); the rest were not started")
 
     tsv.write_text("".join(line + "\n" for line in tsv_lines))
 
@@ -210,7 +254,7 @@ def main() -> int:
         else:
             fast_note = f"fast tier: {fast_secs}s (no T00 time recorded in §6)"
 
-    total = len(commands)
+    total = len(tsv_lines)
     summary = (
         f"fullrun: total={total} pass={counts['pass']} fail={counts['fail']} stale={counts['stale']} "
         f"new_red={new_red} still_red={still_red} fixed={fixed} fast_doubled={fast_doubled} "
