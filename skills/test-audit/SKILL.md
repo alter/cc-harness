@@ -12,6 +12,9 @@ Delegate the whole job to the `test-auditor` subagent (Opus, fresh context) with
 
 ## Data, measured first
 
+Measure in a throwaway copy, never in the working tree: `git worktree add <tmp dir> HEAD`, run the full tier and the probes there with `--out <report dir as an absolute path>`, then `git worktree remove --force <tmp dir>`. Test runs write files (reports, state, caches); in the copy they disappear with it. The copy holds the last commit: uncommitted changes are not measured — say so in the report when `git status` is not clean.
+
+
 - **No full run yet?** Run the full tier once (`cc-fullrun --out <report dir>`, or `python3 <harness>/fullrun/engine.py`) before anything else; an audit without a measured run is opinion.
 - **Full run history**: `FULLRUN-*.tsv` (status and seconds per command), `FULLRUN-*.md` (census, time), `FULLRUN-*.tests.json` (outcome per test).
 - **Time per test**: `python3 ~/.claude/fullrun/timing.py slowest --report '<report glob from §6>' --top 30`.
@@ -40,7 +43,7 @@ Auditor: <context>, <date>; data: <report files>; probes run: <list or none>.
 ## What was not checked
 ```
 
-Every finding: `path:line`, the measurement or probe that proves it, CONFIRMED or PLAUSIBLE, and the direction. Findings go into the review loop; the audit itself changes nothing in the repository but `TEST-AUDIT.md`.
+Every finding: `path:line`, the measurement or probe that proves it, CONFIRMED or PLAUSIBLE, and the direction. Findings go into the review loop; the audit itself changes nothing in the repository but `TEST-AUDIT.md` and the run reports in the report directory.
 
 ## When it runs
 

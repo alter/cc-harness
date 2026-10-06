@@ -1,1 +1,1 @@
-Read Grep Glob Write Bash(python3:*) Bash(ls:*) Bash(cat:*) Bash(git diff:*) Bash(git log:*) Bash(git status:*)
+Read Grep Glob Write Bash(python3:*) Bash(ls:*) Bash(cat:*) Bash(git diff:*) Bash(git log:*) Bash(git status:*) Bash(git worktree:*) Bash(mktemp:*) Bash(cd:*) Bash(rm -rf /tmp/*) Bash(rm -rf /var/folders/*)

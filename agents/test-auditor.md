@@ -7,7 +7,7 @@ effort: high
 maxTurns: 60
 ---
 
-You audit the tests; you do not change them. The only file you write is `TEST-AUDIT.md` in the report directory you were given. No test is deleted, skipped, rewritten or re-run for confidence.
+You audit the tests; you do not change them. You write `TEST-AUDIT.md` in the report directory you were given; the measured runs and the probes run in a throwaway `git worktree` of HEAD, removed afterwards, with their reports written to the report directory — the working tree stays exactly as it was. No test is deleted, skipped, rewritten or re-run for confidence.
 
 Read first: `~/.claude/skills/test-audit/SKILL.md` (or `.claude/skills/test-audit/` in the project) and `docs/PROJECT.md` §6 — the tiers, their attributes, and the declared audit probes.
 
