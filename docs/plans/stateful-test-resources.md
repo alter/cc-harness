@@ -36,7 +36,7 @@ bash 5.3, python 3.14 (stdlib), jq 1.6, git; Claude Code 2.1.289. Memory samplin
 - psycopg pipeline mode or any driver-specific optimisation inside the harness.
 
 ## Tasks
-- [ ] T00 Baseline: `./selftest.sh`, counts in Log — verify: `./selftest.sh`
+- [x] T00 Baseline: `./selftest.sh`, counts in Log — verify: `./selftest.sh`
 - [ ] T01 Peak memory per command: sample the process group's RSS each second, record MiB in the tsv and the report — verify: selftest `fullrun-peak-mem`
 - [ ] T02 `mem=` budget (`512M`, `2G`) and the 75%-of-RAM default; over it → stop the group, status `mem`; `check.py` holds a milestone on `mem` — verify: selftest `fullrun-mem-budget`, `fullrun-mem-default`, unit `milestone-mem-holds`
 - [ ] T03 `leftover=`: count before and after each command; growth → finding naming the command and the delta — verify: selftest `fullrun-leftover`, `fullrun-leftover-not-a-number`
@@ -45,3 +45,4 @@ bash 5.3, python 3.14 (stdlib), jq 1.6, git; Claude Code 2.1.289. Memory samplin
 - [ ] T06 Finish: README/BEHAVIOR/HARNESS; `./selftest.sh` against T00; `./agenttest.sh test-audit`; trial install — verify: `./selftest.sh`
 
 ## Log
+- 2026-10-05 T00: baseline: selftest 363, failed 0.
