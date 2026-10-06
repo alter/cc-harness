@@ -28,6 +28,7 @@ build_repo() {
     [ "$a" = main ] && continue
     cp "$SRC/agents/$a.md" "$work/.claude/agents/$a.md" || return 1
   done
+  [ -f "$case_dir/with-fullrun" ] && cp -R "$SRC/fullrun" "$work/.claude/fullrun"
   if [ -f "$case_dir/skill" ]; then
     cp "$SRC/skills/$(head -n 1 "$case_dir/skill")/SKILL.md" "$work/.claude/skill.md" || return 1
     while IFS= read -r sk; do

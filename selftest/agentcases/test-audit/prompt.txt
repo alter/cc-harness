@@ -1,0 +1,1 @@
+Run /test-audit with report directory `reports/`. The procedure is in .claude/skills/test-audit/SKILL.md; the harness scripts are in .claude/fullrun/ (engine.py, timing.py, census.py) — there is no ~/.claude copy here. Non-interactive: do not ask anything.
