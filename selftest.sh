@@ -627,6 +627,14 @@ printf '## 6. Gate checks\n\n### Full tier\n\n```\npython3 -c "import time; b = 
 out=$(cd "$fm" && bash "$FR" --out "$fm/r" 2>&1)
 peak=$(awk -F'\t' 'NF >= 4 {print $4}' "$fm"/r/FULLRUN-*.tsv 2>/dev/null | head -1)
 [ -n "$peak" ] && [ "$peak" -ge 120 ] && ok "fullrun-peak-mem: the peak of the process group is recorded (${peak} MiB)" || bad "fullrun-peak-mem: the peak of the process group is recorded" "tsv: $(cat "$fm"/r/FULLRUN-*.tsv 2>/dev/null)"
+fmb="$TMP/fullrun-mem-budget"; mkdir -p "$fmb/docs"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\n#: mem=60M\npython3 -c "import time; b = bytearray(160 * 1024 * 1024); b[::4096] = b\\"x\\" * len(b[::4096]); time.sleep(20)"\n```\n\n## 7. Delivery\n' > "$fmb/docs/PROJECT.md"
+t0=$(date +%s); out=$(cd "$fmb" && bash "$FR" --out "$fmb/r" 2>&1); el=$(( $(date +%s) - t0 ))
+check "fullrun-mem-budget: a command over mem= is reported mem" "$out" 'mem=1 '
+[ "$el" -le 10 ] && ok "fullrun-mem-budget: it is stopped, not waited out (${el}s)" || bad "fullrun-mem-budget: it is stopped, not waited out" "${el}s"
+sed -i.bak 's/^#: mem=60M$//' "$fmb/docs/PROJECT.md"
+out=$(cd "$fmb" && FULLRUN_RAM_BYTES=$((100 * 1024 * 1024)) bash "$FR" --out "$fmb/r" 2>&1)
+check "fullrun-mem-default: without mem= the budget is 75% of RAM" "$out" 'mem=1 '
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"

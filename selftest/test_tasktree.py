@@ -391,6 +391,10 @@ class MilestoneFullRun(TreeCase):
         r = self.gate_task("dup\tpytest -n 16 [census of 16 shards]\t0\n")
         self.assertNotEqual(r.returncode, 0)
 
+    def test_milestone_mem_holds(self):
+        r = self.gate_task("mem\tpytest -n 4\t120\t3100\n")
+        self.assertNotEqual(r.returncode, 0)
+
     def test_milestone_empty_tsv_does_not_hide_red(self):
         d = self.root / "10-build" / "01-parser"
         r = self.gate_task("fail\tpytest -m slow\t30\n")

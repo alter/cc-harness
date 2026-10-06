@@ -202,7 +202,7 @@ def main() -> int:
             problems.append(f"{rel}: a gate task is closed without verify:passed")
         runs = sorted(p for p in d.glob("FULLRUN-*.tsv") if p.stat().st_size > 0)
         if kv.get("status") == "done" and kv.get("gate") == "yes" and runs:
-            red = [line.split("\t")[1] for line in runs[-1].read_text(encoding="utf-8").splitlines() if line.startswith(("fail\t", "stale\t", "timeout\t", "empty\t", "dup\t"))]
+            red = [line.split("\t")[1] for line in runs[-1].read_text(encoding="utf-8").splitlines() if line.startswith(("fail\t", "stale\t", "timeout\t", "empty\t", "dup\t", "mem\t"))]
             if red:
                 problems.append(f"{rel}: the milestone is closed while its latest full run ({runs[-1].name}) is red: {red}")
         plan = d / "PLAN.md"
