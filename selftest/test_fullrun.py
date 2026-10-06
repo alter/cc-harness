@@ -94,6 +94,47 @@ class Census(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout)
 
 
+TIMING = ENGINE_DIR / "timing.py"
+
+
+class Timing(unittest.TestCase):
+    def setUp(self):
+        self.tmp = pathlib.Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def test_timing_slowest(self):
+        body = ('<testsuite><testcase classname="t" name="fast" time="0.01"/>'
+                '<testcase classname="t" name="slow" time="42.5"/><testcase classname="t" name="mid" time="3.0"/></testsuite>')
+        (self.tmp / "r.xml").write_text(body, encoding="utf-8")
+        r = subprocess.run([sys.executable, str(TIMING), "slowest", "--report", "r.xml", "--top", "2", "--json", "o.json"], cwd=self.tmp, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        data = json.loads((self.tmp / "o.json").read_text())
+        self.assertEqual([t["test"] for t in data["slowest"]], ["t.slow", "t.mid"])
+        self.assertGreater(data["top_share"], 0.9)
+
+    def test_timing_flaky(self):
+        runs = [{"t.a": "pass", "t.b": "pass"}, {"t.a": "fail", "t.b": "pass"}, {"t.a": "pass", "t.b": "pass"}]
+        for i, outcomes in enumerate(runs):
+            (self.tmp / f"FULLRUN-2026-10-0{i + 1}-000000.tests.json").write_text(json.dumps(outcomes), encoding="utf-8")
+        r = subprocess.run([sys.executable, str(TIMING), "flaky", "--dir", ".", "--runs", "3", "--json", "o.json"], cwd=self.tmp, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        data = json.loads((self.tmp / "o.json").read_text())
+        self.assertEqual(list(data["flaky"]), ["t.a"])
+
+    def test_fullrun_keeps_per_test_outcomes(self):
+        (self.tmp / "docs").mkdir()
+        (self.tmp / "docs" / "PROJECT.md").write_text(
+            "## 6. Gate checks\n\n### Full tier\n\n```\n#: report=r.xml\n"
+            "printf '<testsuite><testcase classname=\"t\" name=\"a\"/><testcase classname=\"t\" name=\"b\"><failure/></testcase></testsuite>' > r.xml\n"
+            "```\n\n## 7. x\n", encoding="utf-8")
+        subprocess.run([sys.executable, str(ENGINE_DIR / "engine.py"), "--out", "r"], cwd=self.tmp, capture_output=True, text=True)
+        files = list((self.tmp / "r").glob("FULLRUN-*.tests.json"))
+        self.assertTrue(files)
+        self.assertEqual(json.loads(files[0].read_text()), {"t.a": "pass", "t.b": "fail"})
+
+
 PROJECT_TEMPLATE = pathlib.Path(os.environ.get("PROJECT_TEMPLATE", HERE.parent / "project-template" / "docs" / "PROJECT.md"))
 
 

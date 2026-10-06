@@ -7,6 +7,7 @@ import datetime
 import glob
 import threading
 import importlib
+import json
 import math
 import os
 import pathlib
@@ -208,6 +209,7 @@ def main() -> int:
     started = time.monotonic()
     counts = {k: 0 for k in ("pass", "fail", "stale", "timeout", "empty", "dup", "skipped")}
     rows, findings, tsv_lines, censuses = [], [], [], []
+    test_outcomes: dict[str, str] = {}
     seq = iter(range(1, 1_000_000))
     lock = threading.Lock()
 
@@ -243,6 +245,9 @@ def main() -> int:
                 status = "empty"
                 with lock:
                     findings.append(f"`{text}` exited 0 but its result is empty: `{attrs['expect']}` failed — the run proved nothing")
+        if report:
+            with lock:
+                test_outcomes.update(census.outcomes(report))
         if status == "pass" and report and (shards == 1 or canary):
             verdict, line = take_census([report], attrs, shards, canary)
             with lock:
@@ -314,6 +319,8 @@ def main() -> int:
             findings.append(f"`{c.text}`: two shards failed with the same cause ({sig!r}); the rest were not started")
 
     tsv.write_text("".join(line + "\n" for line in tsv_lines))
+    if test_outcomes:
+        (out / f"FULLRUN-{stamp}.tests.json").write_text(json.dumps(test_outcomes, indent=1, sort_keys=True))
 
     new_red = still_red = fixed = 0
     compare = []

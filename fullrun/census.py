@@ -40,6 +40,26 @@ def executed(report_glob: str) -> list[str]:
     return ids
 
 
+def outcomes(report_glob: str) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for path in sorted(glob.glob(report_glob, recursive=True)):
+        try:
+            root = ET.parse(path).getroot()
+        except ET.ParseError:
+            continue
+        for case in root.iter("testcase"):
+            classname = case.get("classname") or case.get("file") or ""
+            test = norm(f"{classname}::{case.get('name') or ''}" if classname else case.get("name") or "")
+            if case.find("skipped") is not None:
+                state = "skipped"
+            elif case.find("failure") is not None or case.find("error") is not None:
+                state = "fail"
+            else:
+                state = "pass"
+            result[test] = state
+    return result
+
+
 def listed(list_cmd: str | None, list_file: str | None) -> list[str] | None:
     if list_file:
         text = open(list_file, encoding="utf-8").read()
