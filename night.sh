@@ -68,7 +68,9 @@ claude \
 fullrun=${CC_FULLRUN:-}
 if [ -z "$fullrun" ]; then
   here=$(cd "$(dirname "$0")" && pwd)
-  if [ -x "$here/fullrun.sh" ]; then fullrun="$here/fullrun.sh"; else fullrun=$(command -v cc-fullrun || true); fi
+  if [ -x "$here/fullrun.sh" ]; then fullrun="$here/fullrun.sh"
+  elif [ -x "$here/cc-fullrun" ]; then fullrun="$here/cc-fullrun"
+  else fullrun=$(command -v cc-fullrun || true); fi
 fi
 if [ -n "$fullrun" ] && [ -f docs/PROJECT.md ] && grep -q '^### Full tier' docs/PROJECT.md; then
   echo "full run: every command of the full tier, report next to the plan"

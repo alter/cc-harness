@@ -43,13 +43,14 @@ for s in "$SRC"/skills/*/; do
   name=$(basename "$s"); mkdir -p "$TARGET/skills/$name"; cp "$s"/* "$TARGET/skills/$name/"
 done
 rm -rf "$TARGET/project-template"; cp -R "$SRC/project-template" "$TARGET/project-template"
+rm -rf "$TARGET/fullrun"; mkdir -p "$TARGET/fullrun"; cp "$SRC"/fullrun/*.py "$TARGET/fullrun/"
 cp "$SRC/night.sh" "$BIN_DIR/cc-night"
 cp "$SRC/fullrun.sh" "$BIN_DIR/cc-fullrun"
 chmod +x "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" "$TARGET"/hooks/* "$BIN_DIR/cc-night" "$BIN_DIR/cc-fullrun"
 
 if [ "$TARGET" != "$HOME/.claude" ]; then
   echo "== rewrite ~/.claude -> $TARGET in installed copies"
-  grep -rlE '[~]/\.claude|\$HOME/\.claude' "$TARGET/hooks" "$TARGET/agents" "$TARGET/skills" "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" 2>/dev/null \
+  grep -rlE '[~]/\.claude|\$HOME/\.claude' "$TARGET/hooks" "$TARGET/agents" "$TARGET/skills" "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" "$BIN_DIR/cc-fullrun" "$BIN_DIR/cc-night" 2>/dev/null \
     | xargs -r sed -i.bak -e "s#~/\.claude#$TARGET#g" -e "s#\$HOME/\.claude#$TARGET#g"
   find "$TARGET" -name '*.bak' -delete
 fi

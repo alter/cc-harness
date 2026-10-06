@@ -610,7 +610,17 @@ for ref in "$TARGET/skills/attack/catalogs.md" "$TARGET/skills/pgsql-slow-querie
 done
 
 echo "== full run engine (census, timing)"
-fr_dir="$TARGET/fullrun"; [ -d "$fr_dir" ] || fr_dir="$SRC/fullrun"
+fr_dir="$TARGET/fullrun"
+if [ "$TARGET" != "$SRC" ]; then
+  [ -f "$fr_dir/engine.py" ] && ok "installed: fullrun engine present" || bad "installed: fullrun engine present" "missing $fr_dir/engine.py"
+  for w in "$TARGET/bin/cc-fullrun" "$HOME/bin/cc-fullrun"; do
+    [ -x "$w" ] || continue
+    wd="$TMP/installed-fullrun"; mkdir -p "$wd/docs"; printf '## 6. Gate checks\n\n### Full tier\n\n```\ntrue\n```\n\n## 7. x\n' > "$wd/docs/PROJECT.md"
+    check "installed: $w finds its engine" "$(cd "$wd" && env -u CLAUDE_CONFIG_DIR bash "$w" --out "$wd/r" 2>&1)" 'fullrun: total=1 pass=1'
+    break
+  done
+fi
+[ -d "$fr_dir" ] || fr_dir="$SRC/fullrun"
 ft=$(FULLRUN_DIR="$fr_dir" python3 -m unittest -v "$SRC/selftest/test_fullrun.py" 2>&1)
 while IFS= read -r line; do
   case "$line" in
