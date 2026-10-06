@@ -1,5 +1,5 @@
 ---
-status: running
+status: done
 created: 2026-10-06
 ---
 # Stateful test resources: memory budget, leftovers, audit lens, template rules
@@ -61,3 +61,4 @@ bash 5.3, python 3.14 (stdlib), jq 1.6, git; Claude Code 2.1.289. Memory samplin
 - 2026-10-05 T07: leftover= у команды с частями: счёт вокруг первой части (идёт одна) и вокруг всего размножения (до первой параллельной части, после последней), находка — на команду с пометкой [shards 2–N], а не на отдельную часть. Проверка fullrun-leftover-parallel-leak красная до правки: «утечку» приписывало части 2 вместо 3; no-false-finding был зелёным по удаче расписания. selftest 374/0.
 - 2026-10-05 T08: память группы: на Linux сумма Pss из /proc/<pid>/smaps_rollup (общие страницы делятся), иначе RSS с пометкой «may overcount memory shared after fork»; бюджет по умолчанию останавливает только при точном замере, при RSS — находка; явный mem= останавливает везде. Проверка fullrun-mem-shared-fork (200 МиБ на 4 читателя после fork, RAM подменена на 800 МиБ) красная до правки: прогон убит при реальных ~200 МиБ; fullrun-mem-default переписан на зависимый от платформы (см. Assumptions). selftest 375/0.
 - 2026-10-05 T09: наименьшая свободная память машины за время команды (Linux MemAvailable, macOS vm_stat free+inactive+speculative); ниже 10% RAM (FULLRUN_LOW_MEM_PCT) — находка про память вне группы и OOM без подкачки. Проверка fullrun-machine-low-memory красная до правки. Linux проверен в контейнере python:3.12 (procps-ng 4.0.4, VM 3916 MiB): test_fullrun OK; fork 4×200 МиБ общей памяти → PSS 219 MiB, pass; mem=100M при 300 МиБ → mem за 1 s; MemAvailable читается, находка «fell to 1761 MiB (45% of 3916 MiB)» при пороге 100%. README: что видит и чего не видит замер памяти. selftest 376/0.
+- 2026-10-06 finish after T07–T09: selftest 376/0, против T00 ничего не потеряно (267 → 376); пробная установка 391/0, ~/bin не тронут; agenttest test-audit PASS; Linux-путь (PSS, MemAvailable, mem-стоп) проверен в контейнере python:3.12. status: done.
