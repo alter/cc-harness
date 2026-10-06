@@ -4,8 +4,10 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import datetime
+import glob
 import threading
 import importlib
+import math
 import os
 import pathlib
 import re
@@ -157,13 +159,31 @@ def main() -> int:
         return 2
 
     counts = {k: 0 for k in ("pass", "fail", "stale", "timeout", "empty", "dup", "skipped")}
-    rows, findings, tsv_lines = [], [], []
+    rows, findings, tsv_lines, censuses = [], [], [], []
     seq = iter(range(1, 1_000_000))
     lock = threading.Lock()
 
-    def execute(text: str, attrs: dict[str, str]) -> tuple[str, int, int, pathlib.Path]:
+    def take_census(reports: list[str], attrs: dict[str, str], shards: int = 1, canary: bool = False) -> tuple[str | None, str]:
+        list_ids = census.listed(attrs.get("list"), None)
+        data = census.summarize(reports, list_ids, int(attrs.get("repeat", "1") or 1))
+        line = (f"census {', '.join(reports)}: unique={data['unique']} executions={data['executions']} listed={data['listed']} "
+                f"duplicates={data['duplicate_count']} overlap={data['overlap_count']} missing={data['missing_count']}")
+        if data["empty"]:
+            return "empty", line + " — no test executed"
+        if data["duplicate_count"] or data["overlap_count"]:
+            return "dup", line + f" — e.g. {list(data['duplicates'].items())[:3] or list(data['overlap'].items())[:3]}"
+        if canary and data["listed"] and shards > 1 and data["executions"] > math.ceil(data["listed"] / shards) * 1.5:
+            return "dup", line + f" — one shard ran {data['executions']} of {data['listed']} tests, more than its share of {shards}"
+        if not canary and data["missing_count"]:
+            return "dup", line + f" — {data['missing_count']} listed tests never ran, e.g. {data['missing'][:3]}"
+        return None, line
+
+    def execute(text: str, attrs: dict[str, str], report: str | None = None, shards: int = 1, canary: bool = False) -> tuple[str, int, int, pathlib.Path]:
         with lock:
             log = logs / f"{next(seq)}.log"
+        if report:
+            for old in glob.glob(report):
+                pathlib.Path(old).unlink(missing_ok=True)
         budget = seconds(attrs.get("budget"))
         if budget is None and prev.get(text, ("", None))[0] == "pass" and prev[text][1]:
             budget = max(2 * prev[text][1], int(os.environ.get("FULLRUN_MIN_BUDGET", "60")))
@@ -175,6 +195,14 @@ def main() -> int:
                 status = "empty"
                 with lock:
                     findings.append(f"`{text}` exited 0 but its result is empty: `{attrs['expect']}` failed — the run proved nothing")
+        if status == "pass" and report and (shards == 1 or canary):
+            verdict, line = take_census([report], attrs, shards, canary)
+            with lock:
+                censuses.append(line)
+            if verdict:
+                status = verdict
+                with lock:
+                    findings.append(f"`{text}`: {line}")
         return status, rc, secs, log
 
     def record(text: str, status: str, rc: int | str, secs: int, log: pathlib.Path | str) -> None:
@@ -186,8 +214,17 @@ def main() -> int:
         for key in c.unknown:
             findings.append(f"unknown attribute `{key}` on `{c.text}` (known: {', '.join(sorted(KEYS))})")
         shards = int(c.attrs.get("shards", "1") or 1)
-        texts = [c.text.replace("{shard}", str(k)).replace("{shards}", str(shards)) for k in range(1, shards + 1)]
-        status, rc, secs, log = execute(texts[0], c.attrs)
+
+        def expand(value: str, k: int) -> str:
+            return value.replace("{shard}", str(k)).replace("{shards}", str(shards))
+
+        texts = [expand(c.text, k) for k in range(1, shards + 1)]
+        reports = [expand(c.attrs["report"], k) for k in range(1, shards + 1)] if c.attrs.get("report") else [None] * shards
+        if not c.attrs.get("report") or not c.attrs.get("list"):
+            findings.append(f"census SKIP for `{c.text}`: no report= (JUnit XML) or no list= — this run is not verifiable: nobody can tell whether every test ran once")
+        if c.attrs.get("repeat") and not c.attrs.get("reason"):
+            findings.append(f"`{c.text}` declares repeat={c.attrs['repeat']} without reason=")
+        status, rc, secs, log = execute(texts[0], c.attrs, reports[0], shards, canary=True)
         record(texts[0], status, rc, secs, log)
         if shards == 1:
             continue
@@ -199,10 +236,11 @@ def main() -> int:
         stop = threading.Event()
         signatures: dict[str, int] = {}
 
-        def shard(text: str) -> tuple[str, str, int | str, int, pathlib.Path | str]:
+        def shard(job: tuple[str, str | None]) -> tuple[str, str, int | str, int, pathlib.Path | str]:
+            text, report = job
             if stop.is_set():
                 return text, "skipped", "-", 0, "not started: two shards already failed with the same cause"
-            st, code, sec, lg = execute(text, c.attrs)
+            st, code, sec, lg = execute(text, c.attrs, report, shards)
             if st != "pass":
                 sig = signature(lg) if isinstance(lg, pathlib.Path) else ""
                 with lock:
@@ -213,9 +251,15 @@ def main() -> int:
 
         workers = max(1, int(c.attrs.get("parallel", "1") or 1))
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-            results = list(pool.map(shard, texts[1:]))
+            results = list(pool.map(shard, list(zip(texts[1:], reports[1:]))))
         for text, st, code, sec, lg in results:
             record(text, st, code, sec, lg)
+        if c.attrs.get("report") and all(r[1] == "pass" for r in results):
+            verdict, line = take_census([r for r in reports if r], c.attrs, shards)
+            censuses.append(line)
+            if verdict:
+                record(f"{c.text} [census of {shards} shards]", verdict, "-", 0, line)
+                findings.append(f"`{c.text}`: {line}")
         if stop.is_set():
             sig = max(signatures, key=signatures.get)
             findings.append(f"`{c.text}`: two shards failed with the same cause ({sig!r}); the rest were not started")
@@ -266,6 +310,8 @@ def main() -> int:
     if counts["stale"]:
         report += ["", "## Stale declarations",
                    "A command in §6 no longer exists or points at a missing path: the declaration in docs/PROJECT.md is out of date, not a test failure. Fix §6 (/intake refresh)."]
+    if censuses:
+        report += ["", "## Census", *[f"- {line}" for line in censuses]]
     if findings:
         report += ["", "## Findings", *[f"- {f}" for f in findings]]
     md.write_text("\n".join(report) + "\n")

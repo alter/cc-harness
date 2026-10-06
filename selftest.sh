@@ -531,6 +531,35 @@ t0=$(date +%s); out=$(cd "$fs" && bash "$FR" --out "$fs/r" 2>&1); el=$(( $(date 
 [ "$el" -le 9 ] && ok "fullrun-shards-run: the fan-out runs in parallel (${el}s)" || bad "fullrun-shards-run: the fan-out runs in parallel" "${el}s for canary 2s + 2 shards of 2s in parallel"
 [ "$(tr '\n' ' ' < "$fs/sig-started.log" 2>/dev/null)" = "1 2 3 " ] && ok "fullrun-same-signature-stops: two failures with one cause stop the rest" || bad "fullrun-same-signature-stops: two failures with one cause stop the rest" "$(tr '\n' ' ' < "$fs/sig-started.log" 2>/dev/null)"
 check "fullrun-shards: skipped shards are counted" "$out" 'skipped=6'
+fc="$TMP/fullrun-census"; mkdir -p "$fc/docs" "$fc/bin"
+cat > "$fc/bin/fakejunit" <<'EOF'
+#!/usr/bin/env bash
+out=$1; shift; times=$1; shift
+{ printf '<?xml version="1.0"?><testsuite>'; for _ in $(seq "$times"); do for t in "$@"; do printf '<testcase classname="t" name="%s"/>' "$t"; done; done; printf '</testsuite>'; } > "$out"
+EOF
+chmod +x "$fc/bin/fakejunit"
+cat > "$fc/docs/PROJECT.md" <<EOF
+## 6. Gate checks
+
+### Full tier
+
+\`\`\`
+#: shards=4 report=all-{shard}.xml list="printf 't::a\\nt::b\\nt::c\\nt::d\\n'"
+echo {shard} >> census-started.log; $fc/bin/fakejunit all-{shard}.xml 1 a b c d
+#: report=thrice.xml list="printf 't::a\\nt::b\\n'"
+$fc/bin/fakejunit thrice.xml 3 a b
+#: report=ok.xml list="printf 't::a\\nt::b\\n'"
+$fc/bin/fakejunit ok.xml 1 a b
+echo no report here
+\`\`\`
+
+## 7. Delivery
+EOF
+out=$(cd "$fc" && bash "$FR" --out "$fc/r" 2>&1)
+[ "$(cat "$fc/census-started.log" 2>/dev/null)" = "1" ] && ok "fullrun-census-dup-stops: a canary shard that ran every test stops the fan-out" || bad "fullrun-census-dup-stops: a canary shard that ran every test stops the fan-out" "$(tr '\n' ' ' < "$fc/census-started.log" 2>/dev/null) / $out"
+check "fullrun-census-dup: three executions per test is dup" "$out" 'dup=2 '
+check "fullrun-census-clean: one execution per test passes" "$out" 'pass=2 '
+check "fullrun-census-skip-finding: a command without report= is reported unverifiable" "$(cat "$fc"/r/FULLRUN-*.md 2>/dev/null)" 'census SKIP'
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"
