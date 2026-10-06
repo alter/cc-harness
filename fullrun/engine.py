@@ -130,12 +130,12 @@ def mebibytes(value: str | None) -> int | None:
     return int(float(m.group(1)) * {"": 1, "K": 1 / 1024, "M": 1, "G": 1024}[m.group(2).upper()])
 
 
-def mem_limit(attrs: dict[str, str]) -> int | None:
+def mem_limit(attrs: dict[str, str]) -> tuple[int | None, bool]:
     explicit = mebibytes(attrs.get("mem"))
     if explicit:
-        return explicit
+        return explicit, True
     ram = physical_ram_mib()
-    return int(ram * 0.75) if ram else None
+    return (int(ram * 0.75) if ram else None), False
 
 
 def leftover_count(command: str | None) -> int | None:
@@ -154,17 +154,27 @@ def seconds(value: str | None) -> int | None:
     return int(m.group(1)) * {"": 1, "s": 1, "m": 60, "h": 3600}[m.group(2)]
 
 
-def group_rss_mib(pgid: int) -> int:
+def group_mem_mib(pgid: int) -> tuple[int, bool]:
     try:
-        out = subprocess.run(["ps", "-A", "-o", "pgid=,rss="], capture_output=True, text=True, timeout=5).stdout
+        out = subprocess.run(["ps", "-A", "-o", "pid=,pgid=,rss="], capture_output=True, text=True, timeout=5).stdout
     except (OSError, subprocess.SubprocessError):
-        return 0
-    total = 0
-    for line in out.splitlines():
-        parts = line.split()
-        if len(parts) == 2 and parts[0] == str(pgid) and parts[1].isdigit():
-            total += int(parts[1])
-    return total // 1024
+        return 0, False
+    rows = [line.split() for line in out.splitlines()]
+    members = [(r[0], r[2]) for r in rows if len(r) == 3 and r[1] == str(pgid) and r[2].isdigit()]
+    pss_total, exact = 0, bool(members)
+    for pid, _ in members:
+        rollup = pathlib.Path(f"/proc/{pid}/smaps_rollup")
+        try:
+            m = re.search(r"^Pss:\s+(\d+) kB", rollup.read_text(), re.M)
+        except OSError:
+            m = None
+        if not m:
+            exact = False
+            break
+        pss_total += int(m.group(1))
+    if exact:
+        return pss_total // 1024, True
+    return sum(int(rss) for _, rss in members) // 1024, False
 
 
 def stop_group(proc: subprocess.Popen) -> None:
@@ -179,9 +189,10 @@ def stop_group(proc: subprocess.Popen) -> None:
         proc.wait()
 
 
-def run(cmd: str, log: pathlib.Path, budget: int | None, mem_budget: int | None = None) -> tuple[int, int, str | None, int]:
+def run(cmd: str, log: pathlib.Path, budget: int | None, mem_budget: int | None = None, mem_hard: bool = False) -> tuple[int, int, str | None, int, bool]:
     t0 = time.monotonic()
     peak = 0
+    exact_all = True
     stopped: str | None = None
     with log.open("w") as fh:
         proc = subprocess.Popen(["bash", "-c", cmd], stdout=fh, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
@@ -193,8 +204,10 @@ def run(cmd: str, log: pathlib.Path, budget: int | None, mem_budget: int | None 
                 break
             except subprocess.TimeoutExpired:
                 pass
-            peak = max(peak, group_rss_mib(proc.pid))
-            if mem_budget and peak > mem_budget:
+            sample, exact = group_mem_mib(proc.pid)
+            exact_all = exact_all and exact
+            peak = max(peak, sample)
+            if mem_budget and peak > mem_budget and (mem_hard or exact):
                 stopped = "mem"
             elif budget is not None and time.monotonic() - t0 > budget:
                 stopped = "timeout"
@@ -204,7 +217,7 @@ def run(cmd: str, log: pathlib.Path, budget: int | None, mem_budget: int | None 
                 break
     with CHILDREN_LOCK:
         CHILDREN.discard(proc.pid)
-    return rc, int(round(time.monotonic() - t0)), stopped, peak
+    return rc, int(round(time.monotonic() - t0)), stopped, peak, exact_all
 
 
 def classify(rc: int, log: pathlib.Path, stopped: str | None) -> str:
@@ -314,15 +327,20 @@ def main() -> int:
             budget = max(2 * prev[text][1], int(os.environ.get("FULLRUN_MIN_BUDGET", "60")))
         counting = bool(attrs.get("leftover")) and count_leftover
         before = leftover_count(attrs["leftover"]) if counting else None
-        rc, secs, stopped, peak = run(text, log, budget, mem_limit(attrs))
+        limit, hard = mem_limit(attrs)
+        rc, secs, stopped, peak, exact = run(text, log, budget, limit, hard)
         if counting:
             leftover_finding(text, attrs["leftover"], before, leftover_count(attrs["leftover"]))
         with lock:
             peaks[text] = peak
         status = classify(rc, log, stopped)
+        method = "PSS" if exact else "RSS, may overcount memory shared after fork"
         if stopped == "mem":
             with lock:
-                findings.append(f"`{text}` passed its memory budget ({mem_limit(attrs)} MiB, peak {peak} MiB sampled) and was stopped with its process group")
+                findings.append(f"`{text}` passed its memory budget ({limit} MiB, peak {peak} MiB, {method}) and was stopped with its process group")
+        elif limit and peak > limit:
+            with lock:
+                findings.append(f"`{text}` peaked at {peak} MiB ({method}) over the default budget of {limit} MiB (75% of RAM); not stopped because RSS overstates shared pages — declare mem= to enforce it, or measure on Linux where PSS is exact")
         if status == "pass" and attrs.get("expect"):
             check = subprocess.run(["bash", "-c", attrs["expect"]], capture_output=True, text=True, stdin=subprocess.DEVNULL)
             if check.returncode != 0:
@@ -459,7 +477,7 @@ def main() -> int:
         f"timeout={counts['timeout']} empty={counts['empty']} dup={counts['dup']} mem={counts['mem']} skipped={counts['skipped']} full_over_budget={full_over_budget}"
     )
     report = [f"# {'Full' if args.tier == 'full' else 'Fast'} run {stamp}", "", summary, "", f"Compared with: {'the previous run' if prev else 'nothing (first run)'}", "",
-              "| # | status | exit | time | peak memory (sampled) | command | log |", "|---|---|---|---|---|---|---|", *rows, "",
+              "| # | status | exit | time | peak memory (sampled: PSS on Linux, RSS elsewhere) | command | log |", "|---|---|---|---|---|---|---|", *rows, "",
               "## Changes since the previous run", *(compare or ["- none"]), "", "## Time", full_note, fast_note]
     if counts["stale"]:
         report += ["", "## Stale declarations",

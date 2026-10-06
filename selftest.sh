@@ -634,7 +634,11 @@ check "fullrun-mem-budget: a command over mem= is reported mem" "$out" 'mem=1 '
 [ "$el" -le 10 ] && ok "fullrun-mem-budget: it is stopped, not waited out (${el}s)" || bad "fullrun-mem-budget: it is stopped, not waited out" "${el}s"
 sed -i.bak 's/^#: mem=60M$//' "$fmb/docs/PROJECT.md"
 out=$(cd "$fmb" && FULLRUN_RAM_BYTES=$((100 * 1024 * 1024)) bash "$FR" --out "$fmb/r" 2>&1)
-check "fullrun-mem-default: without mem= the budget is 75% of RAM" "$out" 'mem=1 '
+if [ -r /proc/self/smaps_rollup ]; then
+  check "fullrun-mem-default: without mem= the budget is 75% of RAM (PSS: enforced)" "$out" 'mem=1 '
+else
+  check "fullrun-mem-default: without mem= the budget is 75% of RAM (RSS: a finding, not a stop)" "$(cat "$fmb"/r/FULLRUN-*.md 2>/dev/null)" 'over the default budget'
+fi
 fl="$TMP/fullrun-leftover"; mkdir -p "$fl/docs" "$fl/dbs"
 cat > "$fl/docs/PROJECT.md" <<'EOF'
 ## 6. Gate checks
@@ -675,6 +679,28 @@ EOF
 (cd "$flp" && bash "$FR" --out "$flp/r" >/dev/null 2>&1); findings=$(sed -n '/^## Findings/,$p' "$flp"/r/FULLRUN-*.md 2>/dev/null | grep 'leaves')
 printf '%s' "$findings" | grep -q 'clean_' && bad "fullrun-leftover-parallel-no-false-finding: shards that clean up are not reported" "$findings" || ok "fullrun-leftover-parallel-no-false-finding: shards that clean up are not reported"
 [ "$(printf '%s\n' "$findings" | grep -c 'leak_')" -eq 1 ] && ok "fullrun-leftover-parallel-leak: one leaking shard gives one finding for the command" || bad "fullrun-leftover-parallel-leak: one leaking shard gives one finding for the command" "$findings"
+fsh="$TMP/fullrun-mem-shared"; mkdir -p "$fsh/docs"
+cat > "$fsh/fork.py" <<'EOF'
+import multiprocessing as mp
+import time
+
+buf = bytearray(200 * 1024 * 1024)
+buf[::4096] = b"x" * len(buf[::4096])
+
+
+def reader(_):
+    total = sum(buf[::4096])
+    time.sleep(3)
+    return total
+
+
+if __name__ == "__main__":
+    with mp.get_context("fork").Pool(4) as pool:
+        print(pool.map(reader, range(4)))
+EOF
+printf '## 6. Gate checks\n\n### Full tier\n\n```\npython3 fork.py\n```\n\n## 7. Delivery\n' > "$fsh/docs/PROJECT.md"
+out=$(cd "$fsh" && FULLRUN_RAM_BYTES=$((800 * 1024 * 1024)) bash "$FR" --out "$fsh/r" 2>&1)
+check "fullrun-mem-shared-fork: shared pages after fork do not stop a run under the default budget" "$out" 'pass=1 .*mem=0 '
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"
