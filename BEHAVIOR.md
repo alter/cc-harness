@@ -193,6 +193,7 @@ To stop: `touch .claude/plan-pause` or `status: paused` in the plan file. In the
 | `verifier` | sonnet high, 240 turns | Bash, Read, Grep, Glob, Write, Edit | independent verification, writes `VERIFY.md` | Bash and Write/Edit were called |
 | `worker` | sonnet high, 80 turns, `run-task` preloaded | all | one plan task in delegate mode, or one part of a split task in its own worktree | Edit/Write/Bash was called; the report reads `T## done\|blocked\|open: …` |
 | `attacker` | opus high, 60 turns | Read, Grep, Glob, Bash, Write, Edit | `/attack`: source → sink map, mandatory minimum, catalogs, reproduction with inert probes, `ATTACK.md` | Bash was called |
+| `test-auditor` | opus high, 60 turns | Read, Grep, Glob, Bash, Write | `/test-audit`: timing, flakiness, census, order/parallel probes, `TEST-AUDIT.md` | Bash was called |
 | `pg-checker` | sonnet high, 40 turns | Read, Grep, Glob, Bash | `/pgsql-slow-queries`: held transactions, missing indexes, read-only | Read or Grep was called |
 | anything else | — | — | — | at least one tool call behind a claim of "done" |
 
