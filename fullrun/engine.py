@@ -186,11 +186,10 @@ def main() -> int:
     text = PROJECT.read_text(encoding="utf-8")
     out = pathlib.Path(args.out) if args.out else pathlib.Path(".claude/reports")
     out.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    n = 0
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S%f")
     while (out / f"FULLRUN-{stamp}.md").exists() or (out / f"FULLRUN-{stamp}.tsv").exists():
-        n += 1
-        stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S") + f"-{n}"
+        time.sleep(0.001)
+        stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S%f")
     logs = pathlib.Path(".claude/scratch/fullrun") / stamp
     logs.mkdir(parents=True, exist_ok=True)
     tsv, md = out / f"FULLRUN-{stamp}.tsv", out / f"FULLRUN-{stamp}.md"

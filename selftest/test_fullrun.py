@@ -135,6 +135,23 @@ class Timing(unittest.TestCase):
         self.assertEqual(json.loads(files[0].read_text()), {"t.a": "pass", "t.b": "fail"})
 
 
+class ReportOrder(unittest.TestCase):
+    def test_reports_sort_in_run_order_within_one_second(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        try:
+            (tmp / "docs").mkdir()
+            (tmp / "docs" / "PROJECT.md").write_text("## 6. Gate checks\n\n### Full tier\n\n```\ntrue\n```\n\n## 7. x\n", encoding="utf-8")
+            names = []
+            for _ in range(3):
+                subprocess.run([sys.executable, str(ENGINE_DIR / "engine.py"), "--out", "r"], cwd=tmp, capture_output=True, text=True)
+                newest = max((tmp / "r").glob("FULLRUN-*.md"), key=lambda p: p.stat().st_mtime_ns)
+                names.append(newest.name)
+            self.assertEqual(names, sorted(names), names)
+            self.assertEqual(len(set(names)), 3)
+        finally:
+            shutil.rmtree(tmp)
+
+
 PROJECT_TEMPLATE = pathlib.Path(os.environ.get("PROJECT_TEMPLATE", HERE.parent / "project-template" / "docs" / "PROJECT.md"))
 
 
