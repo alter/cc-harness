@@ -1,5 +1,5 @@
 ---
-status: done
+status: running
 created: 2026-10-06
 ---
 # Test run gates: budgets, a canary shard, a run census, a periodic test audit
@@ -62,6 +62,13 @@ bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, 
 - [x] T13 `/test-audit` skill + `test-auditor` agent (Opus): timing, census, flakiness, redundancy (mutation report where available), parallel safety (static shared-resource scan + declared `audit-shuffle=`/`audit-parallel=` runs), TEST-AUDIT.md with the four sections, findings into the review loop — verify: `./agenttest.sh test-audit` (AC9)
 - [x] T14 Triggers: `cc-night` runs `/test-audit` when the last TEST-AUDIT is 7+ days old or the latest full run has `fast_doubled=1`/`full_over_budget=1`; `/run` runs it when it closes a milestone — verify: selftest `night-runs-test-audit`, `night-skips-fresh-test-audit`
 - [x] T15 Finish: README/BEHAVIOR/HARNESS; `./selftest.sh` against T00; `./agenttest.sh` complete; trial install and `./selftest.sh <target>` — verify: `./selftest.sh && ./agenttest.sh`
+
+### After the final review
+- [ ] T16 Atomic report: the tsv is written once at the end (temp file + rename); `check.py` and `previous()` skip empty tsv files; an interrupted, stopped or empty-tier run leaves no tsv that hides the last red run — verify: selftest `fullrun-stop-keeps-last-red`, `fullrun-unanswered-tier-no-tsv`
+- [ ] T17 Template example split: a test-runner command with census attributes and a verified sharding mechanism; a mutation command with budget/expect/shards and no census; `/intake` and the attribute text say census belongs on test-runner commands and `list=` must list exactly the selection the command runs — verify: unit `test_project_template_full_tier_attrs` (no census attrs on the mutation line) + flags verified against the tool's documentation (URL in Log)
+- [ ] T18 `integrity-check.py`: mutation tools in the repetition guard (a loop around mutmut, stryker, pitest, cargo-mutants, go-mutesting, infection) — verify: selftest `integrity-added-repeat: loop around mutmut`
+- [ ] T19 `cc-fullrun --tier fast`: the same budgets, expect, shards and census for the fast tier, reports `FASTRUN-*` kept apart from the full-run history; `run-task` uses it when §6 declares attributes on the fast tier — verify: selftest `fastrun-census-dup`, `fastrun-separate-history`
+- [ ] T20 `/test-audit` measures in a throwaway `git worktree`: the measured run and the probes leave the working tree as it was, except TEST-AUDIT.md and reports — verify: `./agenttest.sh test-audit` with a check that `git status` shows nothing outside `reports/`
 
 ## Log
 - 2026-10-05 T00: baseline: selftest 302/0, agenttest --self-check ok.
