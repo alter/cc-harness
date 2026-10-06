@@ -159,8 +159,8 @@ def signature(log: pathlib.Path) -> str:
     return ""
 
 
-def previous(out: pathlib.Path, current: pathlib.Path) -> dict[str, tuple[str, int | None]]:
-    runs = sorted(p for p in out.glob("FULLRUN-*.tsv") if p != current and p.stat().st_size > 0)
+def previous(out: pathlib.Path, current: pathlib.Path, prefix: str = "FULLRUN") -> dict[str, tuple[str, int | None]]:
+    runs = sorted(p for p in out.glob(f"{prefix}-*.tsv") if p != current and p.stat().st_size > 0)
     if not runs:
         return {}
     data = {}
@@ -176,6 +176,7 @@ def main() -> int:
     ap.add_argument("--project", default=".")
     ap.add_argument("--out")
     ap.add_argument("--stop", action="store_true", help="stop the full run running in this checkout, with its children")
+    ap.add_argument("--tier", choices=("full", "fast"), default="full", help="which tier of §6 to run (default: full)")
     args = ap.parse_args()
     os.chdir(args.project)
     if args.stop:
@@ -187,21 +188,23 @@ def main() -> int:
     out = pathlib.Path(args.out) if args.out else pathlib.Path(".claude/reports")
     out.mkdir(parents=True, exist_ok=True)
     stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S%f")
-    while (out / f"FULLRUN-{stamp}.md").exists() or (out / f"FULLRUN-{stamp}.tsv").exists():
+    prefix = "FULLRUN" if args.tier == "full" else "FASTRUN"
+    while (out / f"{prefix}-{stamp}.md").exists() or (out / f"{prefix}-{stamp}.tsv").exists():
         time.sleep(0.001)
         stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S%f")
     logs = pathlib.Path(".claude/scratch/fullrun") / stamp
     logs.mkdir(parents=True, exist_ok=True)
-    tsv, md = out / f"FULLRUN-{stamp}.tsv", out / f"FULLRUN-{stamp}.md"
-    prev = previous(out, tsv)
+    tsv, md = out / f"{prefix}-{stamp}.tsv", out / f"{prefix}-{stamp}.md"
+    prev = previous(out, tsv, prefix)
     STATE.mkdir(parents=True, exist_ok=True)
     commit = subprocess.run(["git", "rev-parse", "--short=12", "HEAD"], capture_output=True, text=True).stdout.strip() or "none"
     (STATE / "current").write_text(f"{os.getpid()} {commit} {stamp}\n")
     signal.signal(signal.SIGTERM, on_term)
 
-    commands = tier(text, "Full")
+    tier_name = args.tier.capitalize()
+    commands = tier(text, tier_name)
     if not commands:
-        print(f"no full tier declared in {PROJECT} §6 (### Full tier)", file=sys.stderr)
+        print(f"no {args.tier} tier declared in {PROJECT} §6 (### {tier_name} tier)", file=sys.stderr)
         return 2
 
     started = time.monotonic()
@@ -320,7 +323,7 @@ def main() -> int:
     partial.write_text("".join(line + "\n" for line in tsv_lines))
     os.replace(partial, tsv)
     if test_outcomes:
-        (out / f"FULLRUN-{stamp}.tests.json").write_text(json.dumps(test_outcomes, indent=1, sort_keys=True))
+        (out / f"{prefix}-{stamp}.tests.json").write_text(json.dumps(test_outcomes, indent=1, sort_keys=True))
 
     new_red = still_red = fixed = 0
     compare = []
@@ -339,14 +342,14 @@ def main() -> int:
 
     full_minutes = (time.monotonic() - started) / 60
     m = re.search(r"^\| Full tier budget[^|]*\|\s*([0-9.]+)", text, re.M)
-    full_budget = float(m.group(1)) if m else None
+    full_budget = float(m.group(1)) if m and args.tier == "full" else None
     full_over_budget = int(bool(full_budget and full_minutes > full_budget))
     full_note = (f"full tier: {full_minutes:.1f} min against a budget of {full_budget:g} min" if full_budget
                  else f"full tier: {full_minutes:.1f} min (no budget declared in §6)")
     if full_over_budget:
         full_note += " — **over budget**; /test-audit is due"
     fast_note, fast_doubled = "fast tier: not declared", 0
-    fast = tier(text, "Fast")
+    fast = tier(text, "Fast") if args.tier == "full" else []
     if fast:
         t0 = time.monotonic()
         for c in fast:
@@ -364,11 +367,11 @@ def main() -> int:
 
     total = len(tsv_lines)
     summary = (
-        f"fullrun: total={total} pass={counts['pass']} fail={counts['fail']} stale={counts['stale']} "
+        f"{'fullrun' if args.tier == 'full' else 'fastrun'}: total={total} pass={counts['pass']} fail={counts['fail']} stale={counts['stale']} "
         f"new_red={new_red} still_red={still_red} fixed={fixed} fast_doubled={fast_doubled} "
         f"timeout={counts['timeout']} empty={counts['empty']} dup={counts['dup']} skipped={counts['skipped']} full_over_budget={full_over_budget}"
     )
-    report = [f"# Full run {stamp}", "", summary, "", f"Compared with: {'the previous run' if prev else 'nothing (first run)'}", "",
+    report = [f"# {'Full' if args.tier == 'full' else 'Fast'} run {stamp}", "", summary, "", f"Compared with: {'the previous run' if prev else 'nothing (first run)'}", "",
               "| # | status | exit | time | command | log |", "|---|---|---|---|---|---|", *rows, "",
               "## Changes since the previous run", *(compare or ["- none"]), "", "## Time", full_note, fast_note]
     if counts["stale"]:

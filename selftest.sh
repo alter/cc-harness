@@ -599,6 +599,29 @@ out=$(cd "$fx" && bash "$FR" --stop 2>&1); sleep 2
 pgrep -f 'sleep 33.5' >/dev/null && bad "fullrun-stop: the running full run and its children are stopped" "$(pgrep -fl 'sleep 33.5') / $out" || ok "fullrun-stop: the running full run and its children are stopped"
 [ ! -f "$fx/second.log" ] && ok "fullrun-stop: nothing after the stop is started" || bad "fullrun-stop: nothing after the stop is started" "second.log exists"
 [ ! -f "$fx/child.pid" ] && ok "fullrun-state-not-in-project-root" || bad "fullrun-state-not-in-project-root" "child.pid in the project root"
+ff="$TMP/fastrun"; mkdir -p "$ff/docs"
+cat > "$ff/docs/PROJECT.md" <<EOF
+## 6. Gate checks
+
+### Fast tier
+
+\`\`\`
+#: report=fast.xml list="printf 't::a\\nt::b\\n'"
+$fc/bin/fakejunit fast.xml 3 a b
+\`\`\`
+
+### Full tier
+
+\`\`\`
+true
+\`\`\`
+
+## 7. Delivery
+EOF
+out=$(cd "$ff" && bash "$FR" --tier fast --out "$ff/r" 2>&1); rc=$?
+check "fastrun-census-dup: the fast tier is censused too" "$out" 'dup=1 '
+[ "$rc" -ne 0 ] && ok "fastrun-census-dup: a duplicated fast run exits non-zero" || bad "fastrun-census-dup: a duplicated fast run exits non-zero" "exit $rc"
+ls "$ff"/r/FASTRUN-*.tsv >/dev/null 2>&1 && ! ls "$ff"/r/FULLRUN-* >/dev/null 2>&1 && ok "fastrun-separate-history: fast runs keep their own reports" || bad "fastrun-separate-history: fast runs keep their own reports" "$(ls "$ff/r" 2>&1)"
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"
