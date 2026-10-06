@@ -25,5 +25,7 @@ rm -f state.txt; python3 run_tests.py --junit reports/junit.xml
 | Full tier budget, minutes, whole run | 5 |
 | Audit: run in another order | rm -f state.txt; python3 run_tests.py --reverse --junit reports/junit-reverse.xml |
 | Audit: run in parallel | none |
+| Audit: isolation between parallel workers | python3 isolation_probe.py |
+| Audit: calls to the external resource per test | python3 calls_per_test.py |
 
 ## 7. Delivery

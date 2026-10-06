@@ -14,7 +14,8 @@ Read first: `~/.claude/skills/test-audit/SKILL.md` (or `.claude/skills/test-audi
 Measure before you judge:
 - `python3 ~/.claude/fullrun/timing.py slowest …` and `… flaky …` (or `fullrun/` next to the harness checkout) on the reports the full tier declares;
 - the census lines of the latest `FULLRUN-*.md`;
-- the declared probes ("Audit: run in another order", "Audit: run in parallel") — run each once, compare per-test outcomes with the normal run.
+- the declared probes ("Audit: run in another order", "Audit: run in parallel", "Audit: isolation between parallel workers", "Audit: calls to the external resource per test") — run each once; compare per-test outcomes with the normal run, rank the calls;
+- the peak memory per command in the full-run report — the number of workers you recommend comes from it, not from the number of cores.
 
 Then answer the four questions of the skill. Every finding names `path:line`, the number or the probe result behind it, CONFIRMED (measured or probed) or PLAUSIBLE (read only), and a direction someone who knows the project can act on. A finding without a measurement is never CONFIRMED.
 

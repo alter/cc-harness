@@ -22,6 +22,17 @@ Measure in a throwaway copy, never in the working tree: `git worktree add <tmp d
 - **Census**: the `## Census` lines of the latest full run — duplicates, overlap, missing tests.
 - **Probes**, only when `docs/PROJECT.md` §6 declares them: "Audit: run in another order" and "Audit: run in parallel". Their per-test outcomes are compared with the normal run: a test that passes in order and fails reversed or in parallel depends on another test or on shared state.
 
+## Tests that use an external stateful resource
+
+When the suite talks to a database, a queue or a bucket, add this lens before the four questions:
+
+- **Isolation**: run "Audit: isolation between parallel workers" from §6 when declared. A failure names the shared resource; parallelism waits until it is fixed. Not declared → read how each worker gets its resource and say it is unproven.
+- **Calls per test**: run "Audit: calls to the external resource per test" when declared and rank the tests. A test with tens or hundreds of calls is the first speed-up candidate; batching independent calls and building a read-only world once beat adding workers.
+- **World building**: the share of a test's time spent creating its data against the assertions themselves. A fast builder that bypasses the service layer needs the equivalence test the template asks for — its absence is a finding.
+- **Workers from memory, not from cores**: the full-run report has the peak memory of each command's process group. Recommended workers = (RAM × 0.75 − the resource's own memory) / peak per worker, rounded down. A box without swap gets no rounding up.
+- **Distribution**: a resource per module with a distribution that spreads a module's tests across workers (pytest-xdist `--dist load`) clones the resource once per worker per module — a finding; `loadfile`/`loadscope` keep a module on one worker.
+- **Leftovers**: findings "leaves N resource(s) behind" in the full-run report point at a missing sweeper.
+
 ## The four questions, each answered with evidence
 
 1. **Why is it slow?** The slowest tests and the share of total time they take; for each, the cause read in its code: a real `sleep` or timeout, real network, a database or container started per test instead of per module, a fixture rebuilt every time, a large input generated on every run, a whole suite repeated (`-count`, `--reruns`, loops, shards that each run everything — the census says so).
