@@ -27,6 +27,7 @@ RED = ("fail", "stale", "timeout", "empty", "dup", "mem")
 PROJECT = pathlib.Path("docs/PROJECT.md")
 STATE = pathlib.Path(".claude/scratch/fullrun")
 CHILDREN: set[int] = set()
+LOWEST: dict[str, int | None] = {}
 CHILDREN_LOCK = threading.Lock()
 
 
@@ -177,6 +178,19 @@ def group_mem_mib(pgid: int) -> tuple[int, bool]:
     return sum(int(rss) for _, rss in members) // 1024, False
 
 
+def available_mib() -> int | None:
+    try:
+        if sys.platform == "darwin":
+            out = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=5).stdout
+            page = int(re.search(r"page size of (\d+) bytes", out).group(1))
+            pages = sum(int(re.search(rf"^{name}:\s+(\d+)", out, re.M).group(1)) for name in ("Pages free", "Pages inactive", "Pages speculative"))
+            return pages * page // (1024 * 1024)
+        m = re.search(r"^MemAvailable:\s+(\d+) kB", pathlib.Path("/proc/meminfo").read_text(), re.M)
+        return int(m.group(1)) // 1024 if m else None
+    except (OSError, AttributeError, ValueError, subprocess.SubprocessError):
+        return None
+
+
 def stop_group(proc: subprocess.Popen) -> None:
     try:
         os.killpg(proc.pid, signal.SIGTERM)
@@ -193,6 +207,7 @@ def run(cmd: str, log: pathlib.Path, budget: int | None, mem_budget: int | None 
     t0 = time.monotonic()
     peak = 0
     exact_all = True
+    lowest = available_mib()
     stopped: str | None = None
     with log.open("w") as fh:
         proc = subprocess.Popen(["bash", "-c", cmd], stdout=fh, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
@@ -204,6 +219,9 @@ def run(cmd: str, log: pathlib.Path, budget: int | None, mem_budget: int | None 
                 break
             except subprocess.TimeoutExpired:
                 pass
+            free = available_mib()
+            if free is not None:
+                lowest = free if lowest is None else min(lowest, free)
             sample, exact = group_mem_mib(proc.pid)
             exact_all = exact_all and exact
             peak = max(peak, sample)
@@ -217,6 +235,7 @@ def run(cmd: str, log: pathlib.Path, budget: int | None, mem_budget: int | None 
                 break
     with CHILDREN_LOCK:
         CHILDREN.discard(proc.pid)
+    LOWEST[cmd] = lowest
     return rc, int(round(time.monotonic() - t0)), stopped, peak, exact_all
 
 
@@ -335,6 +354,11 @@ def main() -> int:
             peaks[text] = peak
         status = classify(rc, log, stopped)
         method = "PSS" if exact else "RSS, may overcount memory shared after fork"
+        ram, low = physical_ram_mib(), LOWEST.get(text)
+        threshold = float(os.environ.get("FULLRUN_LOW_MEM_PCT", "10"))
+        if ram and low is not None and low < ram * threshold / 100:
+            with lock:
+                findings.append(f"`{text}`: machine memory available fell to {low} MiB ({100 * low / ram:.0f}% of {ram} MiB) — memory outside the command's process group (a database service, other jobs on the runner) is near exhaustion; without swap the OOM killer picks the victim")
         if stopped == "mem":
             with lock:
                 findings.append(f"`{text}` passed its memory budget ({limit} MiB, peak {peak} MiB, {method}) and was stopped with its process group")

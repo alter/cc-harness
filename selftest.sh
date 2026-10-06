@@ -701,6 +701,10 @@ EOF
 printf '## 6. Gate checks\n\n### Full tier\n\n```\npython3 fork.py\n```\n\n## 7. Delivery\n' > "$fsh/docs/PROJECT.md"
 out=$(cd "$fsh" && FULLRUN_RAM_BYTES=$((800 * 1024 * 1024)) bash "$FR" --out "$fsh/r" 2>&1)
 check "fullrun-mem-shared-fork: shared pages after fork do not stop a run under the default budget" "$out" 'pass=1 .*mem=0 '
+flm="$TMP/fullrun-lowmem"; mkdir -p "$flm/docs"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\nsleep 1.5\n```\n\n## 7. Delivery\n' > "$flm/docs/PROJECT.md"
+(cd "$flm" && FULLRUN_LOW_MEM_PCT=100 bash "$FR" --out "$flm/r" >/dev/null 2>&1)
+check "fullrun-machine-low-memory: the machine's lowest available memory during a command is reported, low is a finding" "$(cat "$flm"/r/FULLRUN-*.md 2>/dev/null)" 'machine memory available fell to'
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"
