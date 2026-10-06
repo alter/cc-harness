@@ -268,11 +268,12 @@ def main() -> int:
 
         texts = [expand(c.text, k) for k in range(1, shards + 1)]
         reports = [expand(c.attrs["report"], k) for k in range(1, shards + 1)] if c.attrs.get("report") else [None] * shards
+        shard_attrs = [{key: expand(value, k) if key in ("expect", "report") else value for key, value in c.attrs.items()} for k in range(1, shards + 1)]
         if not c.attrs.get("report") or not c.attrs.get("list"):
             findings.append(f"census SKIP for `{c.text}`: no report= (JUnit XML) or no list= — this run is not verifiable: nobody can tell whether every test ran once")
         if c.attrs.get("repeat") and not c.attrs.get("reason"):
             findings.append(f"`{c.text}` declares repeat={c.attrs['repeat']} without reason=")
-        status, rc, secs, log = execute(texts[0], c.attrs, reports[0], shards, canary=True)
+        status, rc, secs, log = execute(texts[0], shard_attrs[0], reports[0], shards, canary=True)
         record(texts[0], status, rc, secs, log)
         if shards == 1:
             continue
@@ -284,11 +285,11 @@ def main() -> int:
         stop = threading.Event()
         signatures: dict[str, int] = {}
 
-        def shard(job: tuple[str, str | None]) -> tuple[str, str, int | str, int, pathlib.Path | str]:
-            text, report = job
+        def shard(job: tuple[str, str | None, dict[str, str]]) -> tuple[str, str, int | str, int, pathlib.Path | str]:
+            text, report, attrs = job
             if stop.is_set():
                 return text, "skipped", "-", 0, "not started: two shards already failed with the same cause"
-            st, code, sec, lg = execute(text, c.attrs, report, shards)
+            st, code, sec, lg = execute(text, attrs, report, shards)
             if st != "pass":
                 sig = signature(lg) if isinstance(lg, pathlib.Path) else ""
                 with lock:
@@ -299,7 +300,7 @@ def main() -> int:
 
         workers = max(1, int(c.attrs.get("parallel", "1") or 1))
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-            results = list(pool.map(shard, list(zip(texts[1:], reports[1:]))))
+            results = list(pool.map(shard, list(zip(texts[1:], reports[1:], shard_attrs[1:]))))
         for text, st, code, sec, lg in results:
             record(text, st, code, sec, lg)
         if c.attrs.get("report") and all(r[1] == "pass" for r in results):

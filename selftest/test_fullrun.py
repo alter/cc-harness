@@ -94,5 +94,36 @@ class Census(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout)
 
 
+PROJECT_TEMPLATE = pathlib.Path(os.environ.get("PROJECT_TEMPLATE", HERE.parent / "project-template" / "docs" / "PROJECT.md"))
+
+
+class TemplateAttrs(unittest.TestCase):
+    def test_project_template_full_tier_attrs(self):
+        sys.path.insert(0, str(ENGINE_DIR))
+        import engine
+        text = PROJECT_TEMPLATE.read_text(encoding="utf-8")
+        start = text.index("```text example-full-tier")
+        example = text[start:text.index("```", start + 5) + 3].replace("```text example-full-tier", "```")
+        cmds = engine.tier("## 6. Gate checks\n\n### Full tier\n\n" + example + "\n\n## 7. x\n", "Full")
+        self.assertTrue(cmds)
+        for c in cmds:
+            self.assertEqual(c.unknown, [])
+        self.assertTrue(any("{shard}" in c.text and c.attrs.get("shards") for c in cmds))
+
+
+class ShardExpansion(unittest.TestCase):
+    def test_expect_is_expanded_per_shard(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        try:
+            (tmp / "docs").mkdir()
+            (tmp / "docs" / "PROJECT.md").write_text(
+                "## 6. Gate checks\n\n### Full tier\n\n```\n#: shards=2 expect=\"test -s out-{shard}.txt\"\necho x > out-{shard}.txt\n```\n\n## 7. x\n",
+                encoding="utf-8")
+            r = subprocess.run([sys.executable, str(ENGINE_DIR / "engine.py"), "--out", str(tmp / "r")], cwd=tmp, capture_output=True, text=True)
+            self.assertIn("pass=2", r.stdout, r.stdout + r.stderr)
+        finally:
+            shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     unittest.main()

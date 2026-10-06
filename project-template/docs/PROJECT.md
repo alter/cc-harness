@@ -94,6 +94,13 @@ Run by the night full run and at the end of a milestone, never before a single `
 _unanswered_
 ```
 
+A command may carry attributes on a `#:` line directly above it. Keys: `budget` (`40m`; over it the command is stopped with its children and reported `timeout`; without it, twice the last passing time), `expect` (a postcondition on the result; exit 0 with a failed `expect` is `empty`), `report` (JUnit XML the command writes), `list` (a command that lists the tests without running them — `pytest --collect-only -q`, `go test -list .`, `cargo nextest list`, `jest --listTests`), `shards` and `parallel` (the command uses `{shard}`/`{shards}`; shard 1 runs alone first and the rest start only after it passed its budget, its `expect` and its census), `repeat` with `reason` (a declared repetition; anything else that runs a test twice is a duplicate). With `report` and `list` the run is censused: each test ran exactly once, every listed test ran, shards are disjoint.
+
+```text example-full-tier
+#: budget=40m shards=16 parallel=4 report=reports/mut-{shard}.xml list="pytest --collect-only -q -m mutation" expect="test -s reports/mut-{shard}.xml"
+mutmut run --shard {shard}/{shards}
+```
+
 | Question | Answer |
 |---|---|
 | How a test is marked full-only here (marker, build tag, `#[ignore]`, a directory, a separate command) | _unanswered_ |
