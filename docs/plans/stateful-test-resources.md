@@ -1,5 +1,5 @@
 ---
-status: done
+status: running
 created: 2026-10-06
 ---
 # Stateful test resources: memory budget, leftovers, audit lens, template rules
@@ -43,6 +43,11 @@ bash 5.3, python 3.14 (stdlib), jq 1.6, git; Claude Code 2.1.289. Memory samplin
 - [x] T04 Template: `AGENTS.md` and `PROJECT.md` rules for stateful test resources (read-only connection for read-only tests, equivalence test for a fast world builder, a sweeper for process-named resources, distribution mode with per-module databases), PostgreSQL examples; §6 rows for the audit probes — verify: unit `test_project_template_full_tier_attrs` still passes + HUMAN
 - [x] T05 `/test-audit` lens for external stateful resources: isolation probe, calls per test from a declared command, world-building share, distribution mode; memory per worker from the run report to recommend a worker count — verify: `./agenttest.sh test-audit` (AC5)
 - [x] T06 Finish: README/BEHAVIOR/HARNESS; `./selftest.sh` against T00; `./agenttest.sh test-audit`; trial install — verify: `./selftest.sh`
+
+### After the final review
+- [ ] T07 `leftover=` on a sharded command: counted around the canary and around the whole fan-out, reported against the command, never per parallel shard — verify: selftest `fullrun-leftover-parallel-no-false-finding`, `fullrun-leftover-parallel-leak`
+- [ ] T08 Shared memory: a forked process group that shares a big buffer must not be over-counted into a `mem` stop; on Linux sum `Pss` from `/proc/<pid>/smaps_rollup`, on macOS keep RSS labelled "may overcount shared memory" and, without an explicit `mem=`, a group over the default budget is a finding, not a stop — verify: selftest `fullrun-mem-shared-fork`
+- [ ] T09 Machine memory during a command: the lowest available memory (`MemAvailable`, `vm_stat` free+inactive) in the report, a finding under 10% of RAM — memory outside the group (a Postgres service) becomes visible; the Linux code paths run once in a container if Docker is available, otherwise the report says "checked on macOS only" — verify: selftest `fullrun-machine-low-memory` (threshold overridden)
 
 ## Log
 - 2026-10-05 T00: baseline: selftest 363, failed 0.
