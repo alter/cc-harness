@@ -94,12 +94,12 @@ Run by the night full run and at the end of a milestone, never before a single `
 _unanswered_
 ```
 
-A command may carry attributes on a `#:` line directly above it. Keys: `budget` (`40m`; over it the command is stopped with its children and reported `timeout`; without it, twice the last passing time), `expect` (a postcondition on the result; exit 0 with a failed `expect` is `empty`), `report` (JUnit XML the command writes), `list` (a command that lists the tests without running them — `pytest --collect-only -q`, `go test -list .`, `cargo nextest list`, `jest --listTests`), `shards` and `parallel` (the command uses `{shard}`/`{shards}`; shard 1 runs alone first and the rest start only after it passed its budget, its `expect` and its census), `repeat` with `reason` (a declared repetition; anything else that runs a test twice is a duplicate). With `report` and `list` the run is censused: each test ran exactly once, every listed test ran, shards are disjoint. `{shard}` counts from 1, `{shard0}` from 0 — tools differ, check yours.
+A command may carry attributes on a `#:` line directly above it. Keys: `budget` (`40m`; over it the command is stopped with its children and reported `timeout`; without it, twice the last passing time), `expect` (a postcondition on the result; exit 0 with a failed `expect` is `empty`), `report` (JUnit XML the command writes), `list` (a command that lists the tests without running them — `pytest --collect-only -q`, `go test -list .`, `cargo nextest list`, `jest --listTests`), `shards` and `parallel` (the command uses `{shard}`/`{shards}`; shard 1 runs alone first and the rest start only after it passed its budget, its `expect` and its census), `repeat` with `reason` (a declared repetition; anything else that runs a test twice is a duplicate), `mem` (`512M`, `2G`; the peak of the command's process group is sampled every half second, over it the command is stopped and reported `mem`, which holds a milestone; without it, 75% of the machine's RAM), `leftover` (a command printing one number — databases, temp dirs, containers named by tests — counted before and after; growth is a finding). With `report` and `list` the run is censused: each test ran exactly once, every listed test ran, shards are disjoint. `{shard}` counts from 1, `{shard0}` from 0 — tools differ, check yours.
 
 Census attributes belong on **test-runner** commands only, and `list=` must list exactly the selection the command runs (`pytest -m slow` pairs with `pytest --collect-only -q -m slow`, not with the whole suite). A mutation run executes the tests many times on purpose and reports mutants, not test cases: give it `budget`, `expect` on its own result files and `shards`, never `report`/`list`.
 
 ```text example-full-tier
-#: budget=20m shards=4 parallel=4 report=reports/junit-{shard}.xml list="pytest --collect-only -q"
+#: budget=20m mem=2G shards=4 parallel=4 report=reports/junit-{shard}.xml list="pytest --collect-only -q" leftover="psql -Atc \"select count(*) from pg_database where datname like 'test_%'\""
 pytest --splits {shards} --group {shard} --junitxml=reports/junit-{shard}.xml
 #: budget=60m shards=8 parallel=4 expect="cat mutants-{shard}/mutants.out/caught.txt mutants-{shard}/mutants.out/missed.txt mutants-{shard}/mutants.out/timeout.txt | grep -q ."
 cargo mutants --shard {shard0}/{shards} --baseline=skip --output mutants-{shard}
@@ -114,6 +114,8 @@ The first line uses pytest-split (`--splits N --group k`, groups from 1 — http
 | Full tier budget, minutes, whole run (over it: a finding, and `/test-audit` is due) | _unanswered_ |
 | Audit: run in another order (a command, for `/test-audit`; e.g. `pytest -p random_order`, `go test -shuffle=on`) | _unanswered_ |
 | Audit: run in parallel (a command, for `/test-audit`; e.g. `pytest -n 4`, `go test -p 4`, `cargo nextest run`) | _unanswered_ |
+| Audit: isolation between parallel workers (a command that runs two workers and fails when one sees the other's data) | _unanswered_ |
+| Audit: calls to the external resource per test (a command printing `<test id> <count>` lines; PostgreSQL: `pg_stat_statements` deltas or driver tracing) | _unanswered_ |
 
 Baseline accepted as-is (pre-existing failures tolerated): _unanswered_
 

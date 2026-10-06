@@ -37,6 +37,12 @@ Read the owning guide before changing an area; read only the sections you need. 
 - Run the baseline once before the first edit to separate pre-existing failures from new ones; record it in the plan's `## Log`.
 - Narrowest stable check per change; the full gate list before a task is marked `[x]`; broad regression only for cross-cutting changes or release.
 - End-to-end tests only for the minimal product-critical path; assert outcomes (persisted data, navigation), never wording or layout.
+- Tests that use an external stateful resource (a database, a queue, a bucket):
+  - a shared "world" built once is reached by read-only tests through a read-only connection (PostgreSQL: `SET default_transaction_read_only = on`, or a role with `SELECT` only), so a test that starts writing fails at once instead of poisoning the tests after it;
+  - a fast world builder that bypasses the product's service layer (one SQL function, a bulk `INSERT … RETURNING`) has an equivalence test in the full tier: the world built both ways, table snapshots compared; at least one test per entity still goes through the service layer;
+  - a resource named after a process (`test_<pid>_…`) has a sweeper that drops the ones whose process is gone, and the full tier declares a `leftover=` count for it;
+  - parallel workers each get their own resource, and the distribution keeps a module on one worker when the resource is per module (pytest-xdist: `--dist loadfile` or `loadscope`, not `load`);
+  - fewer calls per test before more workers: build what read-only tests share once, batch independent calls; the number of workers comes from measured peak memory, not from the number of cores.
 
 ## Git and workspace
 
