@@ -22,6 +22,13 @@ MARKERS = [
     r"checkov:skip", r"tfsec:ignore", r"@SuppressWarnings", r"@Disabled\b", r"@Ignore\b", r"#pragma\s+warning\s+disable",
     r"rubocop:disable", r"\bnosec\b", r"NOLINT",
 ]
+TEST_WORD = r"(test|tests|pytest|jest|vitest|mocha|playwright|cargo|nextest|tox|nox|go|rspec|phpunit|ctest|bats)"
+REPEATS = [
+    r"-count=(?!1\b)\d+", r"--reruns\b", r"--count[ =]\d+", r"--repeat-each", r"--runs[ =]\d+", r"pytest-repeat",
+    r"--flake-finder", r"--retries[ =][1-9]", r"^\s*retries:\s*[1-9]", r"^\s*retry:\s*[1-9]",
+    r"\bfor\b[^\n]*;\s*do\b[^\n]*\b" + TEST_WORD + r"\b", r"\b(seq|xargs)\b[^\n]*\b" + TEST_WORD + r"\b",
+]
+CI_FILE = re.compile(r"(^|/)\.github/workflows/[^/]+\.ya?ml$|(^|/)\.gitlab-ci\.yml$")
 CONFIG_NAMES = re.compile(
     r"^(\.eslintrc.*|eslint\.config\..*|\.prettierrc.*|prettier\.config\..*|biome\.jsonc?|\.?ruff\.toml|setup\.cfg|tox\.ini|"
     r"\.?mypy\.ini|pytest\.ini|\.flake8|\.?pylintrc|\.golangci\.ya?ml|\.?clippy\.toml|\.?rustfmt\.toml|\.shellcheckrc|"
@@ -82,6 +89,7 @@ def floor(text: str) -> float | None:
 def findings(base: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     markers = [re.compile(m, re.M) for m in MARKERS + project_markers()]
+    repeats = [re.compile(m, re.M) for m in REPEATS]
     status = git("diff", "--name-status", base).splitlines() + [
         f"A\t{p}" for p in git("ls-files", "--others", "--exclude-standard").splitlines()
     ]
@@ -115,6 +123,13 @@ def findings(base: str) -> list[tuple[str, str]]:
         for rx in markers:
             if len(list(rx.finditer(after))) > len(list(rx.finditer(before))):
                 out.append((path, f"a suppression was added ({rx.pattern})"))
+        for rx in repeats:
+            if len(list(rx.finditer(after))) > len(list(rx.finditer(before))):
+                out.append((path, f"test repetition was added ({rx.pattern}): a run is not repeated for confidence; a declared repeat= with a reason lives in PROJECT.md §6"))
+        if CI_FILE.search(path) and after.count("matrix:") > before.count("matrix:"):
+            runs = re.findall(r"run:\s*(.*)", after)
+            if any(re.search(r"\b" + TEST_WORD + r"\b", r) and "matrix." not in r for r in runs):
+                out.append((path, "a CI matrix was added and its test step does not use the matrix value: every cell runs the same suite"))
     return out
 
 
