@@ -578,6 +578,14 @@ out=$(cd "$fb2" && bash "$FR" --out "$fb2/r" 2>&1)
 check "fullrun-over-budget: a full run longer than its declared budget is a finding" "$out" 'full_over_budget=1'
 sed -i.bak 's/| 0.03 |/| 60 |/' "$fb2/docs/PROJECT.md"; out=$(cd "$fb2" && bash "$FR" --out "$fb2/r" 2>&1)
 check "fullrun-within-budget" "$out" 'full_over_budget=0'
+fx="$TMP/fullrun-stop"; mkdir -p "$fx/docs"
+printf '## 6. Gate checks\n\n### Full tier\n\n```\nbash -c "sleep 33.5 & wait"\necho second >> second.log\n```\n\n## 7. Delivery\n' > "$fx/docs/PROJECT.md"
+(cd "$fx" && bash "$FR" --out "$fx/r" > "$fx/run.out" 2>&1 &)
+sleep 2
+out=$(cd "$fx" && bash "$FR" --stop 2>&1); sleep 2
+pgrep -f 'sleep 33.5' >/dev/null && bad "fullrun-stop: the running full run and its children are stopped" "$(pgrep -fl 'sleep 33.5') / $out" || ok "fullrun-stop: the running full run and its children are stopped"
+[ ! -f "$fx/second.log" ] && ok "fullrun-stop: nothing after the stop is started" || bad "fullrun-stop: nothing after the stop is started" "second.log exists"
+[ ! -f "$fx/child.pid" ] && ok "fullrun-state-not-in-project-root" || bad "fullrun-state-not-in-project-root" "child.pid in the project root"
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"

@@ -66,6 +66,8 @@ Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.
 - Building anything the ledger in `docs/PROJECT.md` marks `absent` or `removed`, however tempting the dormant code looks.
 - Ending the turn while unchecked tasks remain. The Stop hook will send you back; save the round trip.
 - Retrying a failed command unchanged. After the first failure, `/diagnose`.
+- Running tests again for confidence, or writing code that does (loops, `-count=N`, `--reruns`, shards that each run the whole suite). `integrity-check` flags it; the full run's census catches it at runtime.
+- Waiting out a run that is known to fail for a cause already fixed. Stop it (`cc-fullrun --stop`), restart it canary-first, and say so in the Log.
 - Rewriting an acceptance criterion or a task's `verify:` command. They are frozen when the plan starts running; `stop-guard` refuses the stop while any frozen line differs. Splitting a task adds lines and keeps the original.
 - Expanding scope. Anything outside `## Goal` becomes a line under `## Out of scope` or a new task at the end, not work done now.
 - Touching anything under `## Out of scope`.

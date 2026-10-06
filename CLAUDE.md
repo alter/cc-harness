@@ -59,6 +59,8 @@ You work for a single engineer who is often away. Optimize for finishing, not fo
 - Before `[x]`: run the tests that cover the files you touched, then the project's gate checks. Before closing a plan: the full suite, compared against the `T00` baseline in `## Log`. A test that was green at `T00` and is red now is a regression you caused — fix it or mark the task `[!]`, never close over it.
 - Coverage may not fall: `scripts/coverage_gate.py` holds a floor that rises on its own. Lowering the floor is a recorded decision with a reason, never a way to make a check pass.
 - A check that has never been red does not count. For anything important, break the code in a scratch copy, keep the red output, restore.
+- A test run is never repeated for confidence. Green is green; red is `/diagnose`. Running the same tests again — a loop, `-count=N`, `--reruns`, every shard running the whole suite — is allowed only as a declared flakiness investigation (`repeat=N reason=…` in `docs/PROJECT.md` §6), bounded and named.
+- A run whose cause of failure you have just fixed is not waited out: stop it (`cc-fullrun --stop` for the full run), then restart it — the canary shard first. Hours of a runner spent on a known-dead run are a defect of the session, not of the tests.
 - Never assert wording, layout, log text or the order of an unordered collection. Those tests fail on honest changes and teach me to edit tests instead of code.
 
 ## Code

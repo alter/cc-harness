@@ -24,6 +24,47 @@ census = importlib.import_module("census")
 KEYS = {"budget", "expect", "report", "list", "shards", "parallel", "repeat", "reason"}
 RED = ("fail", "stale", "timeout", "empty", "dup")
 PROJECT = pathlib.Path("docs/PROJECT.md")
+STATE = pathlib.Path(".claude/scratch/fullrun")
+CHILDREN: set[int] = set()
+CHILDREN_LOCK = threading.Lock()
+
+
+def kill_group(pgid: int) -> None:
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(pgid, sig)
+        except (ProcessLookupError, PermissionError):
+            return
+        time.sleep(0.5)
+
+
+def on_term(signum, frame) -> None:
+    with CHILDREN_LOCK:
+        groups = list(CHILDREN)
+    for pgid in groups:
+        kill_group(pgid)
+    (STATE / "current").unlink(missing_ok=True)
+    os._exit(143)
+
+
+def stop_running() -> int:
+    current = STATE / "current"
+    if not current.is_file():
+        print("no full run is running in this checkout")
+        return 0
+    pid, commit, stamp = (current.read_text().split() + ["?", "?"])[:3]
+    try:
+        os.kill(int(pid), signal.SIGTERM)
+    except ProcessLookupError:
+        current.unlink(missing_ok=True)
+        print(f"full run {stamp} (pid {pid}) was already gone")
+        return 0
+    for _ in range(40):
+        if not current.exists():
+            break
+        time.sleep(0.25)
+    print(f"stopped full run {stamp} (pid {pid}, started at commit {commit}); restart it after the fix — the canary shard runs first")
+    return 0
 
 
 class Command:
@@ -77,11 +118,8 @@ def run(cmd: str, log: pathlib.Path, budget: int | None) -> tuple[int, int, bool
     t0 = time.monotonic()
     with log.open("w") as fh:
         proc = subprocess.Popen(["bash", "-c", cmd], stdout=fh, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
-        pidfile = pathlib.Path(os.environ.get("FULLRUN_STATE", ".")) / "child.pid"
-        try:
-            pidfile.write_text(str(proc.pid))
-        except OSError:
-            pass
+        with CHILDREN_LOCK:
+            CHILDREN.add(proc.pid)
         try:
             rc = proc.wait(timeout=budget)
             timed_out = False
@@ -97,6 +135,8 @@ def run(cmd: str, log: pathlib.Path, budget: int | None) -> tuple[int, int, bool
                     pass
                 proc.wait()
             rc = -1
+    with CHILDREN_LOCK:
+        CHILDREN.discard(proc.pid)
     return rc, int(round(time.monotonic() - t0)), timed_out
 
 
@@ -134,8 +174,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Run the full tier of docs/PROJECT.md §6 to the end and report it.")
     ap.add_argument("--project", default=".")
     ap.add_argument("--out")
+    ap.add_argument("--stop", action="store_true", help="stop the full run running in this checkout, with its children")
     args = ap.parse_args()
     os.chdir(args.project)
+    if args.stop:
+        return stop_running()
     if not PROJECT.is_file():
         print(f"no {PROJECT} in {os.getcwd()}: run /intake first", file=sys.stderr)
         return 2
@@ -152,6 +195,10 @@ def main() -> int:
     tsv, md = out / f"FULLRUN-{stamp}.tsv", out / f"FULLRUN-{stamp}.md"
     tsv.write_text("")
     prev = previous(out, tsv)
+    STATE.mkdir(parents=True, exist_ok=True)
+    commit = subprocess.run(["git", "rev-parse", "--short=12", "HEAD"], capture_output=True, text=True).stdout.strip() or "none"
+    (STATE / "current").write_text(f"{os.getpid()} {commit} {stamp}\n")
+    signal.signal(signal.SIGTERM, on_term)
 
     commands = tier(text, "Full")
     if not commands:
@@ -324,6 +371,7 @@ def main() -> int:
     if findings:
         report += ["", "## Findings", *[f"- {f}" for f in findings]]
     md.write_text("\n".join(report) + "\n")
+    (STATE / "current").unlink(missing_ok=True)
     print(summary)
     print(f"report: {md}")
     return 0 if all(counts[k] == 0 for k in RED) else 1
