@@ -1,5 +1,5 @@
 ---
-status: running
+status: done
 created: 2026-10-06
 ---
 # Test run gates: budgets, a canary shard, a run census, a periodic test audit
@@ -92,3 +92,4 @@ bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, 
 - 2026-10-05 T18: integrity-check: мутационные инструменты (mutmut, stryker, pitest, cargo-mutants, go-mutesting, infection, mull) в правиле повтора; цикл, чья переменная идёт в аргумент части (--shard/--group/--splits/partition/chunk), — разбиение, не повтор (проверяется вся строка). Проверка «loop around mutmut» красная до правки; новая проверка integrity-loop-that-shards-is-fine поймала ложное срабатывание на seq … cargo mutants --shard {}/8 и была красной до исключения. selftest 360/0.
 - 2026-10-05 T19: engine --tier fast|full: быстрый ярус с теми же атрибутами (бюджет, expect, части, перепись), отчёты FASTRUN-* с отдельной историей, без замера быстрого яруса и бюджета полного; run-task при атрибутах в быстром ярусе гоняет его через cc-fullrun --tier fast, dup/empty/timeout — проваленный гейт. Goal плана уточнён: защита действует для прогонов через cc-fullrun, остальное покрывает только статический страж. Проверки fastrun-census-dup и fastrun-separate-history красные до правки. HUMAN pending: текст run-task. selftest 363/0.
 - 2026-10-05 T20: skills/test-audit и test-auditor: полный ярус и пробы — во временном git worktree HEAD с отчётами в каталог отчётов, worktree удаляется; незакоммиченное не меряется — сказать в отчёте. agenttest test-audit: проверка «git status вне reports/ пуст»; с прежним навыком красный (остались state.txt, junit, tests/__pycache__), с новым — PASS за 149 s. Аудитор нашёл дефект заготовки: пустой reports/ не хранится в git, в чистом клоне запись junit упала бы — добавлен reports/.gitkeep; файлы, которые agenttest кладёт в .claude/ после коммита заготовки, исключены из проверки.
+- 2026-10-06 finish after T16–T20: selftest 363/0, trial install 378/0 (cc-fullrun finds its engine, ~/bin untouched), agenttest 10/10. status: done.
