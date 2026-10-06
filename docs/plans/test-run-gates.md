@@ -45,7 +45,7 @@ bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, 
 - CI configuration of any project.
 
 ## Tasks
-- [ ] T00 Baseline: `./selftest.sh` and `./agenttest.sh --self-check`, counts in Log — verify: `./selftest.sh; ./agenttest.sh --self-check`
+- [x] T00 Baseline: `./selftest.sh` and `./agenttest.sh --self-check`, counts in Log — verify: `./selftest.sh; ./agenttest.sh --self-check`
 - [ ] T01 `fullrun.sh`: parse `#: key=value` attribute lines; record duration per command in the tsv; unknown keys are a finding — verify: selftest `fullrun-attrs-parsed`, `fullrun-unknown-attr`
 - [ ] T02 `budget=` (and the default from history) through a process-group timeout wrapper; status `timeout` — verify: selftest `fullrun-timeout`, `fullrun-default-budget-from-history`
 - [ ] T03 `expect=` postcondition; status `empty` — verify: selftest `fullrun-empty`
@@ -63,3 +63,4 @@ bash 5.3, python 3.14 (stdlib only: `xml.etree`, `subprocess`, `json`), jq 1.6, 
 - [ ] T15 Finish: README/BEHAVIOR/HARNESS; `./selftest.sh` against T00; `./agenttest.sh` complete; trial install and `./selftest.sh <target>` — verify: `./selftest.sh && ./agenttest.sh`
 
 ## Log
+- 2026-10-05 T00: baseline: selftest 302/0, agenttest --self-check ok.
