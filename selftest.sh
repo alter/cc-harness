@@ -751,7 +751,8 @@ out=$(jq -n --arg c "cat $TMP/big.py" '{tool_name:"Bash",tool_input:{command:$c}
 out=$(jq -n '{tool_name:"Bash",tool_input:{command:"git stash"},cwd:"/tmp"}' | CC_DISABLED_HOOKS=git-guard python3 "$H/git-guard.py"); check_empty "disabled-hooks: git-guard" "$out"
 out=$(jq -n --arg c "$stallproj" '{cwd:$c,session_id:"disabled-case",last_assistant_message:"x"}' | CC_DISABLED_HOOKS=stop-guard HOME="$TMP" "$H/stop-guard.sh"); check_empty "disabled-hooks: stop-guard" "$out"
 out=$(jq -n --arg f "$TMP/big.py" '{tool_name:"Read",tool_input:{file_path:$f}}' | CC_DISABLED_HOOKS=retry-guard "$H/read-guard.sh"); check "disabled-hooks: another hook's id does not disable this one" "$out" '"permissionDecision": *"deny"'
-for f in "$H"/*.sh "$H"/*.py; do
+for src_hook in "$SRC"/hooks/*.sh "$SRC"/hooks/*.py; do
+  f="$H/$(basename "$src_hook")"; [ -f "$f" ] || continue
   id=$(basename "$f"); id=${id%.*}
   grep -q 'CC_DISABLED_HOOKS' "$f" && ok "disabled-hooks: $id honours the switch" || bad "disabled-hooks: $id honours the switch" "no CC_DISABLED_HOOKS check in $f"
 done
