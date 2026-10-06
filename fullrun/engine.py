@@ -296,7 +296,14 @@ def main() -> int:
             return "dup", line + f" — {data['missing_count']} listed tests never ran, e.g. {data['missing'][:3]}"
         return None, line
 
-    def execute(text: str, attrs: dict[str, str], report: str | None = None, shards: int = 1, canary: bool = False) -> tuple[str, int, int, pathlib.Path]:
+    def leftover_finding(label: str, command: str, before: int | None, after: int | None) -> None:
+        with lock:
+            if before is None or after is None:
+                findings.append(f"`{label}`: leftover command `{command}` did not print a number")
+            elif after > before:
+                findings.append(f"`{label}` leaves {after - before} resource(s) behind ({before} → {after} by `{command}`): clean up, or add a sweeper for resources named after a dead process")
+
+    def execute(text: str, attrs: dict[str, str], report: str | None = None, shards: int = 1, canary: bool = False, count_leftover: bool = True) -> tuple[str, int, int, pathlib.Path]:
         with lock:
             log = logs / f"{next(seq)}.log"
         if report:
@@ -305,15 +312,11 @@ def main() -> int:
         budget = seconds(attrs.get("budget"))
         if budget is None and prev.get(text, ("", None))[0] == "pass" and prev[text][1]:
             budget = max(2 * prev[text][1], int(os.environ.get("FULLRUN_MIN_BUDGET", "60")))
-        before = leftover_count(attrs.get("leftover"))
+        counting = bool(attrs.get("leftover")) and count_leftover
+        before = leftover_count(attrs["leftover"]) if counting else None
         rc, secs, stopped, peak = run(text, log, budget, mem_limit(attrs))
-        after = leftover_count(attrs.get("leftover"))
-        if attrs.get("leftover"):
-            with lock:
-                if before is None or after is None:
-                    findings.append(f"`{text}`: leftover command `{attrs['leftover']}` did not print a number")
-                elif after > before:
-                    findings.append(f"`{text}` leaves {after - before} resource(s) behind ({before} → {after} by `{attrs['leftover']}`): clean up, or add a sweeper for resources named after a dead process")
+        if counting:
+            leftover_finding(text, attrs["leftover"], before, leftover_count(attrs["leftover"]))
         with lock:
             peaks[text] = peak
         status = classify(rc, log, stopped)
@@ -376,7 +379,7 @@ def main() -> int:
             text, report, attrs = job
             if stop.is_set():
                 return text, "skipped", "-", 0, "not started: two shards already failed with the same cause"
-            st, code, sec, lg = execute(text, attrs, report, shards)
+            st, code, sec, lg = execute(text, attrs, report, shards, count_leftover=False)
             if st != "pass":
                 sig = signature(lg) if isinstance(lg, pathlib.Path) else ""
                 with lock:
@@ -386,8 +389,11 @@ def main() -> int:
             return text, st, code, sec, lg
 
         workers = max(1, int(c.attrs.get("parallel", "1") or 1))
+        fan_before = leftover_count(c.attrs["leftover"]) if c.attrs.get("leftover") else None
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
             results = list(pool.map(shard, list(zip(texts[1:], reports[1:], shard_attrs[1:]))))
+        if c.attrs.get("leftover"):
+            leftover_finding(f"{c.text} [shards 2–{shards}]", c.attrs["leftover"], fan_before, leftover_count(c.attrs["leftover"]))
         for text, st, code, sec, lg in results:
             record(text, st, code, sec, lg)
         if c.attrs.get("report") and all(r[1] == "pass" for r in results):

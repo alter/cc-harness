@@ -657,6 +657,24 @@ check "fullrun-leftover: a command that leaves resources behind is named with th
 printf '%s' "$rep" | sed -n '/^## Findings/,$p' | grep -q 'tmp_x.*leaves' && bad "fullrun-leftover: a command that cleans up is not named" "$rep" || ok "fullrun-leftover: a command that cleans up is not named"
 check "fullrun-leftover-not-a-number: a leftover command must print a number" "$rep" 'did not print a number'
 check "fullrun-leftover: leftovers are a finding, not a red status" "$out" 'fail=0 .*mem=0'
+flp="$TMP/fullrun-leftover-par"; mkdir -p "$flp/docs" "$flp/dbs"
+cat > "$flp/docs/PROJECT.md" <<'EOF'
+## 6. Gate checks
+
+### Full tier
+
+```
+#: shards=3 parallel=2 leftover="ls dbs | wc -l"
+touch dbs/clean_{shard}; sleep 2; rm dbs/clean_{shard}
+#: shards=3 parallel=2 leftover="ls dbs | wc -l"
+touch dbs/leak_{shard}; sleep 2; [ {shard} -eq 3 ] || rm dbs/leak_{shard}
+```
+
+## 7. Delivery
+EOF
+(cd "$flp" && bash "$FR" --out "$flp/r" >/dev/null 2>&1); findings=$(sed -n '/^## Findings/,$p' "$flp"/r/FULLRUN-*.md 2>/dev/null | grep 'leaves')
+printf '%s' "$findings" | grep -q 'clean_' && bad "fullrun-leftover-parallel-no-false-finding: shards that clean up are not reported" "$findings" || ok "fullrun-leftover-parallel-no-false-finding: shards that clean up are not reported"
+[ "$(printf '%s\n' "$findings" | grep -c 'leak_')" -eq 1 ] && ok "fullrun-leftover-parallel-leak: one leaking shard gives one finding for the command" || bad "fullrun-leftover-parallel-leak: one leaking shard gives one finding for the command" "$findings"
 ls "$frp/report"/FULLRUN-*.md >/dev/null 2>&1 && ok "fullrun writes its report into --out" || bad "fullrun writes its report into --out" "$(ls "$frp/report" 2>&1)"
 
 echo "== skill references"
