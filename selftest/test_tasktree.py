@@ -379,6 +379,18 @@ class MilestoneFullRun(TreeCase):
         r = self.gate_task("pass\tpytest -m slow\nfail\tmutmut run\n")
         self.assertNotEqual(r.returncode, 0)
 
+    def test_milestone_timeout_holds(self):
+        r = self.gate_task("pass\tpytest -m slow\t30\ntimeout\tmutmut run --shard 1/16\t3000\n")
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_milestone_empty_holds(self):
+        r = self.gate_task("empty\tmutmut run\t2900\n")
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_milestone_dup_holds(self):
+        r = self.gate_task("dup\tpytest -n 16 [census of 16 shards]\t0\n")
+        self.assertNotEqual(r.returncode, 0)
+
     def test_milestone_green_full_run_closes(self):
         r = self.gate_task("pass\tpytest -m slow\npass\tmutmut run\n")
         self.assertEqual(r.returncode, 0, r.stdout)
