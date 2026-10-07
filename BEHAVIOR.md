@@ -191,9 +191,9 @@ To stop: `touch .claude/plan-pause` or `status: paused` in the plan file. In the
 | `researcher` | sonnet medium, 12 turns, no CLAUDE.md | Read, Grep, Glob, WebFetch, WebSearch | a map of an unfamiliar subsystem, docs for the pinned version | at least one call and an `EVIDENCE` section with path:line or a URL |
 | `reviewer` | opus high, 12 turns | Read, Grep, Glob, Bash | refute the change: bugs, races, edges, contracts; every CONFIRMED finding reproduced and handed over as a directive (WHERE / FAILURE / WHY NOT CAUGHT / REPRODUCTION / FIX) | Read was called |
 | `verifier` | sonnet high, 240 turns | Bash, Read, Grep, Glob, Write, Edit | independent verification, writes `VERIFY.md` | Bash and Write/Edit were called |
-| `worker` | sonnet high, 80 turns, `run-task` preloaded | all | one plan task in delegate mode, or one part of a split task in its own worktree | Edit/Write/Bash was called; the report reads `T## done\|blocked\|open: …` |
-| `attacker` | opus high, 60 turns | Read, Grep, Glob, Bash, Write, Edit | `/attack`: source → sink map, mandatory minimum, catalogs, reproduction with inert probes, `ATTACK.md` | Bash was called |
-| `test-auditor` | opus high, 60 turns | Read, Grep, Glob, Bash, Write | `/test-audit`: timing, flakiness, census, order/parallel probes, `TEST-AUDIT.md` | Bash was called |
+| `worker` | sonnet high, 250 turns, `run-task` preloaded | all | one plan task in delegate mode, or one part of a split task in its own worktree | Edit/Write/Bash was called; the report reads `T## done\|blocked\|open: …` |
+| `attacker` | opus high, 250 turns | Read, Grep, Glob, Bash, Write, Edit | `/attack`: source → sink map, mandatory minimum, catalogs, reproduction with inert probes, `ATTACK.md` | Bash was called |
+| `test-auditor` | opus high, 250 turns | Read, Grep, Glob, Bash, Write | `/test-audit`: timing, flakiness, census, order/parallel probes, `TEST-AUDIT.md` | Bash was called |
 | `pg-checker` | sonnet high, 40 turns | Read, Grep, Glob, Bash | `/pgsql-slow-queries`: held transactions, missing indexes, read-only | Read or Grep was called |
 | anything else | — | — | — | at least one tool call behind a claim of "done" |
 

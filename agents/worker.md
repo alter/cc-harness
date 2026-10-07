@@ -3,7 +3,7 @@ name: worker
 description: Implements exactly one task of a PLAN.md in a fresh context and returns two lines. Used only by /run in delegate mode (user asked for it) — one plan task, or one part of a split task in its own worktree; the default is the main session doing tasks itself. Full tools, project CLAUDE.md loaded, run-task procedure preloaded.
 model: sonnet
 effort: high
-maxTurns: 80
+maxTurns: 250
 skills:
   - run-task
 ---
