@@ -104,6 +104,8 @@ Hooks run as processes outside the model's window: they cost no tokens, they are
 | `guard-model-switch.sh` | `PreModelSwitch` | asks for confirmation when the context is over 40k tokens | `/model` mid-session means rebuilding the whole prompt cache |
 | `notify.sh` | `Notification`, and from stop-guard | desktop notification | you learn when the model is genuinely stuck or genuinely finished |
 
+`worktree-gc.py` (`SessionStart`: startup/resume/clear, in the background): removes worktrees that are clean, idle for `CC_GC_MIN_IDLE_HOURS`=6, unlocked, not the current directory, and whose HEAD is an ancestor of the base branch, then drops their merged branch; deletes `.claude/scratch/` entries untouched for `CC_GC_SCRATCH_DAYS`=7. Never uses `--force`. `python3 ~/.claude/hooks/worktree-gc.py [--dry-run] [--repo DIR]` runs it by hand and prints what was kept and why. Removes: worktrees and scratch piling up after delegate and `isolation: "worktree"` runs.
+
 Why `PreToolUse` and not `SubagentStart` for the spawn ceiling: `SubagentStart` output only supports `additionalContext`, it cannot deny a spawn. Why stop-guard is a command and not a prompt hook: prompt and agent hooks exist only for tool events; a command costs zero tokens and zero latency.
 
 ### `skills/` — nine procedures

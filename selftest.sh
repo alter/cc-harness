@@ -728,6 +728,14 @@ if [ "$TARGET" != "$SRC" ]; then
   done
 fi
 [ -d "$fr_dir" ] || fr_dir="$SRC/fullrun"
+gc_py="$H/worktree-gc.py"; [ -f "$gc_py" ] || gc_py="$SRC/hooks/worktree-gc.py"
+gt=$(WORKTREE_GC="$gc_py" python3 -m unittest -v "$SRC/selftest/test_worktree_gc.py" 2>&1)
+while IFS= read -r line; do
+  case "$line" in
+    "test_"*" ... ok") ok "worktree-gc: ${line%% *}" ;;
+    "test_"*" ... FAIL"|"test_"*" ... ERROR") bad "worktree-gc: ${line%% *}" "$(printf '%s' "$gt" | grep -A12 "^[A-Z]*: ${line%% *}" | tail -n +3)" ;;
+  esac
+done <<< "$gt"
 ft=$(FULLRUN_DIR="$fr_dir" python3 -m unittest -v "$SRC/selftest/test_fullrun.py" 2>&1)
 while IFS= read -r line; do
   case "$line" in

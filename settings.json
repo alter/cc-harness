@@ -136,6 +136,11 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/session-start.sh"
+          },
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/worktree-gc.py",
+            "timeout": 10
           }
         ]
       }
