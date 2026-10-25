@@ -25,4 +25,30 @@ if [ "$count" -ge "$BUDGET" ]; then
 fi
 
 echo $(( count + 1 )) > "$counter"
+
+rank() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    *fable*) echo 4 ;; *opus*) echo 3 ;; *sonnet*) echo 2 ;; *haiku*) echo 1 ;; *) echo 0 ;;
+  esac
+}
+
+asked=$(printf '%s' "$payload" | jq -r '.tool_input.model // empty')
+cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty')
+if [ -n "$asked" ] && [ "$atype" != "fork" ]; then
+  defined=""
+  for d in ${cwd:+"$cwd/.claude/agents"} "$HOME/.claude/agents"; do
+    f="$d/$atype.md"
+    [ -f "$f" ] || f=$(grep -lxE "name: *$atype" "$d"/*.md 2>/dev/null | head -n 1)
+    [ -n "$f" ] && [ -f "$f" ] || continue
+    defined=$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} /^model:/ {sub(/^model: */, ""); print; exit}' "$f")
+    break
+  done
+  case "$defined" in ''|inherit) cap=${CLAUDE_CODE_SUBAGENT_MODEL:-} ;; *) cap=$defined ;; esac
+  if [ "$(rank "$asked")" -gt "$(rank "$cap")" ] && [ "$(rank "$cap")" -gt 0 ]; then
+    printf '%s' "$payload" | jq --arg r "model $asked dropped: $atype runs on $cap; change its definition to raise it" \
+      '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"allow",permissionDecisionReason:$r,updatedInput:(.tool_input | del(.model))}}'
+    exit 0
+  fi
+fi
+
 jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"allow"}}'

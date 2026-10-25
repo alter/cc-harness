@@ -330,6 +330,19 @@ gs() { jq -n '{session_id:"g1",tool_input:{subagent_type:"scout"}}'; }
 out=$(gs | CC_SUBAGENT_BUDGET=2 "$H/guard-subagent.sh"); check "1/2 allow" "$out" '"permissionDecision": *"allow"'
 out=$(gs | CC_SUBAGENT_BUDGET=2 "$H/guard-subagent.sh"); check "2/2 allow" "$out" '"permissionDecision": *"allow"'
 out=$(gs | CC_SUBAGENT_BUDGET=2 "$H/guard-subagent.sh"); check "3/2 deny" "$out" '"permissionDecision": *"deny"'
+gm="$TMP/gm"; mkdir -p "$gm/.claude/agents"
+printf -- '---\nname: scout\nmodel: haiku\n---\n' > "$gm/.claude/agents/scout.md"
+printf -- '---\nname: reviewer\nmodel: opus\n---\n' > "$gm/.claude/agents/reviewer.md"
+printf -- '---\nname: verifier\nmodel: claude-sonnet-5-5\n---\n' > "$gm/.claude/agents/verifier.md"
+gmc() { jq -n --arg c "$gm" --arg t "$1" --arg m "$2" '{session_id:("gm-"+$t+$m),cwd:$c,tool_input:{subagent_type:$t,model:$m,prompt:"p",description:"d"}}' \
+  | HOME="$TMP" CLAUDE_CODE_SUBAGENT_MODEL=sonnet "$H/guard-subagent.sh"; }
+out=$(gmc scout opus)
+check "subagent-model-up: opus asked for a haiku agent is dropped" "$out" '"updatedInput"'
+if printf '%s' "$out" | jq -e '.hookSpecificOutput.updatedInput | (has("model") | not) and .prompt == "p" and .subagent_type == "scout"' >/dev/null 2>&1; then ok "subagent-model-up: the rest of the input is kept"; else bad "subagent-model-up: the rest of the input is kept" "$out"; fi
+out=$(gmc verifier claude-fable-5-1); check "subagent-model-up: a full fable id over a sonnet agent is dropped" "$out" '"updatedInput"'
+out=$(gmc general-purpose opus); check "subagent-model-up: no definition, capped by CLAUDE_CODE_SUBAGENT_MODEL" "$out" '"updatedInput"'
+out=$(gmc reviewer haiku); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-model-down: a cheaper model is left alone" "$out"; else ok "subagent-model-down: a cheaper model is left alone"; fi
+out=$(gmc reviewer opus); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-model-same: the agent's own model is left alone" "$out"; else ok "subagent-model-same: the agent's own model is left alone"; fi
 out=$(jq -n '{context_tokens:50000,from_model:"sonnet",to_model:"opus",source:"user"}' | "$H/guard-model-switch.sh")
 check "switch at 50k ctx -> ask" "$out" '"permissionDecision": *"ask"'
 out=$(jq -n '{context_tokens:1000,from_model:"sonnet",to_model:"opus",source:"user"}' | "$H/guard-model-switch.sh")
