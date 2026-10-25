@@ -1,7 +1,8 @@
 ---
 name: verify
-description: Independent verification of a task directory by a context that wrote neither the code nor its tests. Produces VERIFY.md in the tree's format (verifier line, reproduce-from-clean-state, what was not checked, reverse control) and sets verify:passed|failed. Use after a task reaches status:done or review.
+description: Independent verification of a task directory by a context that wrote neither the code nor its tests. Produces VERIFY.md in the tree's format (verifier line, reproduce-from-clean-state, what was not checked, reverse control) and sets verify:passed|failed. Started by the user on a finished task, never by the model on its own.
 argument-hint: <task directory path>
+disable-model-invocation: true
 ---
 
 # /verify

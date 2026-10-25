@@ -19,7 +19,7 @@ You work for a single engineer who is often away. Optimize for finishing, not fo
 - Projects with `tasks/` keep one directory per task: `tasks/<phase>/<NN>-<slug>/{task.txt,labels.txt}` plus `NOTES.md`, `VERIFY.md`, `BLOCKED.md`, `PLAN.md` and artefacts. `tasks/README.md`, `PROTOCOL.md`, `GOAL.md`, `DECISIONS.md` outrank this file inside that tree.
 - New work goes through `/task` first; execution plans live in the task directory as `PLAN.md`.
 - `status:done` = the OUTCOME artefact exists at its path, nothing less. OUTCOME outside the repository is never closed by the session that did the work.
-- `verify:passed` is set only by a context that wrote neither the code nor its tests (`/verify`). Never on your own work.
+- `verify:passed` is set only by a context that wrote neither the code nor its tests (`/verify`). Never on your own work. `/verify` and the `verifier` agent are started by the user, on finished tasks; you list what is ready for it, you never start it.
 - `−` lines in SCOPE are boundaries. Do not cross them; if the work needs it, that is a new task.
 
 ## Autonomy: finish the plan
@@ -27,7 +27,7 @@ You work for a single engineer who is often away. Optimize for finishing, not fo
 - Work from `docs/plans/<slug>.md`. Tasks are `- [ ]` / `- [x]` / `- [!]`. Mark a task `[x]` only after its acceptance check passed.
 - After each task: update the checkbox, append one line to `## Log`, commit if the repo is git.
 - A Stop hook re-prompts you while unchecked tasks remain. Do not fight it; do the next task.
-- One session runs the whole plan. Never `/clear`, `/compact` by hand or restart between tasks; the plan file is the state, the conversation is the memory of why. Noise (search, tests, docs) goes to subagents so that memory stays cheap. Delegate mode (one `worker` per task, parallel worktrees for the parts of a split task) only when the user asks for it: measured on small plans it costs 2.5–4.5× more and takes 2.4–2.7× longer than one session (`README.md`, "Execution model").
+- One session runs the whole plan. Never `/clear`, `/compact` by hand or restart between tasks; the one compaction is catnap's: when a `[catnap]` note asks, pass the handoff to `compact_now` with the last action of the turn; the plan file is the state, the conversation is the memory of why. Noise (search, tests, docs) goes to subagents so that memory stays cheap. Delegate mode (one `worker` per task, parallel worktrees for the parts of a split task) only when the user asks for it: measured on small plans it costs 2.5–4.5× more and takes 2.4–2.7× longer than one session (`README.md`, "Execution model").
 - `[!] BLOCKED: <why>` is allowed only for: irreversible external actions (payments, production deploy, data deletion), missing credentials, a dependency that does not exist. Then move to the next task.
 - Write the literal token `NEED_HUMAN` in your final message only when every remaining task is blocked. That is the single escape hatch.
 
@@ -56,7 +56,8 @@ You work for a single engineer who is often away. Optimize for finishing, not fo
 
 - A behaviour change is not done until a test covers it, and that test was seen failing before the change. A test that was green the first time it ran has proved nothing.
 - A fixed bug gets the test that would have caught it, in the same task.
-- Before `[x]`: run the tests that cover the files you touched, then the project's gate checks. Before closing a plan: the full suite, compared against the `T00` baseline in `## Log`. A test that was green at `T00` and is red now is a regression you caused — fix it or mark the task `[!]`, never close over it.
+- Proportion: tests and checks are sized to the change. A change to copy, labels, styles, templates, docs or config values without logic runs only the narrow check for the touched file (or none): no gate checks, no full suite, no reviewer.
+- Before `[x]` of a task that changed logic: run the tests that cover the files you touched, then the project's gate checks. Before closing a plan in which some task changed logic: the full suite, compared against the `T00` baseline in `## Log`. A test that was green at `T00` and is red now is a regression you caused — fix it or mark the task `[!]`, never close over it.
 - Coverage may not fall: `scripts/coverage_gate.py` holds a floor that rises on its own. Lowering the floor is a recorded decision with a reason, never a way to make a check pass.
 - A check that has never been red does not count. For anything important, break the code in a scratch copy, keep the red output, restore.
 - A test run is never repeated for confidence. Green is green; red is `/diagnose`. Running the same tests again — a loop, `-count=N`, `--reruns`, every shard running the whole suite — is allowed only as a declared flakiness investigation (`repeat=N reason=…` in `docs/PROJECT.md` §6), bounded and named.

@@ -11,7 +11,7 @@
 ├── statusline.sh                   status line: limits and cache
 ├── hooks/ (10)                     deterministic guards outside the model's context
 ├── skills/ (9)                     /intake /task /plan /run /run-task /test /verify /diagnose /graphify
-├── agents/ (7)                     Explore scout test-runner researcher reviewer verifier worker
+├── agents/ (11)                    Plan Explore scout test-runner researcher reviewer verifier worker attacker test-auditor pg-checker
 ├── night.sh                        the overnight run, one long session
 ├── install.sh selftest.sh uninstall.sh   backup → install → checks → rollback (INSTALL.md)
 ├── graph-setup.sh                   builds a code graph, refuses to wire one that would answer wrongly
@@ -57,13 +57,14 @@ Nine sections: questions only before the work starts; scope decided by the capab
 
 | Key | Value | Why |
 |---|---|---|
-| `model` | `sonnet[1m]` | Sonnet covers the bulk of development; Opus burns its own weekly window (`seven_day_opus`). The `[1m]` suffix asks for the 1M-context variant, which is what makes one session per plan possible; drop it to `sonnet` if 1M is not enabled for your account (`CLAUDE_CODE_DISABLE_1M_CONTEXT` also turns it off) |
+| `model` | `sonnet[1m]` | Sonnet covers the bulk of development; Opus burns its own weekly window (`seven_day_opus`). The `[1m]` suffix asks for the 1M-context variant, which is what makes one session per plan possible; drop it to `sonnet` if 1M is not enabled for your account (`CLAUDE_CODE_DISABLE_1M_CONTEXT` also turns it off). Architecture is Opus: `skills/plan` sets `model: opus` for its turn (the session model returns with the next prompt), `agents/Plan.md` is Opus |
+| `enabledPlugins` / `extraKnownMarketplaces` | `catnap@lippinc` from `LippInc/catnap` | compaction at a clean break with a handoff instead of a summary cut mid-task; `install.sh` runs `claude plugin install catnap@lippinc -y` when it is missing (`CC_SKIP_PLUGINS=1` skips, a trial target never installs) |
 | `advisorModel` | `opus` | Sonnet calls Opus itself at decision points: split evidence, an architectural fork. Cheaper than a whole day on Opus — but every call forwards the entire conversation to Opus and bills to the weekly Opus window, so a call late in a long session costs the whole session. `advisor-stats.sh` measures it; `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1` switches it off |
 | advisor in subagents | no switch | there is no per-agent switch: the agent frontmatter schema has no `env`, and the advisor is appended to the request after the tool filter, so `disallowedTools` misses it. The only levers are context size (`maxTurns`, `omitClaudeMd`, narrow tools) and the agent's own prompt: `worker` and `verifier` are told to report a fork upward instead of buying an Opus review of their whole context |
 | `CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL` (env) | `1` | **`advisorModel` alone does not enable anything.** The binary gates the tool: first-party API (a subscription is first-party), experimental betas not disabled, and then either this variable or the server-side flag `tengu_sage_compass2`. That flag arrives through GrowthBook, which does not run when telemetry is opted out — so `DISABLE_TELEMETRY` silently leaves the advisor off, and this variable is what turns it back on. Without it the tool is simply absent from the session and the model — correctly — reports it has no advisor. `claude --debug` prints `[AdvisorTool] Server-side tool enabled …` or `[AdvisorTool] Skipping advisor - …` |
 | `effortLevel` | `medium` | a persistent default for routine work |
 | `maxEffortLevel` | `high` | a ceiling: `xhigh`/`max` cannot be selected even by accident; `max` is officially "prone to overthinking" |
-| `autoCompactWindow` | unset | compaction happens at the model's own limit (~1M for Sonnet 5 / Opus 5). The owner's decision: one session per plan, continuity of context is worth more than the price of a turn. If `/usage` shows `long_context` above 10 %, use `/autocompact 500k` in that one session, not in the settings |
+| `autoCompactWindow` | unset | catnap sets the auto-compact line itself (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`, 500K on a 1M window) and asks for a handoff earlier, at a clean break; Claude Code's auto-compact is only the backstop |
 | `autoContinueAtUsageLimit` | `true` | an overnight run that hits the limit waits for the reset and continues by itself. Switch it off for the day through `--settings` |
 | `promptCacheTtl` / `subagentPromptCacheTtl` | `1h` | on a subscription the main conversation already gets an hour, but subagents, forks and compaction get **5 minutes**; raising them to an hour hits `cache_miss` directly |
 | `workflowKeywordTriggerEnabled` | `false` | the word "ultracode" in a prompt no longer fans out a swarm of agents by itself |
@@ -90,7 +91,7 @@ Hooks run as processes outside the model's window: they cost no tokens, they are
 
 | Hook | Event | What it does | Which failure it removes |
 |---|---|---|---|
-| `stop-guard.sh` | `Stop` | while a `PLAN.md` with `status: running` still has `- [ ]`, answers `{"decision":"block","reason":"next task…"}` — Claude Code sends the model back to work; releases the turn once the open-task count stops changing (3 blocks) | "did two tasks out of a hundred and stopped". Exits: `NEED_HUMAN`, `.claude/plan-pause`, 300 continuations, or a plan that is not advancing. Claude Code caps *consecutive* blocks at 8 by default, which would end a plan at task nine: `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=400` moves that ceiling above ours |
+| `stop-guard.sh` | `Stop` | while a `PLAN.md` with `status: running` still has `- [ ]`, answers `{"decision":"block","reason":"next task…"}` — Claude Code sends the model back to work; releases the turn once the open-task count stops changing (3 blocks) | "did two tasks out of a hundred and stopped". Exits: `NEED_HUMAN`, `.claude/plan-pause`, a catnap compaction queued for this session (`<state>/catnap/<session>.json` with `pending: true`, under 15 min old), 300 continuations, or a plan that is not advancing. Claude Code caps *consecutive* blocks at 8 by default, which would end a plan at task nine: `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=400` moves that ceiling above ours |
 | `retry-guard.sh` | `PostToolUse(Bash)`, `PostToolUseFailure` | counts identical failed commands; on the second it injects a demand to run `/diagnose`, on the third it forbids the next call until `ROOT CAUSE:` + `EVIDENCE:` are written | the "tried, failed, try again" loop |
 | `session-start.sh` | `SessionStart` (startup/resume/clear/compact/fork) | injects the active plan, the open tasks and the last Log entries | losing the thread after auto-compaction or a `/clear` at night |
 | `compress-output.sh` | `PostToolUse(Bash)` | strips ANSI, collapses repeats into `(x30)`, saves long output to `.claude/scratch/`, gives the model head and tail through `updatedToolOutput` | 4000 lines of log living in the window on every later turn |
@@ -120,7 +121,7 @@ Only their descriptions live in context (under 1536 characters all together); th
 | `/run` | you / a hook | one task at a time, `[x]` only after the check, a commit per task, `done` only when the artefact exists in the repository, `BLOCKED.md` instead of a stub, `verify:` never touched |
 | `/run-task` | `worker`, or you for a single task | what one task reads, does, verifies, marks and logs — then stops |
 | `/test` | you, or `/plan` when a task needs cover | coverage chosen by risk, every test seen red before it passes, a mutation proving each guard can fail, `scripts/coverage_gate.py` in the gate checks so the floor can only rise, and a one-off `mutmut`/`stryker` audit (by hand, never a gate) whose surviving mutants become tasks |
-| `/verify` | you / `/run` when it finishes | a fresh context (`verifier`): `VERIFY.md` stating what this context did *not* do, reproduction from a clean state, reverse control by mutation, "what was not checked" |
+| `/verify` | you, on a finished task (`disable-model-invocation`: the model cannot start it; `/run` lists what is ready) | a fresh context (`verifier`): `VERIFY.md` stating what this context did *not* do, reproduction from a clean state, reverse control by mutation, "what was not checked" |
 | `/graphify` | you, once per repository | a local AST graph built with zero model tokens, refused outright when it would answer wrongly (submodules, empty extraction, under 20 nodes, over 25% `INFERRED`, under 30% file coverage), and only then wired into `.mcp.json` with a post-commit rebuild |
 | `/diagnose` | the model after a failure / you | freeze → versions off the machine → the levels (environment, dependencies, logs, trace, state, measurements, debugger) → three hypotheses → documentation for the pinned version → third-party workarounds only in scratch → the advisor on split evidence → one fix plus a regression test |
 
@@ -128,6 +129,7 @@ Only their descriptions live in context (under 1536 characters all together); th
 
 | Agent | Model | Context | For what |
 |---|---|---|---|
+| `Plan` | opus, high | with CLAUDE.md | architecture: step-by-step design, critical files, trade-offs; read-only; overrides the built-in one |
 | `Explore` | haiku | without CLAUDE.md | overrides the built-in one: since 2.1.198 the built-in Explore inherits the session's model (Opus ceiling) |
 | `scout` | haiku | without CLAUDE.md | "where the code lives" — paths and lines, changes nothing; carries the four `mcp__graphify__*` tools, which resolve to nothing where no graph was built |
 | `test-runner` | sonnet, low | without CLAUDE.md | runs tests, returns only the reasons for failures. Not Haiku: an invented "12 passed" does not self-correct, unlike an invented path |

@@ -10,7 +10,7 @@ Input: `$ARGUMENTS` — a plan path or a task directory (then its `PLAN.md`). If
 
 ## One session, the whole plan (default)
 
-You do the tasks yourself, one at a time, in this session, by the `run-task` procedure (read the task line, `## Decisions`, `## Assumptions`, `## Out of scope`, the last Log lines; do; run the verify command; mark; log; commit). A subagent's "done" (worker, test-runner, scout) never closes a task: the task's own `verify:` command, run by you and exiting 0, does. The session lives as long as the plan; the plan file is the state, the conversation is the memory of *why*. Do not `/clear`, do not `/compact` by hand, do not spawn a fresh session per task.
+You do the tasks yourself, one at a time, in this session, by the `run-task` procedure (read the task line, `## Decisions`, `## Assumptions`, `## Out of scope`, the last Log lines; do; run the verify command; mark; log; commit). A subagent's "done" (worker, test-runner, scout) never closes a task: the task's own `verify:` command, run by you and exiting 0, does. The session lives as long as the plan; the plan file is the state, the conversation is the memory of *why*. Do not `/clear`, do not `/compact` by hand, do not spawn a fresh session per task. A `[catnap]` note is the exception: pass the handoff to `compact_now` with the last action of the turn and end the turn; `stop-guard` stays quiet while that compaction is queued.
 
 Keep noise out of this context, because this context is what the whole night runs on:
 
@@ -43,7 +43,7 @@ A task directory whose children carry `split:contract`, `split:part` and `split:
 3. Merge each returned branch into the current branch with `git merge --no-ff <branch>`, one at a time. A conflict means the write sets were wrong: `git merge --abort`, mark that part `status:blocked` with `BLOCKED.md` naming the conflicting paths, continue with the other parts. Never resolve a conflict by picking a side. A merged branch is done with: `git worktree remove <path>` and `git branch -d <branch>` (both refuse to drop unmerged work). Before the plan closes, run `python3 ~/.claude/hooks/worktree-gc.py` once: it removes every clean, fully merged worktree and stale `.claude/scratch/` entries, and lists what it kept and why; a kept worktree of a blocked part stays until its `BLOCKED.md` is resolved.
 4. After every merge, run that part's `[fast]` VERIFY items yourself on the merged tree. Red → the part goes back to `in_progress` with an `open:` line in its `NOTES.md`.
 5. The `split:assembly` child last, one `worker`, on the merged tree: it runs the whole fast tier.
-6. `reviewer` and `/verify` run once, on the parent, after the assembly — never per part.
+6. `reviewer` runs once, on the parent, after the assembly — never per part. `/verify` is the user's, on the parent, after the run.
 
 Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.md + PROJECT.md + plan + task ≈ 10–20k tokens of cache write) and knows nothing of *why* the previous task was done the way it was. Measured on a three-task plan of small coupled tasks (one run each, Sonnet 5.5): one session $0.22 and 39 s, delegate $0.59 and 104 s. Delegate pays off where parts run in parallel or the plan is too long for one context; the default mode for everything else.
 
@@ -55,7 +55,7 @@ Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.
 - **A directive that contradicts a `D<n>` decision, the task's SCOPE or `docs/PROJECT.md`** is not executed. Record it under `## Assumptions` as `reviewer: <FIX> — not applied, contradicts D<n>`; when it points at a real defect the decision causes, the task becomes `[!] BLOCKED: reviewer finding conflicts with D<n>` for the owner.
 - **PLAUSIBLE** (no reproduction) is an observation: one line in `NOTES.md` or `## Log`, no task, no fix.
 - After the fix tasks close, `reviewer` runs again **only on the fixed findings** (their WHERE lines and the fix diff), not on the whole change. At most two rounds; a finding still CONFIRMED after the second fix → `[!] BLOCKED: reviewer finding survives two fixes`, with both reproductions in the Log.
-- `/verify` follows the review, in another context, on the same parent task.
+- `/verify` does not follow the review. The user runs it on finished tasks; the Finish report lists which are ready.
 - A task whose SECURITY block adds a sink, or whose DATA adds an `interpretable=yes` field, also gets `/attack <task dir>` after the review; its CONFIRMED findings enter this same loop. At night `cc-night` runs `/attack milestone` after the full run (`CC_NIGHT_ATTACK=0` turns it off).
 - When the reviewed diff touches code that talks to PostgreSQL (a driver import, SQL, a migration, an ORM model), `/pgsql-slow-queries diff` runs beside the reviewer; its CONFIRMED findings become fix tasks the same way, a transaction held across an outside wait blocks the task. At night `cc-night` runs it on the whole project when the repository uses PostgreSQL (`CC_NIGHT_PGSQL=0` turns it off).
 
@@ -88,12 +88,12 @@ Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.
 ## Finish
 
 When no `- [ ]` remains:
-- All `[x]`: set `status: done`, run the full suite and every acceptance criterion command once more, mark each AC. Compare the suite against the `T00` baseline recorded in `## Log`: a test that was green then and is red now is a regression this run caused — it is fixed before the plan closes, or the plan ends `paused` with that test named. A rising coverage floor is expected; a fallen one is a failure, not a formality. In a task tree: apply the `labels.txt` rules above, then suggest `/verify <task dir>` in a fresh context. Report: what changed, why, which checks ran with results, remaining risk, suggested commit message. Stop.
+- All `[x]`: set `status: done`, run every acceptance criterion command once more and, when some task changed logic, the full suite, mark each AC. Compare the suite against the `T00` baseline recorded in `## Log`: a test that was green then and is red now is a regression this run caused — it is fixed before the plan closes, or the plan ends `paused` with that test named. A rising coverage floor is expected; a fallen one is a failure, not a formality. In a task tree: apply the `labels.txt` rules above, then list the task directories ready for `/verify` — never start it yourself. Report: what changed, why, which checks ran with results, remaining risk, suggested commit message. Stop.
 - Some `[!]`: set `status: paused`, list the blocked tasks with their reasons, and end the message with the literal token `NEED_HUMAN`. Stop.
 
 ## Context hygiene during a long run
 
-- The window is the model's full context; compaction is not forced early (no `autoCompactWindow`). If it does happen, the SessionStart hook re-injects the active plan afterwards. Keep the plan file the single source of truth so nothing is lost with the history.
+- catnap decides when to compact: at its note, at a clean break, never mid-task; Claude Code's auto-compact stays on as its backstop. After any compaction the SessionStart hook re-injects the active plan afterwards. Keep the plan file the single source of truth so nothing is lost with the history.
 - Large tool output is trimmed by a hook (repeated lines collapsed, long output saved to `.claude/scratch/` with head and tail inline). When you need the middle, Grep the saved file; do not re-run the command.
 - Whole-file reads over 500 lines are refused by a hook; Grep first, then Read with offset and limit.
 - Do not switch model or effort mid-run: it forfeits the prompt cache on a context this size.

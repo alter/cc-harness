@@ -3,6 +3,7 @@ name: plan
 description: Interview first, then write an executable plan file. Use before any task that touches more than one file or has any open decision. Collects every question up front so execution never stops to ask.
 argument-hint: <what to build or change>
 disable-model-invocation: false
+model: opus
 ---
 
 # /plan
@@ -73,9 +74,9 @@ One paragraph. What is true when this is done.
 
 Task rules:
 - Every acceptance criterion carries an `AC<n>` id and every decision a `D<n>` id. The verifier maps each id to evidence (`path:line`, a test, or a command with its exit code); a decision is checked for *how* the work was done, not only *that* it was done. An id with no evidence is an unproven claim.
-- `T00` is always the baseline: run the project's gate checks once before any edit and record the pre-existing state in `## Log` (which tests were already red, and the coverage percentage from the tool). New failures are then distinguishable from old ones. When `docs/PROJECT.md` §7 or a pre-commit hook forbids commits on the current branch, `T00` also creates the plan's branch (name per the repository's pattern) and `## Decisions` records `Branch: <name>`.
+- `T00` is always the baseline: when any task changes logic, run the project's gate checks once before any edit and record the pre-existing state in `## Log` (which tests were already red, and the coverage percentage from the tool). New failures are then distinguishable from old ones. When `docs/PROJECT.md` §7 or a pre-commit hook forbids commits on the current branch, `T00` also creates the plan's branch (name per the repository's pattern) and `## Decisions` records `Branch: <name>`.
 - A task that changes behaviour carries its test: the task line says which test proves it, and the task is not done until that test was seen failing before the change. A task that only adds tests is fine and belongs to `/test`.
-- Every task ends in a verifiable state and names the command that verifies it. The verify line includes the gate checks from `docs/PROJECT.md`, not only the task-local test.
+- Every task ends in a verifiable state and names the command that verifies it. The verify line of a task that changes logic includes the gate checks from `docs/PROJECT.md`, not only the task-local test. A task without logic (copy, labels, styles, templates, docs, config values) verifies with the narrow check for the touched file — a grep, a render, a lint of that file — never the gate checks or the full suite: the verify line freezes when the plan runs and nothing downstream can narrow it.
 - Architecture or layering decisions become a check, not a paragraph: a task that introduces a boundary also adds the check that enforces it — the tool the project already uses for boundaries, or a short script that reports `path:line [rule] message` — to the gate checks.
 - Order by dependency, then by the user's priority answer.
 - Anything in the "Must become BLOCKED" column of `docs/PROJECT.md` is a separate task, placed last, marked `(needs confirmation)` so `/run` BLOCKs it instead of guessing.

@@ -225,6 +225,14 @@ touch "$proj/.claude-pause-probe"; mkdir -p "$proj/.claude"; touch "$proj/.claud
 out=$(sp "stopping" | HOME="$TMP" "$H/stop-guard.sh"); check_empty "plan-pause releases" "$out"
 rm -f "$proj/.claude/plan-pause"
 out=$(sp "x" | CC_STOP_GUARD_CAP=1 HOME="$TMP" "$H/stop-guard.sh"); check_empty "cap reached releases (counter already at 1)" "$out"
+nap="$TMP/catnap-state"; mkdir -p "$nap/catnap"
+npp() { jq -n --arg c "$proj" '{cwd:$c,session_id:"nap-case",last_assistant_message:"x"}' | CLAUDE_STATE_DIR="$nap" HOME="$TMP" "$H/stop-guard.sh"; }
+printf '{"pending":true}\n' > "$nap/catnap/nap-case.json"
+out=$(npp); check_empty "catnap-pending: a queued compaction releases the stop" "$out"
+printf '{"pending":false}\n' > "$nap/catnap/nap-case.json"
+out=$(npp); check "catnap-done: no queued compaction, the guard blocks" "$out" '"decision": *"block"'
+printf '{"pending":true}\n' > "$nap/catnap/nap-case.json"; touch -t 202001010000 "$nap/catnap/nap-case.json"
+out=$(npp); check "catnap-stale: a pending flag older than 15 min does not release" "$out" '"decision": *"block"'
 
 stallproj="$TMP/stall"; mkdir -p "$stallproj/docs/plans"
 printf -- '---\nstatus: running\n---\n# S\n## Tasks\n- [ ] T01 a\n- [ ] T02 b\n- [ ] T03 c\n## Log\n' > "$stallproj/docs/plans/s.md"

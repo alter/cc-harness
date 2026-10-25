@@ -85,6 +85,19 @@ fi
 rm -f "$NEW"
 jq -e . "$TARGET/settings.json" >/dev/null || { echo "settings.json is not valid JSON" >&2; exit 1; }
 
+echo "== plugins"
+if [ "$TARGET" != "$HOME/.claude" ] || [ "${CC_SKIP_PLUGINS:-0}" = "1" ]; then
+  echo "   skipped (trial target or CC_SKIP_PLUGINS=1)"
+elif ! command -v claude >/dev/null 2>&1; then
+  echo "   no claude CLI on PATH; later: claude plugin marketplace add LippInc/catnap && claude plugin install catnap@lippinc -y"
+elif jq -e '.plugins["catnap@lippinc"]' "$TARGET/plugins/installed_plugins.json" >/dev/null 2>&1; then
+  echo "   catnap@lippinc already installed"
+else
+  { jq -e '.lippinc' "$TARGET/plugins/known_marketplaces.json" >/dev/null 2>&1 || claude plugin marketplace add LippInc/catnap; } \
+    && claude plugin install catnap@lippinc -y 2>&1 | sed 's/^/   /' \
+    || echo "   catnap install failed; by hand: claude plugin install catnap@lippinc -y"
+fi
+
 echo "== check"
 for f in "$TARGET"/hooks/*.sh "$TARGET/statusline.sh" "$TARGET/graph-setup.sh"; do bash -n "$f"; done
 for f in "$TARGET"/hooks/*.py; do [ -e "$f" ] || continue; python3 -c "import ast,sys,pathlib; ast.parse(pathlib.Path(sys.argv[1]).read_text())" "$f"; done

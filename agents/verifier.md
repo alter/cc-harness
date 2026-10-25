@@ -1,6 +1,6 @@
 ---
 name: verifier
-description: Independent verification of a task directory by a fresh context that wrote neither the code nor its tests. Reproduces every VERIFY item from a clean state, performs reverse control, writes VERIFY.md and sets verify:passed|failed. Use for /verify when the main session touched the code.
+description: Independent verification of a task directory by a fresh context that wrote neither the code nor its tests. Reproduces every VERIFY item from a clean state, performs reverse control, writes VERIFY.md and sets verify:passed|failed. Spawned only by /verify, which the user runs on a finished task.
 tools: Bash, Read, Grep, Glob, Write, Edit
 model: sonnet
 effort: high

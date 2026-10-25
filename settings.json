@@ -1,6 +1,17 @@
 {
   "model": "sonnet[1m]",
   "advisorModel": "opus",
+  "extraKnownMarketplaces": {
+    "lippinc": {
+      "source": {
+        "source": "github",
+        "repo": "LippInc/catnap"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "catnap@lippinc": true
+  },
   "effortLevel": "medium",
   "maxEffortLevel": "high",
   "modelSettings": {

@@ -14,6 +14,8 @@ last=$(printf '%s' "$payload" | jq -r '.last_assistant_message // ""')
 
 [ -z "$cwd" ] && exit 0
 [ -f "$cwd/.claude/plan-pause" ] && exit 0
+nap="${CLAUDE_STATE_DIR:-$HOME/.claude/state}/catnap/$session.json"
+if [ -n "$(find "$nap" -mmin -15 2>/dev/null)" ] && jq -e '.pending == true' "$nap" >/dev/null 2>&1; then exit 0; fi
 
 plan=""
 for f in "$cwd"/docs/plans/*.md "$cwd"/tasks/*/PLAN.md "$cwd"/tasks/*/*/PLAN.md; do
