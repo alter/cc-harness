@@ -27,6 +27,11 @@
   "workflowSizeGuideline": "small",
   "ultracode": false,
   "includeCoAuthoredBy": false,
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
   "env": {
     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "5",
     "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2",

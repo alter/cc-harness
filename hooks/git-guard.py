@@ -14,6 +14,14 @@ SEPARATORS = re.compile(r"&&|\|\||[;&|\n]")
 
 
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh"}
+ATTRIBUTION = re.compile(r"claude-session:|co-authored-by:[^\n]*(claude|anthropic)|generated with \[?claude code|noreply@anthropic\.com|claude\.ai/code/session", re.I)
+PUBLISHING_GIT = {"commit", "tag", "notes", "merge"}
+PUBLISHING_GH = {"pr", "issue", "release"}
+KEEP_WORKING = (
+    "This is never done to make progress. "
+    "If uncommitted changes block the task, mark it [!] BLOCKED and continue with others; "
+    "if the owner wants this command, they run it themselves."
+)
 
 
 def segments(command: str, depth: int = 0) -> list[list[str]]:
@@ -88,6 +96,24 @@ def git_reason(options: list[str], rest: list[str]) -> str | None:
     return None
 
 
+def publishes(words: list[str]) -> bool:
+    call = git_call(words)
+    if call:
+        return bool(call[1]) and call[1][0] in PUBLISHING_GIT
+    return os.path.basename(words[0]) == "gh" and len(words) > 1 and words[1] in PUBLISHING_GH
+
+
+def message_files(words: list[str], cwd: str) -> str:
+    names = [b for a, b in zip(words, words[1:]) if a in ("-F", "--file", "--body-file")]
+    names += [w.split("=", 1)[1] for w in words if w.startswith(("--file=", "--body-file="))]
+    texts = []
+    for name in names:
+        path = pathlib.Path(cwd or ".") / name
+        if name != "-" and path.is_file():
+            texts.append(path.read_text(encoding="utf-8", errors="ignore"))
+    return "\n".join(texts)
+
+
 def project_denies(cwd: str) -> list[list[str]]:
     path = pathlib.Path(cwd or ".") / "docs" / "PROJECT.md"
     if not path.is_file():
@@ -100,12 +126,8 @@ def project_denies(cwd: str) -> list[list[str]]:
     return [line.split() for line in m.group(1).splitlines() if line.strip() and not line.strip().startswith("#")]
 
 
-def deny(reason: str, command: str) -> None:
-    text = (
-        f"Refused: {reason}. Command: {command!r}. This is never done to make progress. "
-        "If uncommitted changes block the task, mark it [!] BLOCKED and continue with others; "
-        "if the owner wants this command, they run it themselves."
-    )
+def deny(reason: str, command: str, advice: str = KEEP_WORKING) -> None:
+    text = f"Refused: {reason}. Command: {command!r}. {advice}"
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": text}}))
 
 
@@ -120,7 +142,12 @@ def main() -> int:
         return 0
     command = (payload.get("tool_input") or {}).get("command") or ""
     extra = project_denies(payload.get("cwd") or "")
+    cwd = payload.get("cwd") or ""
     for words in segments(command):
+        if publishes(words) and ATTRIBUTION.search(command + "\n" + message_files(words, cwd)):
+            deny("the message carries tool attribution (a Claude-Session, Co-Authored-By or Generated-with line)", command,
+                 "Nothing about the tooling goes into a commit or a PR. Remove that line and run it again.")
+            return 0
         call = git_call(words)
         if call:
             reason = git_reason(*call)

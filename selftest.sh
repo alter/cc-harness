@@ -41,6 +41,7 @@ if [ -f "$TARGET/settings.json" ]; then
     *"	1") ok "advisor: model set and the account gate is bypassed" ;;
     *) bad "advisor: advisorModel needs CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL=1" "advisorModel/flag: $adv — without the flag the tool never appears in the session" ;;
   esac
+  if jq -e '.attribution == false or (.attribution.commit == "" and .attribution.pr == "" and .attribution.sessionUrl == false)' "$TARGET/settings.json" >/dev/null 2>&1; then ok "attribution: commit trailer, PR line and session link all off"; else bad "attribution: commit trailer, PR line and session link all off" "$(jq -c '.attribution' "$TARGET/settings.json") — includeCoAuthoredBy alone leaves the Claude-Session trailer on"; fi
   m=$(jq -r '.model // "unset"' "$TARGET/settings.json")
   case "$m" in *"[1m]"|unset) ok "model keeps its context variant ($m)" ;; *) bad "model keeps its context variant" "$m — the [1m] suffix is gone, the window is 200k" ;; esac
   for cmd in $(jq -r '.. | .command? // empty' "$TARGET/settings.json" | grep -oE '[^ ]+\.(sh|py)$'); do
@@ -181,6 +182,17 @@ gp="$TMP/gguard"; mkdir -p "$gp/docs"
 printf '## 5. Unattended policy\n\n```deny\nterraform apply\nkubectl delete\n```\n\n## 6. Gate checks\n' > "$gp/docs/PROJECT.md"
 check "git-guard-project-deny: a command listed in PROJECT.md §5 is refused" "$(gg "terraform apply -auto-approve" "$gp")" '"permissionDecision": *"deny"'
 check_empty "git-guard-project-deny: an unlisted command passes" "$(gg "terraform plan" "$gp")"
+ga="$TMP/gattr"; mkdir -p "$ga"; printf 'fix\n\nClaude-Session: https://claude.ai/code/session_x\n' > "$ga/msg.txt"
+for c in $'git commit -m "fix parser\n\nClaude-Session: https://claude.ai/code/session_01"' \
+         'git commit -m fix -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"' \
+         $'git commit -F - <<\'EOF\'\nfix\n\nCo-authored-by: Claude <noreply@anthropic.com>\nEOF' \
+         'gh pr create --title t --body "x 🤖 Generated with [Claude Code](https://claude.com/claude-code)"' \
+         'git commit -F msg.txt'; do
+  check "git-guard-attribution-deny: ${c%%$'\n'*}" "$(gg "$c" "$ga")" '"permissionDecision": *"deny"'
+done
+for c in 'git commit -m "fix parser"' 'git log --grep Claude-Session' 'echo Claude-Session: x' 'gh pr create --title t --body "plain body"'; do
+  check_empty "git-guard-attribution-allow: $c" "$(gg "$c" "$ga")"
+done
 
 echo "== compress-output"
 big=$(for _ in $(seq 1 300); do echo "same line"; done; seq 1 400 | sed 's/^/unique /')
