@@ -42,7 +42,7 @@ TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]+$|_test\.[
 
 
 def git(*args: str) -> str:
-    return subprocess.run(["git", *args], capture_output=True, text=True).stdout
+    return subprocess.run(["git", *args], capture_output=True, text=True, encoding="utf-8", errors="ignore").stdout
 
 
 def old_text(base: str, path: str) -> str:

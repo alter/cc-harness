@@ -141,6 +141,8 @@ out=$(ic); check "integrity-matrix-that-splits-is-fine" "$out" 'integrity: 0 fin
 sed -i.bak 's|go test ./...|seq 0 7 \| xargs -I{} cargo mutants --shard {}/8|' "$ir/scripts/test.sh"; out=$(ic); check "integrity-loop-that-shards-is-fine: a loop feeding --shard is a partition" "$out" 'integrity: 0 finding'; (cd "$ir" && git checkout -q -- scripts); rm -f "$ir/scripts/test.sh.bak"
 printf '#!/bin/sh\ngo test -count=1 ./...\n' > "$ir/scripts/test.sh"; (cd "$ir" && git add scripts && git -c user.name=t -c user.email=t@t commit -qm count1); base=$(git -C "$ir" rev-parse HEAD)
 printf '#!/bin/sh\ngo test -count=1 ./...\necho done\n' > "$ir/scripts/test.sh"; out=$(ic); check "integrity-existing-repeat-ignored: an old -count flag does not count" "$out" 'integrity: 0 finding'; (cd "$ir" && git checkout -q -- scripts)
+mkdir -p "$ir/assets"; printf '\211PNG\r\n\032\n\000\377\376' > "$ir/assets/icon.png"; (cd "$ir" && git add assets && git -c user.name=t -c user.email=t@t commit -qm png); base=$(git -C "$ir" rev-parse HEAD)
+printf '\211PNG\r\n\032\n\000\375\374\373' > "$ir/assets/icon.png"; out=$(ic); check "integrity-binary-changed: a replaced binary file is read without a crash" "$out" 'integrity: 0 finding'; (cd "$ir" && git checkout -q -- assets)
 
 sg="$TMP/sgint"; mkdir -p "$sg/docs/plans" "$sg/src"
 ( cd "$sg" && git init -q && printf 'x = 1\n' > src/a.py \
