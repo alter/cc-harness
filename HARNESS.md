@@ -85,7 +85,7 @@ Nine sections: questions only before the work starts; scope decided by the capab
 | `CC_*` | — | — | thresholds for the hooks below |
 | `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` | 400 | **8** | one finished task is one more consecutive block; the default would override the Stop hook at task nine |
 
-What is deliberately **not** set: `bashOutputMaxChars` — the default (30k characters, then a file plus a preview) already saves; raising it only drives logs into the conversation.
+What is deliberately **not** set: `permissions.blockWritesOutsideWorkingDirectories` (2.1.314). It would hold in every permission mode, but harness agents write outside their cwd by design: `verifier` keeps reverse-control mutations in a scratch copy under `/tmp` or `~/.cache`, and a `worker` in a worktree writes `VERIFY.md` and `.claude/scratch/` into the main checkout (a 2026-11-02 transcript scan counted 111 such writes). Nor `bashOutputMaxChars` — the default (30k characters, then a file plus a preview) already saves; raising it only drives logs into the conversation.
 
 ### `hooks/` — ten guards
 
