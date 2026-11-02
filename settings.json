@@ -68,7 +68,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/guard-subagent.sh"
+            "command": "~/.claude/hooks/guard-subagent.sh",
+            "onFailure": "block"
           }
         ]
       },
@@ -77,7 +78,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/read-guard.sh"
+            "command": "~/.claude/hooks/read-guard.sh",
+            "onFailure": "block"
           }
         ]
       },
@@ -87,12 +89,14 @@
           {
             "type": "command",
             "command": "python3 ~/.claude/hooks/bash-read-guard.py",
-            "timeout": 10
+            "timeout": 10,
+            "onFailure": "block"
           },
           {
             "type": "command",
             "command": "python3 ~/.claude/hooks/git-guard.py",
-            "timeout": 10
+            "timeout": 10,
+            "onFailure": "block"
           }
         ]
       }

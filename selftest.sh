@@ -35,6 +35,11 @@ if [ -f "$TARGET/settings.json" ]; then
   if jq -e . "$TARGET/settings.json" >/dev/null 2>&1; then ok "settings.json is JSON"; else bad "settings.json is JSON" "invalid"; fi
   dup=$(jq -r '(.hooks // {}) | to_entries | map(.key as $e | [.value[].hooks[].command] | group_by(.) | map(select(length > 1) | "\($e): \(.[0])")) | flatten | join(", ")' "$TARGET/settings.json")
   [ -z "$dup" ] && ok "no duplicated hook commands" || bad "no duplicated hook commands" "registered more than once: $dup"
+  ofg=$(jq -r '[.hooks.PreToolUse[]?.hooks[]? | select(.command | test("guard-subagent|read-guard|bash-read-guard|git-guard")) | select(.onFailure != "block") | .command] | join(", ")' "$TARGET/settings.json")
+  ofn=$(jq -r '[.hooks.PreToolUse[]?.hooks[]? | select(.command | test("guard-subagent|read-guard|bash-read-guard|git-guard"))] | length' "$TARGET/settings.json")
+  if [ -z "$ofg" ] && [ "$ofn" -ge 4 ]; then ok "onfailure-guards: every PreToolUse guard fails closed"; else bad "onfailure-guards: every PreToolUse guard fails closed" "without onFailure=block: ${ofg:-none}; guards found: $ofn"; fi
+  ofs=$(jq -r '[(.hooks.Stop, .hooks.SubagentStop, .hooks.SessionStart)[]?.hooks[]? | select(.onFailure == "block") | .command] | join(", ")' "$TARGET/settings.json")
+  [ -z "$ofs" ] && ok "onfailure-stop-free: no Stop/SubagentStop/SessionStart hook blocks on its own failure" || bad "onfailure-stop-free: no Stop/SubagentStop/SessionStart hook blocks on its own failure" "$ofs"
   adv=$(jq -r '[(.advisorModel // ""), (.env.CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL // "")] | @tsv' "$TARGET/settings.json")
   case "$adv" in
     "	"*) ok "advisor: not configured, nothing to gate" ;;
