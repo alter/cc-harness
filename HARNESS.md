@@ -1,6 +1,6 @@
 # The harness: how it is built
 
-52 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory.
+52 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory — and re-checked against the 2.1.316 binary, changelog and live probes (`docs/upgrade-2.1.316.md`).
 
 ## 1. Three floors
 
@@ -245,7 +245,7 @@ What this harness does **not** do, stated plainly: it does not compress the mode
 - `stop-guard` checks the fact of `[x]`, not its quality: if the model marks `[x]` without the check passing, the hook will not notice — `/verify-task` and the morning `## Log` will.
 - `read-guard` and `bash-read-guard` cover Read and the plain shell read; a file can still arrive through a language runtime (`python -c 'print(open(...).read())'`), and then `compress-output` is what trims it. There is no full impermeability and there will not be — hooks lower the frequency, they do not eliminate.
 - The overnight `--dangerously-skip-permissions` is not a harness without a sandbox; it is a risk.
-- Everything was measured on 2.1.272. Later releases change hooks and caching every week (2.1.257–2.1.271 carried more than twenty cache changes); after an upgrade, run `/skill-doctor` and check hook status in `/hooks`.
+- Everything was measured on 2.1.272 and re-checked on 2.1.316 (`docs/upgrade-2.1.316.md`). Later releases change hooks and caching every week (2.1.257–2.1.271 carried more than twenty cache changes); after an upgrade, run `/skill-doctor` and `/doctor prompt-audit` (2.1.283: stale prompting patterns in CLAUDE.md, skills and agents), check hook status in `/hooks`, and read the changelog range the way `docs/upgrade-2.1.316.md` did.
 
 ## Deny rules and the git guard (checked 2026-10-05, Claude Code 2.1.289)
 

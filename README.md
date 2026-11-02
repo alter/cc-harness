@@ -1,7 +1,7 @@
 # A personal Claude Code harness: ask once, finish the plan, diagnose instead of guessing
 
 Not tied to any project. Everything lives in `~/.claude/`; a project only gets `docs/plans/`.
-Every mechanism here was verified against the Claude Code 2.1.272 binary.
+Every mechanism here was verified against the Claude Code 2.1.272 binary and re-checked on 2.1.316 (`docs/upgrade-2.1.316.md`).
 
 ## Install
 

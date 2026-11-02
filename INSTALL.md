@@ -2,7 +2,7 @@
 
 The order: back up → run the checks without installing → install a trial copy into a separate directory → run it live in a sandbox → install into `~/.claude` → roll back if anything is wrong. Every step is one command, and every step is reversible.
 
-You need `jq`, `bash` ≥ 4, `python3` ≥ 3.11 (the guards, `check.py` and `integrity-check.py`; 3.11 for `tomllib`), `git`, and `claude` ≥ 2.1.267 (for `maxEffortLevel`; the deny-rule and `--agent` behaviour in `HARNESS.md` was checked on 2.1.289). These are runtime dependencies of the harness, not of your projects: a project in Go, Rust or shell needs no Python of its own. On macOS nothing else (notifications go through `osascript`); on Linux, `notify-send` if you want them.
+You need `jq`, `bash` ≥ 4, `python3` ≥ 3.11 (the guards, `check.py` and `integrity-check.py`; 3.11 for `tomllib`), `git`, and `claude` ≥ 2.1.314: `onFailure` on the guards needs 2.1.295, the Agent `effort` the subagent guard caps 2.1.292, and Bash hooks seeing Monitor commands 2.1.314. Checked on 2.1.316 (`docs/upgrade-2.1.316.md`). These are runtime dependencies of the harness, not of your projects: a project in Go, Rust or shell needs no Python of its own. On macOS nothing else (notifications go through `osascript`); on Linux, `notify-send` if you want them.
 
 ## 0. What Claude Code keeps where — so you know what is being touched
 
@@ -185,4 +185,4 @@ To roll back from the full archive in §1: `tar xzf ~/claude-full-<stamp>.tgz -C
   `.gitignore`, and `graphify hook install` adds `.gitattributes`, a git merge driver and two git hooks. In a shared
   repository those are changes your colleagues will see — decide before you commit them. The rebuild runs detached,
   so for a few seconds after a commit the graph still describes the previous one.
-- **Version.** The keys `maxEffortLevel`, `subagentPromptCacheTtl` and `omitClaudeMd` in agents need 2.1.267 / 2.1.271 or later. On an older build Claude Code ignores them silently — so check `claude --version` first.
+- **Version.** The keys `maxEffortLevel`, `subagentPromptCacheTtl` and `omitClaudeMd` in agents need 2.1.267 / 2.1.271 or later; `onFailure` on hooks and the `CLAUDE_CODE_SUBAGENT_EFFORT` / `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` variables need 2.1.295 / 2.1.316 / 2.1.296. On an older build Claude Code ignores them silently — so check `claude --version` first.
