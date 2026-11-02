@@ -1,5 +1,5 @@
 ---
-status: running
+status: done
 created: 2026-11-02
 ---
 # Harness upgrade to Claude Code 2.1.316
@@ -15,16 +15,16 @@ The harness matches Claude Code 2.1.316, as found by the audit `docs/upgrade-2.1
 - The result is installed into `~/.claude` and passes `./selftest.sh ~/.claude`.
 
 ## Acceptance criteria
-- [ ] AC1 `git-guard.py` and `bash-read-guard.py` deny a forbidden command whose payload has `tool_name: "Monitor"` — `./selftest.sh` (monitor-*)
-- [ ] AC2 The four PreToolUse guards carry `onFailure: "block"`, and no Stop, SubagentStop or SessionStart hook does — `./selftest.sh` (onfailure-*). A hook that exits 1 under `onFailure: "block"` blocks the call on 2.1.316 (live check recorded in `## Log`).
-- [ ] AC3 `guard-subagent.sh` drops an `effort` above the agent's own (frontmatter `effort:`, else `CLAUDE_CODE_SUBAGENT_EFFORT`). Forks are left alone. The model cap still works — `./selftest.sh` (subagent-effort-*, existing model checks)
-- [ ] AC4 `settings.json` sets `CLAUDE_CODE_SUBAGENT_EFFORT=medium` and `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL=sonnet`. `modelSettings."claude-opus-5"` is gone — `jq` on settings.json
-- [ ] AC5 The harness skill is `verify-task`. No `skills/verify` remains in the source or in an install target, and every reference is renamed — `./selftest.sh` (skill-verify-task-*), `grep -rn '/verify\b'` finds only the built-in mention
-- [ ] AC6 The behaviour of the built-in `verify` on commit is observed live and recorded in HARNESS.md. If it writes `.claude/skills/verify/` into a repository, a deny rule stops that — log line plus `jq` on settings.json
-- [ ] AC7 `permissions.blockWritesOutsideWorkingDirectories` is either on, with evidence that no harness agent writes outside the working directories, or off, with the reason recorded under `## Assumptions` and in HARNESS.md
-- [ ] AC8 `idleCompaction` is either left on, with evidence that SessionStart `source=compact` (or an equivalent) brings the plan back after it, or set to `false` — log line plus `jq`
-- [ ] AC9 The docs name 2.1.316 as verified, and the stale claims from section 5 of the audit are corrected — grep per claim
-- [ ] AC10 No regression: every selftest check green at T00 is green at the end. A trial install passes `./selftest.sh <target>`. The live install passes `./selftest.sh ~/.claude` — `./selftest.sh`
+- [x] AC1 `git-guard.py` and `bash-read-guard.py` deny a forbidden command whose payload has `tool_name: "Monitor"` — `./selftest.sh` (monitor-*)
+- [x] AC2 The four PreToolUse guards carry `onFailure: "block"`, and no Stop, SubagentStop or SessionStart hook does — `./selftest.sh` (onfailure-*). A hook that exits 1 under `onFailure: "block"` blocks the call on 2.1.316 (live check recorded in `## Log`).
+- [x] AC3 `guard-subagent.sh` drops an `effort` above the agent's own (frontmatter `effort:`, else `CLAUDE_CODE_SUBAGENT_EFFORT`). Forks are left alone. The model cap still works — `./selftest.sh` (subagent-effort-*, existing model checks)
+- [x] AC4 `settings.json` sets `CLAUDE_CODE_SUBAGENT_EFFORT=medium` and `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL=sonnet`. `modelSettings."claude-opus-5"` is gone — `jq` on settings.json
+- [x] AC5 The harness skill is `verify-task`. No `skills/verify` remains in the source or in an install target, and every reference is renamed — `./selftest.sh` (skill-verify-task-*), `grep -rn '/verify\b'` finds only the built-in mention
+- [x] AC6 The behaviour of the built-in `verify` on commit is observed live and recorded in HARNESS.md. If it writes `.claude/skills/verify/` into a repository, a deny rule stops that — log line plus `jq` on settings.json
+- [x] AC7 `permissions.blockWritesOutsideWorkingDirectories` is either on, with evidence that no harness agent writes outside the working directories, or off, with the reason recorded under `## Assumptions` and in HARNESS.md
+- [x] AC8 `idleCompaction` is either left on, with evidence that SessionStart `source=compact` (or an equivalent) brings the plan back after it, or set to `false` — log line plus `jq`
+- [x] AC9 The docs name 2.1.316 as verified, and the stale claims from section 5 of the audit are corrected — grep per claim
+- [x] AC10 No regression: every selftest check green at T00 is green at the end. A trial install passes `./selftest.sh <target>`. The live install passes `./selftest.sh ~/.claude` — `./selftest.sh`
 
 ## Stack
 - bash 5.3, python 3 (stdlib), jq 1.6, git.
@@ -112,3 +112,4 @@ The harness matches Claude Code 2.1.316, as found by the audit `docs/upgrade-2.1
 - 2026-11-02 T09: idleCompaction kept on (key absent, default true; `jq .idleCompaction settings.json` = null). Binary 2.1.316: idle path lpr(trigger:"idle") -> x7n -> CGr/tWo -> WTe -> Dse(session,"compact") = SessionStart source=compact on the main thread; settings.json SessionStart has no matcher; session-start.sh case `compact)` re-injects the plan (seen live after this session's compaction). Live idle probe not possible cheaply: AZt()=max(1e5, CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS??2e5) floors the threshold at 100K; probe with 1000 stayed uncompacted after 30 min. Probe tmux session killed.
 - 2026-11-02 T12: `./selftest.sh` 440/0 exit 0 (T00 baseline 408/0, no red); trial install (seeded with live settings.json + old skills/verify) exit 0: old verify gone, verify-task present, 4 PreToolUse onFailure=block; `./selftest.sh <trial>` 456/0 exit 0. Live modelSettings.claude-opus-5 also holds the user's own effortLevel, so install keeps it (retirement drops only the exact harness value).
 - 2026-11-02 T13: `./install.sh` exit 0, backup ~/.claude-backup/20261102-115533; `./selftest.sh ~/.claude` 457/0 exit 0; ~/.claude/skills/verify gone, verify-task present. T07 phase B (.claude/scratch/t07/b.jsonl, repo t07/repoB2): init lists `verify-task` and built-in `verify`; `claude -p "…Commit this change."` made 2 Bash git calls, no Skill call, no .claude/skills/verify/ created → no deny rule; HARNESS.md paragraph extended.
+- 2026-11-02 Finish: `./selftest.sh` 440/0 exit 0 vs T00 408/0 (no regression; monitor 4, onfailure 2, subagent-effort 7, skill-verify-task 1, install-retire 2 green); jq: SUBAGENT_EFFORT=medium, WORKFLOW_SUBAGENT_MODEL=sonnet, opus-5 override absent, blockWrites/idleCompaction unset (off/on by D3/D4); live ~/.claude 457/0. Plan done.
