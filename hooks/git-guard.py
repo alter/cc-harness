@@ -138,7 +138,7 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except Exception:
         return 0
-    if payload.get("tool_name") != "Bash":
+    if payload.get("tool_name") not in ("Bash", "Monitor"):
         return 0
     command = (payload.get("tool_input") or {}).get("command") or ""
     extra = project_denies(payload.get("cwd") or "")

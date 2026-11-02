@@ -90,6 +90,9 @@ sec="$TMP/sec"; mkdir -p "$sec"; echo "K=1" > "$sec/.env"; echo "K=" > "$sec/.en
 for c in "cat $sec/.env" "grep K $sec/.env" "cat ~/.ssh/id_ed25519" "head -n 3 ~/.aws/credentials" "source $sec/.env" "base64 $sec/.env.local"; do
   check "deny-secrets-bash: $c" "$(brg "$c")" '"permissionDecision": *"deny"'
 done
+brgm() { jq -n --arg c "$1" '{tool_name:"Monitor",tool_input:{command:$c}}' | python3 "$H/bash-read-guard.py"; }
+check "monitor-bash-read-guard: a secret read through Monitor is refused" "$(brgm "cat $sec/.env")" '"permissionDecision": *"deny"'
+check "monitor-bash-read-guard: a whole-file read through Monitor is refused" "$(brgm "cat $TMP/big.py")" '"permissionDecision": *"deny"'
 check_empty "deny-secrets-template-allowed: cat .env.example" "$(brg "cat $sec/.env.example")"
 check_empty "deny-secrets-cp-template-allowed: cp .env.example .env" "$(brg "cp $sec/.env.example $sec/.env")"
 check_empty "deny-secrets-cp-template-allowed: cp backend/.env.example backend/.env" "$(brg "cp backend/.env.example backend/.env")"
@@ -182,6 +185,9 @@ for c in "git status" "git stash-like-alias-is-not-stash" "git reset --soft HEAD
 done
 gp="$TMP/gguard"; mkdir -p "$gp/docs"
 printf '## 5. Unattended policy\n\n```deny\nterraform apply\nkubectl delete\n```\n\n## 6. Gate checks\n' > "$gp/docs/PROJECT.md"
+ggm() { jq -n --arg c "$1" --arg d "$TMP" '{tool_name:"Monitor",tool_input:{command:$c},cwd:$d}' | python3 "$GG" 2>&1; }
+check "monitor-git-guard: git stash through Monitor is refused" "$(ggm "git stash")" '"permissionDecision": *"deny"'
+check_empty "monitor-git-guard: a harmless Monitor command passes" "$(ggm "tail -f build.log")"
 check "git-guard-project-deny: a command listed in PROJECT.md §5 is refused" "$(gg "terraform apply -auto-approve" "$gp")" '"permissionDecision": *"deny"'
 check_empty "git-guard-project-deny: an unlisted command passes" "$(gg "terraform plan" "$gp")"
 ga="$TMP/gattr"; mkdir -p "$ga"; printf 'fix\n\nClaude-Session: https://claude.ai/code/session_x\n' > "$ga/msg.txt"

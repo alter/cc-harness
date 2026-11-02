@@ -28,7 +28,13 @@ class WorktreeGc(unittest.TestCase):
         git(self.repo, "commit", "-m", "init")
 
     def tearDown(self):
-        shutil.rmtree(self.tmp)
+        for _ in range(20):
+            try:
+                shutil.rmtree(self.tmp)
+                return
+            except OSError:
+                time.sleep(0.25)
+        shutil.rmtree(self.tmp, ignore_errors=True)
 
     def add(self, name, commit=False):
         path = self.tmp / name

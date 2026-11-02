@@ -57,7 +57,7 @@ The harness matches Claude Code 2.1.316, as found by the audit `docs/upgrade-2.1
 
 ## Tasks
 - [x] T00 Baseline: run `./selftest.sh` once before any edit and record pass/fail counts and any already-red check in `## Log` — verify: `./selftest.sh`
-- [ ] T01 Monitor bypass: selftest cases `monitor-git-guard` (`git stash` with `tool_name=Monitor` → deny) and `monitor-bash-read-guard` (`cat` of a secret/600-line file with `tool_name=Monitor` → deny). Seen red first, then `git-guard.py:141` and `bash-read-guard.py:146` accept `{"Bash","Monitor"}` — verify: `./selftest.sh`
+- [x] T01 Monitor bypass: selftest cases `monitor-git-guard` (`git stash` with `tool_name=Monitor` → deny) and `monitor-bash-read-guard` (`cat` of a secret/600-line file with `tool_name=Monitor` → deny). Seen red first, then `git-guard.py:141` and `bash-read-guard.py:146` accept `{"Bash","Monitor"}` — verify: `./selftest.sh`
 - [ ] T02 Live probe in a trial `CLAUDE_CONFIG_DIR`: a PreToolUse hook with matcher `Bash` that logs its payload, plus a Monitor run of a harmless command. Record the real `tool_name`, and whether a `Bash(git stash:*)` deny rule also stops `git stash list` through Monitor. If it does not, add the matching `Monitor(...)` deny rules (or record why not) and document the result in HARNESS.md — verify: log line plus `jq '.permissions.deny' settings.json`
 - [ ] T03 `onFailure: "block"` on `guard-subagent.sh`, `read-guard.sh`, `bash-read-guard.py`, `git-guard.py`. Add selftest check `onfailure-guards`, which needs exactly those four and none on Stop/SubagentStop/SessionStart; seen red first. Live check in a trial config: a PreToolUse Bash hook that exits 1 with `onFailure: "block"` stops the Bash call; record it in `## Log` — verify: `./selftest.sh`
 - [ ] T04 Effort cap in `guard-subagent.sh`. Cases `subagent-effort-over` (test-runner + effort max → updatedInput without effort), `subagent-effort-within`, `subagent-effort-env-cap` (undefined agent, `CLAUDE_CODE_SUBAGENT_EFFORT=medium`, effort high → dropped), `subagent-effort-fork` (untouched), and model+effort both dropped in one updatedInput. All seen red first — verify: `./selftest.sh`
@@ -81,3 +81,4 @@ The harness matches Claude Code 2.1.316, as found by the audit `docs/upgrade-2.1
 
 ## Log
 - 2026-11-02 T00: ./selftest.sh exit 0, passed 408, failed 0 (baseline; log .claude/scratch/t00-selftest.log).
+- 2026-11-02 T01: git-guard.py:141 and bash-read-guard.py:146 accept Bash|Monitor; 3 monitor-* checks red before, green after. Also fixed a pre-existing race: test_worktree_gc tearDown rmtree raced the detached GC process (worktree-gc.py:235) → bounded retry. selftest 412/0.
