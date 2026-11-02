@@ -127,6 +127,8 @@ Only their descriptions live in context (under 1536 characters all together); th
 | `/graphify` | you, once per repository | a local AST graph built with zero model tokens, refused outright when it would answer wrongly (submodules, empty extraction, under 20 nodes, over 25% `INFERRED`, under 30% file coverage), and only then wired into `.mcp.json` with a post-commit rebuild |
 | `/diagnose` | the model after a failure / you | freeze → versions off the machine → the levels (environment, dependencies, logs, trace, state, measurements, debugger) → three hypotheses → documentation for the pinned version → third-party workarounds only in scratch → the advisor on split evidence → one fix plus a regression test |
 
+Why `/verify-task` and not `/verify`: Claude Code 2.1.316 ships a built-in `verify` skill ("Run before committing nontrivial changes; bootstraps this repo's project verify skill if none exists yet"; 2.1.286: a project or user skill named `verify` is run right before committing). A user skill named `verify` shadows it: the session lists one `verify`. Observed on 2.1.316 with the old name installed (`disable-model-invocation: true`): a product-source change committed through `claude -p` called no `Skill`, and no `.claude/skills/verify/` appeared. The rename keeps the independent check out of the commit path either way and leaves the name to the built-in, which never touches `verify:`.
+
 ### `agents/` — seven roles
 
 | Agent | Model | Context | For what |
