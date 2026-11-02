@@ -79,6 +79,8 @@ Nine sections: questions only before the work starts; scope decided by the capab
 | `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | 2 | 3 | a subagent may spawn one child, not a tree |
 | `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` | 300 | 200 | above the default on purpose: researching a technology before it is used (docs for the pinned version, issues, known pitfalls) takes more searches than the default allows |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | sonnet | = main model | a subagent without an explicit model does not inherit Opus |
+| `CLAUDE_CODE_SUBAGENT_EFFORT` | medium | unset | a subagent without `effort:` (Explore, scout, built-ins) does not run at the session's level; also the effort ceiling `guard-subagent` applies when the definition names none (2.1.316) |
+| `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` | sonnet | per script | Workflow agents are not Agent/Task calls, so `guard-subagent` never sees them; this pins their model (2.1.296) |
 | `MAX_MCP_OUTPUT_TOKENS` | 8000 | — | an MCP server's answer cannot flood the window |
 | `CC_*` | — | — | thresholds for the hooks below |
 | `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` | 400 | **8** | one finished task is one more consecutive block; the default would override the Stop hook at task nine |

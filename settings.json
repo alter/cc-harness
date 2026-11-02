@@ -14,11 +14,6 @@
   },
   "effortLevel": "medium",
   "maxEffortLevel": "high",
-  "modelSettings": {
-    "claude-opus-5": {
-      "maxEffortLevel": "high"
-    }
-  },
   "autoCompactEnabled": true,
   "autoContinueAtUsageLimit": true,
   "promptCacheTtl": "1h",
@@ -45,7 +40,9 @@
     "CLAUDE_CODE_STOP_HOOK_BLOCK_CAP": "400",
     "CC_SWITCH_CTX_LIMIT": "40000",
     "CC_READ_GUARD_LINES": "500",
-    "CC_COMPRESS_MIN_LINES": "40"
+    "CC_COMPRESS_MIN_LINES": "40",
+    "CLAUDE_CODE_SUBAGENT_EFFORT": "medium",
+    "CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL": "sonnet"
   },
   "statusLine": {
     "type": "command",

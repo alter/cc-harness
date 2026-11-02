@@ -21,8 +21,7 @@ The effect: after any interruption — compaction, a usage limit, a restart — 
 | Setting | Value | Behaviour |
 |---|---|---|
 | `model` / `advisorModel` | `sonnet[1m]` / `opus` | the work runs on Sonnet; `/plan` and the `Plan` agent run on Opus; Opus joins by itself as an advisor at decision points (split evidence in `/diagnose`). The key needs `CLAUDE_CODE_ENABLE_EXPERIMENTAL_ADVISOR_TOOL=1` beside it: without the variable an account-level gate keeps the tool out of the session entirely |
-| `effortLevel` / `maxEffortLevel` | `medium` / `high` | medium reasoning depth by default; the ceiling is `high`, so `xhigh` is unavailable even if the model asks for it |
-| `modelSettings.claude-opus-5.maxEffortLevel` | `high` | the advisor does not go to `xhigh` either |
+| `effortLevel` / `maxEffortLevel` | `medium` / `high` | medium reasoning depth by default; the ceiling is `high` for every model, the advisor included, so `xhigh` is unavailable even if the model asks for it |
 | `autoCompactEnabled`, no `autoCompactWindow` | `true`, unset | compaction only at the model's limit (~1M), not earlier. The owner's decision: one session per plan, the memory of *why* is worth more than the price of a turn |
 | `autoContinueAtUsageLimit` | `true` | on hitting the limit the session waits for the reset and continues by itself (switch off for daytime with `--settings '{"autoContinueAtUsageLimit":false}'`) |
 | `promptCacheTtl`, `subagentPromptCacheTtl` | `1h` | a pause of up to an hour between turns (subagents included) does not drop the prompt prefix from cache |
@@ -31,6 +30,8 @@ The effect: after any interruption — compaction, a usage limit, a restart — 
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `5` | no more than five subagents at once |
 | `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | `2` | a subagent may spawn a subagent, but no deeper |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | `sonnet` | a subagent without an explicit model runs on Sonnet, it does not inherit Opus |
+| `CLAUDE_CODE_SUBAGENT_EFFORT` | `medium` | a subagent whose definition names no `effort` (Explore, scout, the built-ins) runs at medium; `guard-subagent` also uses it as the ceiling for an `effort` the call asks for |
+| `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` | `sonnet` | workflow agents bypass `guard-subagent` (they are not Agent/Task calls), so their model is pinned here |
 | `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` | `300` | a ceiling on searches per session |
 | `MAX_MCP_OUTPUT_TOKENS` | `8000` | an MCP tool's answer is cut at 8k tokens |
 | `CC_*` | see §6 | thresholds for the hooks |
