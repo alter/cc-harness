@@ -823,6 +823,9 @@ if CC_BACKUP_DIR="$TMP/retire-backup" CC_SKIP_PLUGINS=1 "$SRC/install.sh" "$ri" 
   printf '{"modelSettings":{"claude-opus-5":{"maxEffortLevel":"high"}}}' > "$ri/settings.json"
   CC_BACKUP_DIR="$TMP/retire-backup2" CC_SKIP_PLUGINS=1 "$SRC/install.sh" "$ri" >/dev/null 2>&1
   if jq -e 'has("modelSettings") | not' "$ri/settings.json" >/dev/null 2>&1; then ok "install-retire: an emptied modelSettings is removed"; else bad "install-retire: an emptied modelSettings is removed" "$(jq -c .modelSettings "$ri/settings.json")"; fi
+  printf '{"modelSettings":{"claude-opus-5":{"effortLevel":"high","maxEffortLevel":"high"}}}' > "$ri/settings.json"
+  CC_BACKUP_DIR="$TMP/retire-backup3" CC_SKIP_PLUGINS=1 "$SRC/install.sh" "$ri" >/dev/null 2>&1
+  if jq -e '.modelSettings["claude-opus-5"] == {"effortLevel":"high"}' "$ri/settings.json" >/dev/null 2>&1; then ok "install-retire: the harness cap leaves a mixed Opus 5 entry, the effortLevel stays"; else bad "install-retire: the harness cap leaves a mixed Opus 5 entry, the effortLevel stays" "$(jq -c .modelSettings "$ri/settings.json")"; fi
 else bad "install-retire: install.sh into a trial target" "install failed"; fi
 echo "== agenttest"
 if [ -x "$SRC/agenttest.sh" ]; then
