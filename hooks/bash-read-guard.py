@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import re
 import shlex
 import subprocess
 import sys
@@ -17,6 +18,8 @@ PROCESSED = ("|", ">", "<", "$(", "`")
 READERS = WHOLE_FILE | WINDOWED | {"grep", "egrep", "rg", "sed", "awk", "cut", "sort", "uniq", "base64", "xxd", "od", "strings", "source", ".", "cp", "scp", "tac", "diff", "jq", "env-cmd", "dotenv"}
 SECRET_NAMES = {".netrc", ".pgpass", ".git-credentials", "credentials"}
 TEMPLATE_SUFFIXES = (".example", ".sample", ".template", ".dist", ".defaults")
+ENV_NAME = re.compile(r"\.env(\.[A-Za-z0-9_-]+)*")
+JQ_VALUE_OPTS = {"--arg": 2, "--argjson": 2, "--slurpfile": 2, "--rawfile": 2, "--indent": 1, "-L": 1}
 
 
 def segments(command: str) -> list[list[str]]:
@@ -84,13 +87,34 @@ def is_secret(word: str) -> bool:
     name = os.path.basename(path)
     if name.endswith(TEMPLATE_SUFFIXES) or name.endswith(".pub"):
         return False
-    if name == ".env" or name.startswith(".env."):
+    if ENV_NAME.fullmatch(name):
         return True
     if "/.ssh/" in path and name not in ("known_hosts", "config", "authorized_keys"):
         return True
     if name == "credentials" and "/.aws/" not in path:
         return False
     return name in SECRET_NAMES or path.endswith("/.docker/config.json")
+
+
+def jq_files(args: list[str]) -> list[str]:
+    files: list[str] = []
+    filter_seen = any(a in ("-f", "--from-file") for a in args)
+    skip = 0
+    for arg in args:
+        if skip:
+            skip -= 1
+            files.append(arg)
+            continue
+        if arg in JQ_VALUE_OPTS:
+            skip = JQ_VALUE_OPTS[arg]
+            continue
+        if arg.startswith("-"):
+            continue
+        if not filter_seen:
+            filter_seen = True
+            continue
+        files.append(arg)
+    return files
 
 
 def secret_read(command: str) -> str | None:
@@ -103,6 +127,8 @@ def secret_read(command: str) -> str | None:
             sources = words[1:]
             if os.path.basename(words[0]) in ("cp", "scp"):
                 sources = [w for w in words[1:] if not w.startswith("-")][:-1]
+            elif os.path.basename(words[0]) == "jq":
+                sources = jq_files(words[1:])
             for word in sources:
                 if is_secret(word):
                     return word

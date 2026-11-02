@@ -82,7 +82,7 @@ The harness matches Claude Code 2.1.316, as found by the audit `docs/upgrade-2.1
   - `docs/upgrade-2.1.316.md`: status "implemented by docs/plans/cc-2.1.316-upgrade.md".
 - [ ] T12 Final gate. Full `./selftest.sh` compared against the T00 baseline. Trial install into a separate directory, then `./selftest.sh <trial>` — verify: `./selftest.sh && ./selftest.sh <trial dir>`
 - [ ] T13 Live install per D5: `./install.sh` (backup into `~/.claude-backup`), then `./selftest.sh ~/.claude`. Confirm `~/.claude/skills/verify` of the harness is gone and `verify-task` is present — verify: `./selftest.sh ~/.claude`
-- [ ] T14 bash-read-guard false positive: a jq filter such as `.env.FOO=="x"` (an argument that is not a path to a file) is refused as a secret read. Selftest case red first, then require the argument to name an existing file or a path-like token — verify: `./selftest.sh`
+- [x] T14 bash-read-guard false positive: a jq filter such as `.env.FOO=="x"` (an argument that is not a path to a file) is refused as a secret read. Selftest case red first, then require the argument to name an existing file or a path-like token — verify: `./selftest.sh`
 
 ## Log
 - 2026-11-02 T00: ./selftest.sh exit 0, passed 408, failed 0 (baseline; log .claude/scratch/t00-selftest.log).
@@ -96,3 +96,4 @@ The harness matches Claude Code 2.1.316, as found by the audit `docs/upgrade-2.1
 - 2026-11-02 T08: scan (.claude/scratch/t08/scan.py) → outside-cwd writes by subagents: /tmp/vv 41, ~/.cache/vs-scratch 6, main checkout from a worktree 64, scratchpad 1114; D3 → leave off, reason under Assumptions and in HARNESS.md.
 - 2026-11-02 T10: install.sh enforces no minimum (only prints `claude --version`), so docs only: INSTALL.md:5 floor 2.1.314 with reasons, :188 version notes, README.md:4 / HARNESS.md:3 / :248 re-checked on 2.1.316, /doctor prompt-audit added to the upgrade routine. grep shows 2.1.3xx in all four places.
 - 2026-11-02 T11: README.md/HARNESS.md: Stop prompt hooks exist (2.1.274/2.1.294), onFailure rationale; WebSearch bucket+refill (binary: max ?? 200, refill 100/h interactive); Explore 2.1.284; models 5.5; hook tables: Monitor, effort cap; BEHAVIOR.md: forks on in -p since 2.1.302; audit marked implemented and item 2 marked refuted by T02. grep per claim: all 12 found.
+- 2026-11-02 T14 (done before T12 so the fix is installed): bash-read-guard skips jq's filter argument and treats only `.env(.name)*` file-name tokens as secrets; 3 secrets-jq/not-a-path checks red before, green after, `jq . .env` still refused; selftest 427/0.

@@ -98,6 +98,10 @@ done
 brgm() { jq -n --arg c "$1" '{tool_name:"Monitor",tool_input:{command:$c}}' | python3 "$H/bash-read-guard.py"; }
 check "monitor-bash-read-guard: a secret read through Monitor is refused" "$(brgm "cat $sec/.env")" '"permissionDecision": *"deny"'
 check "monitor-bash-read-guard: a whole-file read through Monitor is refused" "$(brgm "cat $TMP/big.py")" '"permissionDecision": *"deny"'
+check_empty "secrets-jq-filter: a jq filter that starts with .env. is not a file" "$(brg "jq -e '.env.FOO==\"x\"' $TMP/settings.json")"
+check_empty "secrets-jq-filter: a bare .env.KEY filter is not a file" "$(brg "jq '.env.CLAUDE_CODE_X' $TMP/settings.json")"
+check "secrets-jq-file: jq on a .env file is still refused" "$(brg "jq . $sec/.env")" '"permissionDecision": *"deny"'
+check_empty "secrets-not-a-path: a token with quotes and == is not a file name" "$(brg "grep -c '.env.X==1' $TMP/small.py")"
 check_empty "deny-secrets-template-allowed: cat .env.example" "$(brg "cat $sec/.env.example")"
 check_empty "deny-secrets-cp-template-allowed: cp .env.example .env" "$(brg "cp $sec/.env.example $sec/.env")"
 check_empty "deny-secrets-cp-template-allowed: cp backend/.env.example backend/.env" "$(brg "cp backend/.env.example backend/.env")"
