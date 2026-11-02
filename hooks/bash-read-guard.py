@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-import re
 import shlex
 import subprocess
 import sys
@@ -18,7 +17,6 @@ PROCESSED = ("|", ">", "<", "$(", "`")
 READERS = WHOLE_FILE | WINDOWED | {"grep", "egrep", "rg", "sed", "awk", "cut", "sort", "uniq", "base64", "xxd", "od", "strings", "source", ".", "cp", "scp", "tac", "diff", "jq", "env-cmd", "dotenv"}
 SECRET_NAMES = {".netrc", ".pgpass", ".git-credentials", "credentials"}
 TEMPLATE_SUFFIXES = (".example", ".sample", ".template", ".dist", ".defaults")
-ENV_NAME = re.compile(r"\.env(\.[A-Za-z0-9_-]+)*")
 JQ_VALUE_OPTS = {"--arg": 2, "--argjson": 2, "--slurpfile": 2, "--rawfile": 2, "--indent": 1, "-L": 1}
 
 
@@ -87,7 +85,7 @@ def is_secret(word: str) -> bool:
     name = os.path.basename(path)
     if name.endswith(TEMPLATE_SUFFIXES) or name.endswith(".pub"):
         return False
-    if ENV_NAME.fullmatch(name):
+    if name == ".env" or (name.startswith(".env.") and "=" not in name):
         return True
     if "/.ssh/" in path and name not in ("known_hosts", "config", "authorized_keys"):
         return True
@@ -98,7 +96,7 @@ def is_secret(word: str) -> bool:
 
 def jq_files(args: list[str]) -> list[str]:
     files: list[str] = []
-    filter_seen = any(a in ("-f", "--from-file") for a in args)
+    filter_seen = any(a == "--from-file" or (a.startswith("-") and not a.startswith("--") and "f" in a[1:]) for a in args)
     skip = 0
     for arg in args:
         if skip:
@@ -190,7 +188,7 @@ def main() -> int:
         for word in words[1:]:
             if word.startswith("-") or word.isdigit():
                 continue
-            lines = too_long(pathlib.Path(word).expanduser())
+            lines = too_long(pathlib.Path(os.path.expanduser(word)))
             if lines is not None:
                 deny(os.path.basename(word), lines)
                 return 0

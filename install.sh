@@ -77,6 +77,10 @@ if [ -f "$TARGET/settings.json" ] && jq -e . "$TARGET/settings.json" >/dev/null 
     | .env = (($old.env // {}) + ($new.env // {}))
     | if ($new.permissions.deny // null) != null then .permissions.deny = ((($old.permissions.deny // []) + $new.permissions.deny) | unique) else . end
     | .hooks = (reduce (($new.hooks // {}) | keys[]) as $k ($kept; .[$k] = ((.[$k] // []) + $new.hooks[$k])))
+    # Keys an earlier harness installed and this one no longer does; removed only while they
+    # still hold exactly the value the harness wrote, so an owner'"'"'s own edit survives.
+    | if (.modelSettings["claude-opus-5"] // null) == {"maxEffortLevel": "high"} then del(.modelSettings["claude-opus-5"]) else . end
+    | if (.modelSettings // null) == {} then del(.modelSettings) else . end
   ' "$TARGET/settings.json" "$NEW" > "$MERGED"
   echo "   diff (old -> merged):"
   diff <(jq -S . "$TARGET/settings.json") <(jq -S . "$MERGED") | sed 's/^/   /' || true

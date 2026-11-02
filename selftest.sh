@@ -102,6 +102,11 @@ check_empty "secrets-jq-filter: a jq filter that starts with .env. is not a file
 check_empty "secrets-jq-filter: a bare .env.KEY filter is not a file" "$(brg "jq '.env.CLAUDE_CODE_X' $TMP/settings.json")"
 check "secrets-jq-file: jq on a .env file is still refused" "$(brg "jq . $sec/.env")" '"permissionDecision": *"deny"'
 check_empty "secrets-not-a-path: a token with quotes and == is not a file name" "$(brg "grep -c '.env.X==1' $TMP/small.py")"
+for c in "cat $sec/.env.*" "jq . $sec/.env.*" "cat $sec/.env.{local,production}" "source $sec/.env.\$STAGE" "cat '$sec/.env.local~'" "cat '$sec/.env.prod copy'" "jq -rf $sec/.env" "jq -nf $sec/.env"; do
+  check "deny-secrets-review: $c" "$(brg "$c")" '"permissionDecision": *"deny"'
+done
+jq -n --arg c 'cat ~+/x' '{tool_name:"Bash",tool_input:{command:$c}}' | python3 "$H/bash-read-guard.py" >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "bash-read-guard-exit0: ~+ in a path does not crash the guard" || bad "bash-read-guard-exit0: ~+ in a path does not crash the guard" "exit $rc"
 check_empty "deny-secrets-template-allowed: cat .env.example" "$(brg "cat $sec/.env.example")"
 check_empty "deny-secrets-cp-template-allowed: cp .env.example .env" "$(brg "cp $sec/.env.example $sec/.env")"
 check_empty "deny-secrets-cp-template-allowed: cp backend/.env.example backend/.env" "$(brg "cp backend/.env.example backend/.env")"
@@ -808,6 +813,15 @@ while IFS= read -r line; do
 done <<< "$ft"
 printf '%s' "$ft" | grep -qE '^Ran [1-9]' || bad "full run engine tests ran" "$ft"
 
+echo "== install: retired keys"
+ri="$TMP/retire"; mkdir -p "$ri/skills"
+printf '{"modelSettings":{"claude-opus-5":{"maxEffortLevel":"high"},"claude-fable-5-1":{"maxEffortLevel":"medium"}}}' > "$ri/settings.json"
+if CC_BACKUP_DIR="$TMP/retire-backup" CC_SKIP_PLUGINS=1 "$SRC/install.sh" "$ri" >/dev/null 2>&1; then
+  if jq -e '(.modelSettings | has("claude-opus-5") | not) and .modelSettings["claude-fable-5-1"].maxEffortLevel == "medium"' "$ri/settings.json" >/dev/null 2>&1; then ok "install-retire: the old Opus 5 effort override goes, the owner's own entry stays"; else bad "install-retire: the old Opus 5 effort override goes, the owner's own entry stays" "$(jq -c .modelSettings "$ri/settings.json")"; fi
+  printf '{"modelSettings":{"claude-opus-5":{"maxEffortLevel":"high"}}}' > "$ri/settings.json"
+  CC_BACKUP_DIR="$TMP/retire-backup2" CC_SKIP_PLUGINS=1 "$SRC/install.sh" "$ri" >/dev/null 2>&1
+  if jq -e 'has("modelSettings") | not' "$ri/settings.json" >/dev/null 2>&1; then ok "install-retire: an emptied modelSettings is removed"; else bad "install-retire: an emptied modelSettings is removed" "$(jq -c .modelSettings "$ri/settings.json")"; fi
+else bad "install-retire: install.sh into a trial target" "install failed"; fi
 echo "== agenttest"
 if [ -x "$SRC/agenttest.sh" ]; then
   at=$(AGENTTEST_OUT="$TMP/agenttest" "$SRC/agenttest.sh" --self-check 2>&1)
