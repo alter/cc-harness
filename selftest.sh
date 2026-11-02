@@ -368,6 +368,17 @@ out=$(gmc verifier claude-fable-5-1); check "subagent-model-up: a full fable id 
 out=$(gmc general-purpose opus); check "subagent-model-up: no definition, capped by CLAUDE_CODE_SUBAGENT_MODEL" "$out" '"updatedInput"'
 out=$(gmc reviewer haiku); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-model-down: a cheaper model is left alone" "$out"; else ok "subagent-model-down: a cheaper model is left alone"; fi
 out=$(gmc reviewer opus); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-model-same: the agent's own model is left alone" "$out"; else ok "subagent-model-same: the agent's own model is left alone"; fi
+printf -- '---\nname: test-runner\nmodel: sonnet\neffort: low\n---\n' > "$gm/.claude/agents/test-runner.md"
+gec() { jq -n --arg c "$gm" --arg t "$1" --arg e "$2" --arg m "${3:-}" '{session_id:("ge-"+$t+$e+$m),cwd:$c,tool_input:({subagent_type:$t,effort:$e,prompt:"p",description:"d"} + (if $m == "" then {} else {model:$m} end))}' \
+  | HOME="$TMP" CLAUDE_CODE_SUBAGENT_MODEL=sonnet CLAUDE_CODE_SUBAGENT_EFFORT="${GE_ENV-medium}" "$H/guard-subagent.sh"; }
+noeffort() { printf '%s' "$1" | jq -e '.hookSpecificOutput.updatedInput | (has("effort") | not) and .prompt == "p"' >/dev/null 2>&1; }
+out=$(gec test-runner max); if noeffort "$out"; then ok "subagent-effort-over: max asked for a low agent is dropped"; else bad "subagent-effort-over: max asked for a low agent is dropped" "$out"; fi
+out=$(gec test-runner low); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-effort-within: the agent's own effort is left alone" "$out"; else ok "subagent-effort-within: the agent's own effort is left alone"; fi
+out=$(gec general-purpose high); if noeffort "$out"; then ok "subagent-effort-env-cap: no definition, capped by CLAUDE_CODE_SUBAGENT_EFFORT"; else bad "subagent-effort-env-cap: no definition, capped by CLAUDE_CODE_SUBAGENT_EFFORT" "$out"; fi
+out=$(gec scout xhigh); if noeffort "$out"; then ok "subagent-effort-env-cap: a definition without effort falls back to the env cap"; else bad "subagent-effort-env-cap: a definition without effort falls back to the env cap" "$out"; fi
+out=$(GE_ENV='' gec general-purpose max); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-effort-nocap: no definition and no env leaves effort alone" "$out"; else ok "subagent-effort-nocap: no definition and no env leaves effort alone"; fi
+out=$(gec fork max); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-effort-fork: a fork is left alone" "$out"; else ok "subagent-effort-fork: a fork is left alone"; fi
+out=$(gec test-runner high opus); if printf '%s' "$out" | jq -e '.hookSpecificOutput.updatedInput | (has("effort") | not) and (has("model") | not) and .prompt == "p"' >/dev/null 2>&1; then ok "subagent-effort-and-model: both dropped in one updatedInput"; else bad "subagent-effort-and-model: both dropped in one updatedInput" "$out"; fi
 out=$(jq -n '{context_tokens:50000,from_model:"sonnet",to_model:"opus",source:"user"}' | "$H/guard-model-switch.sh")
 check "switch at 50k ctx -> ask" "$out" '"permissionDecision": *"ask"'
 out=$(jq -n '{context_tokens:1000,from_model:"sonnet",to_model:"opus",source:"user"}' | "$H/guard-model-switch.sh")

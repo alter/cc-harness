@@ -32,23 +32,50 @@ rank() {
   esac
 }
 
+effort_rank() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    low) echo 1 ;; medium) echo 2 ;; high) echo 3 ;; xhigh) echo 4 ;; max) echo 5 ;; *) echo 0 ;;
+  esac
+}
+
+frontmatter() {
+  awk -v k="$2" 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} $0 ~ "^"k":" {sub("^"k": *", ""); print; exit}' "$1"
+}
+
 asked=$(printf '%s' "$payload" | jq -r '.tool_input.model // empty')
+asked_effort=$(printf '%s' "$payload" | jq -r '.tool_input.effort // empty')
 cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty')
-if [ -n "$asked" ] && [ "$atype" != "fork" ]; then
+drop=()
+reasons=()
+if { [ -n "$asked" ] || [ -n "$asked_effort" ]; } && [ "$atype" != "fork" ]; then
   defined=""
+  defined_effort=""
   for d in ${cwd:+"$cwd/.claude/agents"} "$HOME/.claude/agents"; do
     f="$d/$atype.md"
     [ -f "$f" ] || f=$(grep -lxE "name: *$atype" "$d"/*.md 2>/dev/null | head -n 1)
     [ -n "$f" ] && [ -f "$f" ] || continue
-    defined=$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} /^model:/ {sub(/^model: */, ""); print; exit}' "$f")
+    defined=$(frontmatter "$f" model)
+    defined_effort=$(frontmatter "$f" effort)
     break
   done
   case "$defined" in ''|inherit) cap=${CLAUDE_CODE_SUBAGENT_MODEL:-} ;; *) cap=$defined ;; esac
-  if [ "$(rank "$asked")" -gt "$(rank "$cap")" ] && [ "$(rank "$cap")" -gt 0 ]; then
-    printf '%s' "$payload" | jq --arg r "model $asked dropped: $atype runs on $cap; change its definition to raise it" \
-      '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"allow",permissionDecisionReason:$r,updatedInput:(.tool_input | del(.model))}}'
-    exit 0
+  if [ -n "$asked" ] && [ "$(rank "$asked")" -gt "$(rank "$cap")" ] && [ "$(rank "$cap")" -gt 0 ]; then
+    drop+=(model)
+    reasons+=("model $asked dropped: $atype runs on $cap")
   fi
+  effort_cap=${defined_effort:-${CLAUDE_CODE_SUBAGENT_EFFORT:-}}
+  if [ -n "$asked_effort" ] && [ "$(effort_rank "$asked_effort")" -gt "$(effort_rank "$effort_cap")" ] && [ "$(effort_rank "$effort_cap")" -gt 0 ]; then
+    drop+=(effort)
+    reasons+=("effort $asked_effort dropped: $atype runs at $effort_cap")
+  fi
+fi
+
+if [ "${#drop[@]}" -gt 0 ]; then
+  reason="$(IFS=';'; printf '%s' "${reasons[*]}"); change its definition to raise it"
+  keys=$(printf '%s\n' "${drop[@]}" | jq -R . | jq -s .)
+  printf '%s' "$payload" | jq --arg r "$reason" --argjson k "$keys" \
+    '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"allow",permissionDecisionReason:$r,updatedInput:(.tool_input | delpaths($k | map([.])))}}'
+  exit 0
 fi
 
 jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"allow"}}'
