@@ -105,6 +105,7 @@ check_empty "secrets-not-a-path: a token with quotes and == is not a file name" 
 for c in "cat $sec/.env.*" "jq . $sec/.env.*" "cat $sec/.env.{local,production}" "source $sec/.env.\$STAGE" "cat '$sec/.env.local~'" "cat '$sec/.env.prod copy'" "jq -rf $sec/.env" "jq -nf $sec/.env"; do
   check "deny-secrets-review: $c" "$(brg "$c")" '"permissionDecision": *"deny"'
 done
+echo "K=1" > "$sec/.env.bak=1"; check "deny-secrets-review: an existing .env file with = in its name" "$(brg "cat '$sec/.env.bak=1'")" '"permissionDecision": *"deny"'
 jq -n --arg c 'cat ~+/x' '{tool_name:"Bash",tool_input:{command:$c}}' | python3 "$H/bash-read-guard.py" >/dev/null 2>&1; rc=$?
 [ "$rc" -eq 0 ] && ok "bash-read-guard-exit0: ~+ in a path does not crash the guard" || bad "bash-read-guard-exit0: ~+ in a path does not crash the guard" "exit $rc"
 check_empty "deny-secrets-template-allowed: cat .env.example" "$(brg "cat $sec/.env.example")"
@@ -135,6 +136,7 @@ out=$(ic); check "integrity-clean: no change, no finding" "$out" 'integrity: 0 f
 printf 'def g(y):\n    return y\n' >> "$ir/src/a.py"; out=$(ic); check "integrity-existing-marker-ignored: an old noqa does not count" "$out" 'integrity: 0 finding'; reset_ir
 printf 'def g(y):  # noqa\n    return y\n' >> "$ir/src/a.py"; out=$(ic); check "integrity-added-suppression: a new noqa is a finding" "$out" 'integrity: [1-9]'; reset_ir
 printf 'def h():\n    run() || true\n' > "$ir/src/b.sh"; (cd "$ir" && git add src/b.sh); out=$(ic); check "integrity-added-suppression: '|| true' in a new file is a finding" "$out" 'integrity: [1-9]'; (cd "$ir" && git rm -q --cached src/b.sh); rm -f "$ir/src/b.sh"
+mkdir -p "$ir/.claude/scratch" "$ir/.claude/worktrees/w1"; printf 'run() || true\n--reruns 3\n' > "$ir/.claude/scratch/run.log"; printf 'x || true\n' > "$ir/.claude/worktrees/w1/a.sh"; out=$(ic); check "integrity-scratch-ignored: untracked .claude/scratch and .claude/worktrees are not the change" "$out" 'integrity: 0 finding'; rm -rf "$ir/.claude"
 printf 'linters:\n  disable: [errcheck]\n' > "$ir/.golangci.yml"; out=$(ic); check "integrity-lint-config: a changed linter config is a finding" "$out" 'integrity: [1-9]'; reset_ir
 rm "$ir/tests/test_a.py"; out=$(ic); check "integrity-deleted-test: a deleted test file is a finding" "$out" 'integrity: [1-9]'; reset_ir
 printf '{"floor": 70.0, "tolerance": 0.2}\n' > "$ir/.coverage-gate.json"; out=$(ic); check "integrity-floor-lowered: a lowered coverage floor is a finding" "$out" 'integrity: [1-9]'; reset_ir

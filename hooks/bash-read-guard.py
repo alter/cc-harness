@@ -85,7 +85,7 @@ def is_secret(word: str) -> bool:
     name = os.path.basename(path)
     if name.endswith(TEMPLATE_SUFFIXES) or name.endswith(".pub"):
         return False
-    if name == ".env" or (name.startswith(".env.") and "=" not in name):
+    if name == ".env" or (name.startswith(".env.") and ("=" not in name or os.path.lexists(path))):
         return True
     if "/.ssh/" in path and name not in ("known_hosts", "config", "authorized_keys"):
         return True

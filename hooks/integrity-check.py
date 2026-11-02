@@ -97,12 +97,16 @@ def floor(text: str) -> float | None:
         return None
 
 
+SCRATCH = (".claude/scratch/", ".claude/worktrees/")
+
+
 def findings(base: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     markers = [re.compile(m, re.M) for m in MARKERS + project_markers()]
     repeats = [re.compile(m, re.M) for m in REPEATS]
     status = git("diff", "--name-status", base).splitlines() + [
         f"A\t{p}" for p in git("ls-files", "--others", "--exclude-standard").splitlines()
+        if not p.startswith(SCRATCH)
     ]
     changed_paths = {line.split("\t")[-1] for line in status if "\t" in line}
     for line in status:

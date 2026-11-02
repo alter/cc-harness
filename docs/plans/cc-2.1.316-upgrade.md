@@ -86,6 +86,8 @@ The harness matches Claude Code 2.1.316, as found by the audit `docs/upgrade-2.1
 - [ ] T13 Live install per D5: `./install.sh` (backup into `~/.claude-backup`), then `./selftest.sh ~/.claude`. Confirm `~/.claude/skills/verify` of the harness is gone and `verify-task` is present — verify: `./selftest.sh ~/.claude`
 - [x] T14 bash-read-guard false positive: a jq filter such as `.env.FOO=="x"` (an argument that is not a path to a file) is refused as a secret read. Selftest case red first, then require the argument to name an existing file or a path-like token — verify: `./selftest.sh`
 - [x] T14a fix: reviewer — `.env.*`, `.env.{a,b}`, `.env.$VAR`, `.env.local~`, `.env.prod copy` and `jq -rf/-nf .env` were no longer refused — secret = `.env` or `.env.` + no `=`; any short-option cluster with `f` is jq --from-file — verify: `./selftest.sh` (deny-secrets-review)
+- [x] T14b fix: reviewer round 2 — an existing secret file with `=` in its name (`.env.bak=1`) was readable — the `=` exemption applies only when no such file exists — verify: `./selftest.sh` (deny-secrets-review: … with = in its name)
+- [x] T15 integrity-check scanned untracked `.claude/scratch/` and `.claude/worktrees/` (where the contract puts scratch), so every selftest log and trial install counted as an added suppression (94 findings at stop) — skip those prefixes for untracked files — verify: `./selftest.sh` (integrity-scratch-ignored)
 
 ## Log
 - 2026-11-02 T00: ./selftest.sh exit 0, passed 408, failed 0 (baseline; log .claude/scratch/t00-selftest.log).
@@ -102,3 +104,5 @@ The harness matches Claude Code 2.1.316, as found by the audit `docs/upgrade-2.1
 - 2026-11-02 T14 (done before T12 so the fix is installed): bash-read-guard skips jq's filter argument and treats only `.env(.name)*` file-name tokens as secrets; 3 secrets-jq/not-a-path checks red before, green after, `jq . .env` still refused; selftest 427/0.
 - 2026-11-02 T05a: trial install over a copy of live settings kept modelSettings.claude-opus-5; install-retire checks red (2) before, green after.
 - 2026-11-02 review round 1 (reviewer, diff 567e59d..13f2bc0): 3 CONFIRMED → T14a (2 secret-guard holes from T14), T03a (old ~+ crash now blocking); 9 reproduction checks red before, green after; selftest 438/0. PLAUSIBLE, not acted on: P1 matcher stays "Bash" so the Monitor branch in the guards only matters if a release sends tool_name Monitor to a Bash matcher; P2 guard-subagent with jq missing or a non-numeric counter file would exit non-zero (now blocking); P3 git-guard read_text on an unreadable -F file.
+- 2026-11-02 review round 2: findings 1–3 fixed (reviewer reran cases2.txt); 1 new CONFIRMED in the fixed line → T14b. Review loop closed (two rounds).
+- 2026-11-02 T14b + T15: red before (2), green after; selftest 440/0; source integrity-check since 58a32fc: 0 findings. The installed (old) integrity-check keeps flagging scratch until T13 installs this.
