@@ -1,11 +1,11 @@
 ---
-name: verify
+name: verify-task
 description: Independent verification of a task directory by a context that wrote neither the code nor its tests. Produces VERIFY.md in the tree's format (verifier line, reproduce-from-clean-state, what was not checked, reverse control) and sets verify:passed|failed. Started by the user on a finished task, never by the model on its own.
 argument-hint: <task directory path>
 disable-model-invocation: true
 ---
 
-# /verify
+# /verify-task
 
 Independence is the whole point. If this session wrote any of the code or tests under review, do not verify here: delegate the entire job to the `verifier` subagent (fresh context) with the task path, and relay its result. Never set `verify:passed` on your own work.
 

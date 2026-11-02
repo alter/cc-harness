@@ -480,6 +480,8 @@ out=$(cd "$TMP" && bash "$G" 2>&1)
 check "graph-setup: a non-repository is refused" "$out" 'not a git repository|is not on PATH'
 if grep -q 'mcp__graphify__get_node' "$TARGET/agents/scout.md"; then ok "scout may call the graph tools"; else bad "scout may call the graph tools" "not in tools:"; fi
 if [ -f "$TARGET/skills/graphify/SKILL.md" ]; then ok "graphify skill installed"; else bad "graphify skill installed" "missing"; fi
+if grep -qx 'name: verify-task' "$TARGET/skills/verify-task/SKILL.md" 2>/dev/null; then ok "skill-verify-task-installed: the independent check is /verify-task"; else bad "skill-verify-task-installed: the independent check is /verify-task" "missing $TARGET/skills/verify-task/SKILL.md"; fi
+if [ -f "$TARGET/skills/verify/SKILL.md" ] && grep -q 'verify:passed|failed' "$TARGET/skills/verify/SKILL.md"; then bad "no-stale-verify: the harness no longer holds the name of the built-in verify" "$TARGET/skills/verify"; else ok "no-stale-verify: the harness no longer holds the name of the built-in verify"; fi
 
 echo "== night.sh"
 N="$SRC/night.sh"

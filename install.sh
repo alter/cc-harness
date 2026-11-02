@@ -42,6 +42,9 @@ cp "$SRC"/agents/*.md "$TARGET/agents/"
 for s in "$SRC"/skills/*/; do
   name=$(basename "$s"); mkdir -p "$TARGET/skills/$name"; cp "$s"/* "$TARGET/skills/$name/"
 done
+if [ -f "$TARGET/skills/verify/SKILL.md" ] && grep -q 'verify:passed|failed' "$TARGET/skills/verify/SKILL.md"; then
+  rm -rf "$TARGET/skills/verify"; echo "   removed the old harness skills/verify (now skills/verify-task; the name verify belongs to Claude Code)"
+fi
 rm -rf "$TARGET/project-template"; cp -R "$SRC/project-template" "$TARGET/project-template"
 rm -rf "$TARGET/fullrun"; mkdir -p "$TARGET/fullrun"; cp "$SRC"/fullrun/*.py "$TARGET/fullrun/"
 cp "$SRC/night.sh" "$BIN_DIR/cc-night"

@@ -47,7 +47,7 @@ Stopping an overnight run: `touch .claude/plan-pause`, or `status: paused` in th
 
 **Models by role.** Code is written on Sonnet (`model: sonnet[1m]`, workers, test-runner, verifier). Architecture is Opus: `/plan` carries `model: opus` for its turn, the `Plan` agent is Opus, and so are `reviewer`, `attacker` and `test-auditor`. The advisor is Opus (`advisorModel`). Recon (`scout`, `Explore`) is Haiku.
 
-**Checks sized to the change.** A change to copy, labels, styles, templates or docs runs the narrow check for that file and nothing else. Gate checks run per task only when it changed logic, the full suite only when a plan that changed logic closes or at a `gate:yes` milestone. `/verify` is yours: `/run` lists the finished tasks ready for it, and the skill cannot be invoked by the model (`disable-model-invocation`).
+**Checks sized to the change.** A change to copy, labels, styles, templates or docs runs the narrow check for that file and nothing else. Gate checks run per task only when it changed logic, the full suite only when a plan that changed logic closes or at a `gate:yes` milestone. `/verify-task` is yours: `/run` lists the finished tasks ready for it, and the skill cannot be invoked by the model (`disable-model-invocation`).
 
 Fallback: `/run <plan> delegate` — the main session is a coordinator: it hands tasks to the `worker` subagent, runs each task's `verify:` itself (a worker's "done" is a claim), and runs the parts of a split task in parallel git worktrees, merging them one by one. Every worker is a cold start (10–20k tokens of cache write) with no memory of earlier tasks.
 
@@ -131,7 +131,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 | `skills/intake` | `/intake` | one project-level interview → `docs/PROJECT.md`: capability ledger, "decided by the agent", gate checks, what may run unattended |
 | `skills/task` | `/task` | a new task in the `tasks/<phase>/<NN>-<slug>/` tree: `task.txt` (TASK/GOAL/CONTEXT/SCOPE/OUTCOME/VERIFY/ROLE/DEPENDS) + `labels.txt`; `/task init` starts a new tree |
 | `skills/plan` | `/plan` | interview → plan; for a task directory, a `PLAN.md` inside it built from `task.txt`; `T00` is the baseline |
-| `skills/verify` + `agents/verifier.md` | `/verify` | independent verification by another context: `VERIFY.md` (verifier line / reproduce from a clean state / reverse control / what was not checked), then `verify:passed\|failed` |
+| `skills/verify-task` + `agents/verifier.md` | `/verify-task` | independent verification by another context: `VERIFY.md` (verifier line / reproduce from a clean state / reverse control / what was not checked), then `verify:passed\|failed` |
 | `skills/run` | `/run` | execution to the end without questions, in one session; `/run … delegate` makes the session a coordinator: `worker` per task, parallel worktrees for split parts, the coordinator re-runs every verify |
 | `skills/run-task` | `/run-task <plan> <T##>`, preloaded into `worker` | the procedure for one task: what to read, do, verify, mark and log |
 | `skills/test` | `/test` | coverage by risk, red first, reverse control by mutation, and the ratchet wired into the gate checks |
@@ -201,7 +201,7 @@ The format is one directory per task, two required files and a validator (`tasks
 - `/task <phase> <what it produces>` — reads `tasks/README.md` (vocabulary, language), asks once for only what the repository cannot answer, writes `task.txt` and `labels.txt`, runs `tasks/check.py`.
 - `/plan tasks/<phase>/<NN>-<slug>` — turns `task.txt` into a `PLAN.md` inside the task directory: VERIFY → acceptance criteria, `+` lines → tasks, `−` lines → boundaries, DEPENDS → a check that every dependency is `status:done`.
 - `/run` — executes `PLAN.md`; `status:done` only if the OUTCOME artefact exists in the repository, otherwise `in_progress` + `NOTES.md`. Blocking writes `BLOCKED.md` in the tree's format and sets `status:blocked`. It never touches `verify:`.
-- `/verify <directory>` — another context (`verifier`) writes `VERIFY.md` and sets `verify:`.
+- `/verify-task <directory>` — another context (`verifier`) writes `VERIFY.md` and sets `verify:`.
 - The `stop-guard` and `session-start` hooks see `tasks/**/PLAN.md` exactly as they see `docs/plans/*.md`.
 
 The bundled `tasks/check.py` is generic: phases come from the `phase:` block in `tasks/README.md`, roles from the table in `ROLES.md`, milestones and gates from `GOAL.md`; `VERIFY.md` and `BLOCKED.md` markers are recognised in two languages. On a real tree it finds real discrepancies: a SCOPE with no `−` lines, a `phase:` outside the vocabulary, `status:blocked` without `BLOCKED.md`, `verify:passed` without `VERIFY.md`, a missing DEPENDS section, DEPENDS prose disagreeing with the label, and `path:line` references that drifted after edits.

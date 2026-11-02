@@ -10,7 +10,7 @@
 ├── settings.json                   model, effort, cache, ceilings, hooks
 ├── statusline.sh                   status line: limits and cache
 ├── hooks/ (10)                     deterministic guards outside the model's context
-├── skills/ (9)                     /intake /task /plan /run /run-task /test /verify /diagnose /graphify
+├── skills/ (9)                     /intake /task /plan /run /run-task /test /verify-task /diagnose /graphify
 ├── agents/ (11)                    Plan Explore scout test-runner researcher reviewer verifier worker attacker test-auditor pg-checker
 ├── night.sh                        the overnight run, one long session
 ├── install.sh selftest.sh uninstall.sh   backup → install → checks → rollback (INSTALL.md)
@@ -42,7 +42,7 @@ The separation: **behaviour** lives with the user and never enters a repository;
    ↓                                    the Stop hook refuses to stop while a "- [ ] " remains
    ↓                                    retry-guard catches the second identical failure → /diagnose
    ↓                                    does the OUTCOME artefact exist? → status:done, else in_progress + NOTES
-/verify tasks/…/NN-slug              →  another context: VERIFY.md, verify:passed|failed
+/verify-task tasks/…/NN-slug              →  another context: VERIFY.md, verify:passed|failed
 ```
 
 Questions are asked at two points — `/intake` and `/task`/`/plan` — and nowhere else. Everything after that runs on the contract "a fork → pick what agrees with the plan → record it under Assumptions → continue".
@@ -123,7 +123,7 @@ Only their descriptions live in context (under 1536 characters all together); th
 | `/run` | you / a hook | one task at a time, `[x]` only after the check, a commit per task, `done` only when the artefact exists in the repository, `BLOCKED.md` instead of a stub, `verify:` never touched |
 | `/run-task` | `worker`, or you for a single task | what one task reads, does, verifies, marks and logs — then stops |
 | `/test` | you, or `/plan` when a task needs cover | coverage chosen by risk, every test seen red before it passes, a mutation proving each guard can fail, `scripts/coverage_gate.py` in the gate checks so the floor can only rise, and a one-off `mutmut`/`stryker` audit (by hand, never a gate) whose surviving mutants become tasks |
-| `/verify` | you, on a finished task (`disable-model-invocation`: the model cannot start it; `/run` lists what is ready) | a fresh context (`verifier`): `VERIFY.md` stating what this context did *not* do, reproduction from a clean state, reverse control by mutation, "what was not checked" |
+| `/verify-task` | you, on a finished task (`disable-model-invocation`: the model cannot start it; `/run` lists what is ready) | a fresh context (`verifier`): `VERIFY.md` stating what this context did *not* do, reproduction from a clean state, reverse control by mutation, "what was not checked" |
 | `/graphify` | you, once per repository | a local AST graph built with zero model tokens, refused outright when it would answer wrongly (submodules, empty extraction, under 20 nodes, over 25% `INFERRED`, under 30% file coverage), and only then wired into `.mcp.json` with a post-commit rebuild |
 | `/diagnose` | the model after a failure / you | freeze → versions off the machine → the levels (environment, dependencies, logs, trace, state, measurements, debugger) → three hypotheses → documentation for the pinned version → third-party workarounds only in scratch → the advisor on split evidence → one fix plus a regression test |
 
@@ -233,14 +233,14 @@ What this harness does **not** do, stated plainly: it does not compress the mode
 - Once per repository: `/intake`, and copy `project-template/`.
 - New work: `/task`, answer the questions; `/plan`, answer; `/clear`; then `/run` or `cc-night`.
 - Before leaving for the night: `/goal all tasks in <PLAN.md> are [x] or [!]` — belt over braces.
-- In the morning: `## Log`, `## Assumptions`, `BLOCKED.md`; `/verify` on what was closed; `python3 tasks/check.py`.
+- In the morning: `## Log`, `## Assumptions`, `BLOCKED.md`; `/verify-task` on what was closed; `python3 tasks/check.py`.
 - Once a day: `/usage` — which of the five behaviours is above 10 %; once a week: `/skill-doctor`, `/insights`.
 - When your own habits change: edit `~/.claude/CLAUDE.md`, not the project's `CLAUDE.md`.
 
 ## 7. Limits
 
 - `retry-guard` only sees an identical command; "edited it and a different one failed" is caught by the contract alone.
-- `stop-guard` checks the fact of `[x]`, not its quality: if the model marks `[x]` without the check passing, the hook will not notice — `/verify` and the morning `## Log` will.
+- `stop-guard` checks the fact of `[x]`, not its quality: if the model marks `[x]` without the check passing, the hook will not notice — `/verify-task` and the morning `## Log` will.
 - `read-guard` and `bash-read-guard` cover Read and the plain shell read; a file can still arrive through a language runtime (`python -c 'print(open(...).read())'`), and then `compress-output` is what trims it. There is no full impermeability and there will not be — hooks lower the frequency, they do not eliminate.
 - The overnight `--dangerously-skip-permissions` is not a harness without a sandbox; it is a risk.
 - Everything was measured on 2.1.272. Later releases change hooks and caching every week (2.1.257–2.1.271 carried more than twenty cache changes); after an upgrade, run `/skill-doctor` and check hook status in `/hooks`.

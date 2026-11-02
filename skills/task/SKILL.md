@@ -120,12 +120,12 @@ format:2                (only when tasks/format2.py exists; legacy trees keep th
 capability:<ledger row> (when the task adds or changes a product capability; the row must be included/available)
 ```
 
-New tasks start `status:todo`, `verify:pending`. Never set `verify:passed` here — that is `/verify`, in another context.
+New tasks start `status:todo`, `verify:pending`. Never set `verify:passed` here — that is `/verify-task`, in another context.
 
 ### Optional neighbours, created only when they have content
 
 - `NOTES.md` — rationale, measurements, rejected alternatives, dated headings (`# NOTES — <what> (<YYYY-MM-DD>)`). Every number carries a source.
-- `VERIFY.md` — written only by `/verify`.
+- `VERIFY.md` — written only by `/verify-task`.
 - `BLOCKED.md` — written only by `/run` when stopping (format in PROTOCOL §6 / README).
 - Artefacts: logs, screenshots, measurement output, `qa/`, `shots/`.
 

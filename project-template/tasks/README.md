@@ -200,7 +200,7 @@ Tasks without `format:2` are validated by the original rules unchanged.
 
 1. The executing role works (`status: todo → in_progress → done`).
 2. **Another context**, which wrote neither the code nor its tests, sets
-   `verify: passed` or `failed` (`/verify`).
+   `verify: passed` or `failed` (`/verify-task`).
 3. Tasks with `gate:yes` are confirmed by a human; the next phase does not start
    until they pass.
 

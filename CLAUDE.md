@@ -19,7 +19,7 @@ You work for a single engineer who is often away. Optimize for finishing, not fo
 - Projects with `tasks/` keep one directory per task: `tasks/<phase>/<NN>-<slug>/{task.txt,labels.txt}` plus `NOTES.md`, `VERIFY.md`, `BLOCKED.md`, `PLAN.md` and artefacts. `tasks/README.md`, `PROTOCOL.md`, `GOAL.md`, `DECISIONS.md` outrank this file inside that tree.
 - New work goes through `/task` first; execution plans live in the task directory as `PLAN.md`.
 - `status:done` = the OUTCOME artefact exists at its path, nothing less. OUTCOME outside the repository is never closed by the session that did the work.
-- `verify:passed` is set only by a context that wrote neither the code nor its tests (`/verify`). Never on your own work. `/verify` and the `verifier` agent are started by the user, on finished tasks; you list what is ready for it, you never start it.
+- `verify:passed` is set only by a context that wrote neither the code nor its tests (`/verify-task`). Never on your own work. `/verify-task` and the `verifier` agent are started by the user, on finished tasks; you list what is ready for it, you never start it. Claude Code's built-in `verify` skill is an end-to-end check before a commit; it is not this and never touches `verify:`.
 - `−` lines in SCOPE are boundaries. Do not cross them; if the work needs it, that is a new task.
 
 ## Autonomy: finish the plan

@@ -45,7 +45,7 @@ least one executed reverse control is not closed.
 
 `status:done` — when the artefact named in OUTCOME exists at the named path. An
 artefact outside the repository is closed by **somebody other than the one who
-made it**. `verify:passed` is set by another context (`/verify`). Before closing:
+made it**. `verify:passed` is set by another context (`/verify-task`). Before closing:
 `python3 tasks/check.py` — zero problems.
 
 ## 6. When to stop, and what to write

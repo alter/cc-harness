@@ -97,5 +97,5 @@ tests actually assert. Not on a schedule.
 - What is now covered that was not, by behaviour and not by file.
 - The number before and after, from the tool and not from memory.
 - Every mutation you tried, and which ones the suite caught. Name the ones it did not.
-- What is still uncovered on purpose, and why — the honest boundary, the same list `/verify` writes under "what was not checked".
+- What is still uncovered on purpose, and why — the honest boundary, the same list `/verify-task` writes under "what was not checked".
 - After a mutation audit: the survivors, split into tests to write and survivors accepted with a reason. Never the score.

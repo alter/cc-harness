@@ -85,13 +85,13 @@ The session does the tasks itself, one at a time, following the `run-task` proce
 
 **Task-tree rules** (when the plan lives in `tasks/<phase>/<NN>-<slug>/`; the tree's `README.md` and `PROTOCOL.md` outrank the skill):
 - `labels.txt` `status`: `in_progress` while running; `done` only when every OUTCOME artefact exists **in the repository** (`test -f`, `git cat-file -e HEAD:<path>`, the count matches) and the gates pass. An OUTCOME outside the repository (a machine at a provider, a phone, a signed build, a person's eyes) is never closed by this session: it stays `in_progress` and `NOTES.md` says what is missing and who can provide it.
-- `verify:` is never touched. That belongs to `/verify`, in another context.
+- `verify:` is never touched. That belongs to `/verify-task`, in another context.
 - Blocking: besides `[!] BLOCKED`, write `BLOCKED.md` in the task directory (date; exactly what is missing — a variable name, a task path, a question; what was done before stopping, with paths; what can be done without it) and set `status:blocked`. A stub instead of a secret, "hardcode it for now", "assume the provider is X" — that is a false `done` with delayed discovery, not a workaround.
 - `NOTES.md` with a dated heading: rationale, measurements with sources, rejected alternatives, this session's assumptions. A number without a source is not written.
 - Reverse control: VERIFY items that demand it are executed and the red output is kept in `NOTES.md`.
 - Before closing: `python3 tasks/check.py` — zero problems. Commit messages follow `PROTOCOL.md`; submodules in its order.
 
-**Finish.** No open tasks and all `[x]` → `status: done`, one more run of every acceptance criterion, each one marked; in a tree, the `labels.txt` rules above plus the list of directories ready for `/verify`, which the user starts; then a report: what changed, why, which checks ran with results, remaining risk, a suggested commit message. If any `[!]` remain → `status: paused`, a list of the blocked tasks with reasons, and the last word is `NEED_HUMAN`. Only that word releases the stop-guard.
+**Finish.** No open tasks and all `[x]` → `status: done`, one more run of every acceptance criterion, each one marked; in a tree, the `labels.txt` rules above plus the list of directories ready for `/verify-task`, which the user starts; then a report: what changed, why, which checks ran with results, remaining risk, a suggested commit message. If any `[!]` remain → `status: paused`, a list of the blocked tasks with reasons, and the last word is `NEED_HUMAN`. Only that word releases the stop-guard.
 
 At the start, `/run` says once: "to make this survive API hiccups, type `/goal all tasks in <plan> are [x] or [!]`" — and does not wait for an answer.
 
@@ -160,7 +160,7 @@ Triggered by the contract after the first non-trivial failure (a build, a test, 
 7. **Split evidence**: two hypotheses with equal support, or docs contradicting observation → one advisor call (Opus) with the evidence table. No coin flips.
 8. **One fix**: `ROOT CAUSE:` and `EVIDENCE:` into the plan's `## Log`; one fix; the original reproduction again; a regression test where a suite exists. If it did not help, you are back at step 4 with new evidence, not at "try again".
 
-## 8. Checking someone else's work — `/verify`
+## 8. Checking someone else's work — `/verify-task`
 
 Independence is the whole point. If this session wrote the code or the tests, it does not verify: the whole job goes to `verifier` (a fresh context) and the result is relayed. `verify:passed` is never set on one's own work.
 
@@ -236,6 +236,6 @@ The point is narrow. The harness helps him stay quiet where quiet is his to keep
 - It does not guarantee the quality of thought at 900k tokens of context: the attention grey zone in a long context is real. The harness keeps the context small not through a compaction threshold but by sending noise to subagents and trimming output in hooks. If `/usage` shows `long_context` above 10 %, revisit that decision rather than live with it.
 - It does not replace `PROJECT.md` and the task tree: without a capability ledger and a `task.txt`, the model will guess the scope at night — and it will guess wider.
 - It does not protect you from `--dangerously-skip-permissions` on a machine with production credentials. That is your decision and your perimeter.
-- It does not check `verify:passed` twice: `/verify` is independent by context, not by model. A human's eyes remain in the `HUMAN` items.
+- It does not check `verify:passed` twice: `/verify-task` is independent by context, not by model. A human's eyes remain in the `HUMAN` items.
 - It does not keep the code graph honest for you. `/graphify` refuses to wire a graph whose numbers are bad, and the post-commit hook rebuilds after every commit — but a rebuild that fails leaves the old graph in place, answering about code that no longer exists. The only defence is the one the skill insists on: check one known symbol against `grep -n` before trusting a run of graph answers.
 - It does not stop the advisor from firing inside a subagent. There is no per-agent switch: the frontmatter schema has no `env` field, and the advisor is appended to the request after the tool filter, so `disallowedTools` cannot reach it either. `worker` and `verifier` are told in their prompts to report a fork upward instead of buying an Opus opinion on their whole context; that is a rule, not a guard.

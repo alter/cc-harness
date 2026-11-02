@@ -43,7 +43,7 @@ A task directory whose children carry `split:contract`, `split:part` and `split:
 3. Merge each returned branch into the current branch with `git merge --no-ff <branch>`, one at a time. A conflict means the write sets were wrong: `git merge --abort`, mark that part `status:blocked` with `BLOCKED.md` naming the conflicting paths, continue with the other parts. Never resolve a conflict by picking a side. A merged branch is done with: `git worktree remove <path>` and `git branch -d <branch>` (both refuse to drop unmerged work). Before the plan closes, run `python3 ~/.claude/hooks/worktree-gc.py` once: it removes every clean, fully merged worktree and stale `.claude/scratch/` entries, and lists what it kept and why; a kept worktree of a blocked part stays until its `BLOCKED.md` is resolved.
 4. After every merge, run that part's `[fast]` VERIFY items yourself on the merged tree. Red → the part goes back to `in_progress` with an `open:` line in its `NOTES.md`.
 5. The `split:assembly` child last, one `worker`, on the merged tree: it runs the whole fast tier.
-6. `reviewer` runs once, on the parent, after the assembly — never per part. `/verify` is the user's, on the parent, after the run.
+6. `reviewer` runs once, on the parent, after the assembly — never per part. `/verify-task` is the user's, on the parent, after the run.
 
 Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.md + PROJECT.md + plan + task ≈ 10–20k tokens of cache write) and knows nothing of *why* the previous task was done the way it was. Measured on a three-task plan of small coupled tasks (one run each, Sonnet 5.5): one session $0.22 and 39 s, delegate $0.59 and 104 s. Delegate pays off where parts run in parallel or the plan is too long for one context; the default mode for everything else.
 
@@ -55,7 +55,7 @@ Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.
 - **A directive that contradicts a `D<n>` decision, the task's SCOPE or `docs/PROJECT.md`** is not executed. Record it under `## Assumptions` as `reviewer: <FIX> — not applied, contradicts D<n>`; when it points at a real defect the decision causes, the task becomes `[!] BLOCKED: reviewer finding conflicts with D<n>` for the owner.
 - **PLAUSIBLE** (no reproduction) is an observation: one line in `NOTES.md` or `## Log`, no task, no fix.
 - After the fix tasks close, `reviewer` runs again **only on the fixed findings** (their WHERE lines and the fix diff), not on the whole change. At most two rounds; a finding still CONFIRMED after the second fix → `[!] BLOCKED: reviewer finding survives two fixes`, with both reproductions in the Log.
-- `/verify` does not follow the review. The user runs it on finished tasks; the Finish report lists which are ready.
+- `/verify-task` does not follow the review. The user runs it on finished tasks; the Finish report lists which are ready.
 - A task whose SECURITY block adds a sink, or whose DATA adds an `interpretable=yes` field, also gets `/attack <task dir>` after the review; its CONFIRMED findings enter this same loop. At night `cc-night` runs `/attack milestone` after the full run (`CC_NIGHT_ATTACK=0` turns it off).
 - When the reviewed diff touches code that talks to PostgreSQL (a driver import, SQL, a migration, an ORM model), `/pgsql-slow-queries diff` runs beside the reviewer; its CONFIRMED findings become fix tasks the same way, a transaction held across an outside wait blocks the task. At night `cc-night` runs it on the whole project when the repository uses PostgreSQL (`CC_NIGHT_PGSQL=0` turns it off).
 
@@ -77,7 +77,7 @@ Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.
 `tasks/README.md` and `tasks/PROTOCOL.md` outrank everything below where they differ.
 
 - `labels.txt` `status`: `in_progress` while running. `done` only when every artefact named in `task.txt` OUTCOME exists **in the repository** (`test -f`, `git cat-file -e HEAD:<path>`, the count matches) and the gate checks pass. An OUTCOME outside the repository (a machine at a provider, a phone, a signed build, a person's eyes) is never closed by this session: leave `in_progress` and write in `NOTES.md` what is missing and who can provide it.
-- **Never touch `verify:`.** Verification is another context's job (`/verify`). Setting `verify:passed` on your own work is the one thing this tree forbids absolutely.
+- **Never touch `verify:`.** Verification is another context's job (`/verify-task`). Setting `verify:passed` on your own work is the one thing this tree forbids absolutely.
 - Blocking: instead of `[!] BLOCKED` alone, also create `BLOCKED.md` in the task directory in the tree's format (date; what exactly is missing — variable name, task path, question; what was done before stopping, with paths; what can be done without it) and set `status:blocked`. A stub instead of a secret, "hardcode for now", "assume the provider is X" — is a false `done` with delayed discovery, not a workaround.
 - `NOTES.md`: dated heading (`# NOTES — <what> (<YYYY-MM-DD>)`), rationale, measurements with sources, rejected alternatives, and this session's assumptions. Numbers carry a source or are not written.
 - Reverse control: VERIFY items that say so are executed, and the red output is kept in `NOTES.md` (the verifier will need it for `VERIFY.md`).
@@ -88,7 +88,7 @@ Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.
 ## Finish
 
 When no `- [ ]` remains:
-- All `[x]`: set `status: done`, run every acceptance criterion command once more and, when some task changed logic, the full suite, mark each AC. Compare the suite against the `T00` baseline recorded in `## Log`: a test that was green then and is red now is a regression this run caused — it is fixed before the plan closes, or the plan ends `paused` with that test named. A rising coverage floor is expected; a fallen one is a failure, not a formality. In a task tree: apply the `labels.txt` rules above, then list the task directories ready for `/verify` — never start it yourself. Report: what changed, why, which checks ran with results, remaining risk, suggested commit message. Stop.
+- All `[x]`: set `status: done`, run every acceptance criterion command once more and, when some task changed logic, the full suite, mark each AC. Compare the suite against the `T00` baseline recorded in `## Log`: a test that was green then and is red now is a regression this run caused — it is fixed before the plan closes, or the plan ends `paused` with that test named. A rising coverage floor is expected; a fallen one is a failure, not a formality. In a task tree: apply the `labels.txt` rules above, then list the task directories ready for `/verify-task` — never start it yourself. Report: what changed, why, which checks ran with results, remaining risk, suggested commit message. Stop.
 - Some `[!]`: set `status: paused`, list the blocked tasks with their reasons, and end the message with the literal token `NEED_HUMAN`. Stop.
 
 ## Context hygiene during a long run
