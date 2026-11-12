@@ -440,6 +440,16 @@ tgs="$XDG_STATE_HOME/cc-turn-guard"; mkdir -p "$tgs/old" "$tgs/tg1"; : > "$tgs/o
 python3 -c 'import os, sys, time; t = time.time() - 4 * 86400; os.utime(sys.argv[1], (t, t))' "$tgs/old/x.seen"
 tgt g 0; tgp SubagentStart g lim "" "" >/dev/null
 if [ ! -e "$tgs/old/x.seen" ] && [ -e "$tgs/tg1/fresh.seen" ]; then ok "turn-guard-state-gc: state older than two days is removed, fresh state stays"; else bad "turn-guard-state-gc: state older than two days is removed, fresh state stays" "$(ls -R "$tgs" 2>&1 | head -c 200)"; fi
+tgctx() { [ "$(printf '%s' "$1" | jq -r --arg e "$2" --arg n "$3" '.hookSpecificOutput | .hookEventName == $e and (.additionalContext | test("TURN LIMIT") and test("(^|[^0-9])" + $n + "([^0-9]|$)"))' 2>/dev/null)" = true ]; }
+tgt n7 7; out=$(tgp PostToolUse n7 lim Bash toolu_7_1); check_empty "turn-guard-notice: turn maxTurns-3, no output" "$out"
+tgt n8 8 2; out=$(tgp PostToolUse n8 lim Bash toolu_8_1)
+if tgctx "$out" PostToolUse 2; then ok "turn-guard-notice: turn maxTurns-2 names the turns left"; else bad "turn-guard-notice: turn maxTurns-2 names the turns left" "$out"; fi
+out2=$(tgp PostToolUse n8 lim Bash toolu_8_2)
+if tgctx "$out" PostToolUse 2 && [ -z "$out2" ]; then ok "turn-guard-notice-once: a second call of the same turn, no output"; else bad "turn-guard-notice-once: a second call of the same turn, no output" "$out2"; fi
+out=$(tgp SubagentStart s1 lim "" "")
+if tgctx "$out" SubagentStart 10; then ok "turn-guard-announce: the agent is told its limit and where TURN LIMIT comes from"; else bad "turn-guard-announce: the agent is told its limit and where TURN LIMIT comes from" "$out"; fi
+out2=$(tgp SubagentStart s2 nolim "" "")
+if tgctx "$out" SubagentStart 10 && [ -z "$out2" ]; then ok "turn-guard-announce: nothing for an agent without a limit"; else bad "turn-guard-announce: nothing for an agent without a limit" "$out2"; fi
 out=$(jq -n --arg c "$gm" '{session_id:"ad1",cwd:$c,tool_input:{subagent_type:"scout",model:"opus",prompt:"p",description:"d"}}' | HOME="$TMP" CLAUDE_CODE_SUBAGENT_MODEL=sonnet "$H/guard-subagent.sh")
 if [ -x "$H/agent-def.sh" ] && ! grep -q 'frontmatter()' "$H/guard-subagent.sh" && printf '%s' "$out" | grep -q updatedInput; then ok "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup"; else bad "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup" "$out"; fi
 
