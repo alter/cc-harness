@@ -72,7 +72,7 @@ start_leg() {
   scan
   mkdir -p "$state_dir" 2>/dev/null || return 0
   printf '%s\n' "$seen_n" > "$state_dir/$aid.base" 2>/dev/null
-  rm -f "$state_dir/$aid.noticed" 2>/dev/null
+  rm -f "$state_dir/$aid.noticed" "$state_dir/$aid.forced" 2>/dev/null
 }
 
 announce() {
@@ -88,6 +88,7 @@ notice() {
 }
 
 refuse() {
+  mkdir -p "$state_dir" 2>/dev/null && : > "$state_dir/$aid.forced" 2>/dev/null
   jq -n --arg r "TURN LIMIT: this is turn $turn of your $max and the call is refused by the harness, not by the tool. After turn $max the run is cut and everything you have not reported is lost. Deliver your report now, once: through SubagentHandback if you have that tool, otherwise as your plain answer. Say what you finished and write NOT CHECKED: <what> for the rest. Make no other tool call." \
     '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
 }

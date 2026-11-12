@@ -11,6 +11,13 @@ atype=$(printf '%s' "$payload" | jq -r '.agent_type // ""')
 transcript=$(printf '%s' "$payload" | jq -r '.agent_transcript_path // ""')
 last=$(printf '%s' "$payload" | jq -r '.last_assistant_message // ""')
 
+aid=$(printf '%s' "$payload" | jq -r '.agent_id // ""')
+session=$(printf '%s' "$payload" | jq -r '.session_id // ""')
+case "$aid$session" in
+  ''|*[!A-Za-z0-9_-]*) ;;
+  *) [ -f "${XDG_STATE_HOME:-$HOME/.local/state}/cc-turn-guard/$session/$aid.forced" ] && exit 0 ;;
+esac
+
 [ -f "$transcript" ] || exit 0
 printf '%s' "$last" | grep -qE 'NOT DONE|НЕ СДЕЛАНО' && exit 0
 
