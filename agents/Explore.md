@@ -3,7 +3,7 @@ name: Explore
 description: Read-only search across the repository. Finds files, symbols, call sites and dependencies. Does not review or judge code.
 tools: Read, Grep, Glob
 model: haiku
-maxTurns: 6
+maxTurns: 10
 omitClaudeMd: true
 ---
 

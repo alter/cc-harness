@@ -3,7 +3,7 @@ name: scout
 description: Quick reconnaissance before an edit. Use when it is unknown where the relevant code, config or test lives. Returns paths and line numbers, changes nothing.
 tools: Read, Grep, Glob, mcp__graphify__get_node, mcp__graphify__get_neighbors, mcp__graphify__query_graph, mcp__graphify__shortest_path
 model: haiku
-maxTurns: 6
+maxTurns: 10
 omitClaudeMd: true
 ---
 

@@ -4,7 +4,7 @@ description: Works out how an unfamiliar subsystem or library behaves and return
 tools: Read, Grep, Glob, WebFetch, WebSearch
 model: sonnet
 effort: medium
-maxTurns: 12
+maxTurns: 20
 omitClaudeMd: true
 ---
 
