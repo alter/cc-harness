@@ -64,13 +64,13 @@ The result is a five-line summary and a path. After that there are no more quest
 
 **Phase 3, the plan file.** `PLAN.md` in the task directory (built from `task.txt`: GOAL → Goal, VERIFY → acceptance criteria with commands, HUMAN items marked and not closable by `/run`; `+` → Tasks; `−` → Out of scope verbatim; DEPENDS → every dependency must be `status:done`, otherwise the first task is `[!] BLOCKED: depends on …`), otherwise `docs/plans/<slug>.md`. Sections: `status`, Goal, Acceptance criteria, Stack, Decisions, Assumptions, Out of scope, Tasks, Log. Task rules: `T00` is the baseline (gate checks before any edit, the pre-existing red recorded in the Log); every task is ≤ ~1 hour and ends in a verifiable state with a command that includes the gate checks; an architectural decision becomes a check (`import-linter`), not a paragraph; anything in the "must become BLOCKED" column of `PROJECT.md` is a separate task at the end marked `(needs confirmation)`; a task that adds a capability also updates its ledger row; 20 small tasks beat 5 vague ones.
 
-**Phase 4, hand-off.** One final question: "clean window" (recommended) → `status: running`, print the two lines `/clear` and `/run <plan>` and stop (the interview noise stays out of the execution context; `session-start` will bring the plan back after `/clear`); "start here, now" → `running` and straight into execution (sensible up to ~10 tasks); "I will edit it first" → stop.
+**Phase 4, hand-off.** One final question: "clean window" (recommended) → the plan stays `status: draft` (a `running` plan with open tasks makes `stop-guard` block the planning window itself), print the two lines `/clear` and `/run <plan>` and stop (the interview noise stays out of the execution context; `/run` sets `running` in the clean window); "start here, now" → `running` and straight into execution (sensible up to ~10 tasks); "I will edit it first" → stop.
 
 ## 5. Execution — `/run`
 
 ### The default mode: one session for the whole plan
 
-Input: a plan path or a task directory; empty means the single `running` plan, or the single `draft` when none is running (it is set to `running`). The word `delegate` in the arguments switches on the fallback mode below.
+Input: a plan path or a task directory; empty means the single `running` plan, or the single `draft` when none is running (it is set to `running`); a `draft` plan named by path is set to `running` the same way. The word `delegate` in the arguments switches on the fallback mode below.
 
 The session does the tasks itself, one at a time, following the `run-task` procedure:
 

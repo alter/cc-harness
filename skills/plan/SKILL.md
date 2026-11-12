@@ -88,9 +88,9 @@ Task rules:
 Show the plan path and the task count. Ask exactly one final AskUserQuestion:
 "Start in a clean window" (Recommended) / "Start here, now" / "I will edit the file first".
 
-- "Clean window": set `status: running`, then print exactly two lines and stop:
+- "Clean window": leave `status: draft` (the Stop hook blocks any turn that ends while a plan is `running` with open tasks, so `running` here would trap this window; `/run` sets `running` in the clean one), then print exactly two lines and stop:
   `/clear`
   `/run docs/plans/<slug>.md`
-  The interview and reconnaissance noise stays out of the execution context; `/clear` costs nothing and the plan file carries everything. The SessionStart hook re-injects the plan after `/clear`.
+  The interview and reconnaissance noise stays out of the execution context; `/clear` costs nothing and the plan file carries everything. `/run` flips `draft` to `running`.
 - "Start here, now": set `status: running` and continue immediately as `/run` would. Only sensible for plans under ~10 tasks.
 - "Edit first": stop. The user will run `/run docs/plans/<slug>.md` later (or `cc-night` for an unattended run).

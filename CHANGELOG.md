@@ -2,6 +2,11 @@
 
 One entry per `stable-*` tag, newest first. The reasons and the evidence behind each entry are in the plan under `docs/plans/` named in it.
 
+## stable-2026-11-12-2 — /plan no longer traps its own window
+
+### Fixed
+- `/plan` "clean window" left the plan `running`, so `stop-guard` blocked the planning window before `/clear`. The plan now stays `draft`; `/run` sets `running`, also when given a path.
+
 ## stable-2026-11-12 — subagents hand back a report at the turn limit
 
 Plan: `docs/plans/subagent-limit-handback.md`. Checked live on Claude Code 2.1.322; evidence in `docs/tech/claude-code-subagent-turns@2.1.322.md`.
