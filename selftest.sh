@@ -454,6 +454,12 @@ out=$(tgp SubagentStart s1 lim "" "")
 if tgctx "$out" SubagentStart 10; then ok "turn-guard-announce: the agent is told its limit and where TURN LIMIT comes from"; else bad "turn-guard-announce: the agent is told its limit and where TURN LIMIT comes from" "$out"; fi
 out2=$(tgp SubagentStart s2 nolim "" "")
 if tgctx "$out" SubagentStart 10 && [ -z "$out2" ]; then ok "turn-guard-announce: nothing for an agent without a limit"; else bad "turn-guard-announce: nothing for an agent without a limit" "$out2"; fi
+printf -- '---\nname: worker\nmodel: sonnet\nmaxTurns: 10\n---\n' > "$tg/.claude/agents/worker.md"
+sef() { jq -n --arg a "$1" --arg t "$tg/t/subagents/agent-$1.jsonl" '{session_id:"tg1",agent_id:$a,agent_type:"worker",agent_transcript_path:$t,last_assistant_message:"Half of the parser is written. NOT CHECKED: the tests.",stop_hook_active:false}' | "$H/subagent-evidence.sh"; }
+tgt f0 9; tgt f9 9
+out0=$(sef f0); tgp PreToolUse f9 worker Bash toolu_9_1 >/dev/null; out=$(sef f9)
+if printf '%s' "$out0" | grep -qE '"decision": *"block"' && [ -z "$out" ]; then ok "subagent-evidence-forced: a report forced by turn-guard passes, the same report without the marker is blocked"; else bad "subagent-evidence-forced: a report forced by turn-guard passes, the same report without the marker is blocked" "unmarked: $out0 marked: $out"; fi
+tgp SubagentStart f9 worker "" "" >/dev/null; out=$(sef f9); check "subagent-evidence-forced: a new leg clears the marker" "$out" '"decision": *"block"'
 out=$(jq -n --arg c "$gm" '{session_id:"ad1",cwd:$c,tool_input:{subagent_type:"scout",model:"opus",prompt:"p",description:"d"}}' | HOME="$TMP" CLAUDE_CODE_SUBAGENT_MODEL=sonnet "$H/guard-subagent.sh")
 if [ -x "$H/agent-def.sh" ] && ! grep -q 'frontmatter()' "$H/guard-subagent.sh" && printf '%s' "$out" | grep -q updatedInput; then ok "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup"; else bad "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup" "$out"; fi
 
