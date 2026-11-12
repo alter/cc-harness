@@ -1,6 +1,6 @@
 # The harness: how it is built
 
-212 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory — and re-checked against the 2.1.316 binary, changelog and live probes (`docs/upgrade-2.1.316.md`).
+214 files, three floors. `BEHAVIOR.md` walks through the behaviour step by step; this file is about the construction. Every setting below was verified in the Claude Code 2.1.272 binary or in the official documentation — nothing from memory — and re-checked against the 2.1.316 binary, changelog and live probes (`docs/upgrade-2.1.316.md`).
 
 ## 1. Three floors
 
