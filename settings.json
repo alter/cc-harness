@@ -96,6 +96,16 @@
             "onFailure": "block"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/turn-guard.sh",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -110,6 +120,16 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/retry-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/turn-guard.sh",
+            "timeout": 10
           }
         ]
       }
@@ -157,6 +177,17 @@
           {
             "type": "command",
             "command": "python3 ~/.claude/hooks/worktree-gc.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/turn-guard.sh",
             "timeout": 10
           }
         ]

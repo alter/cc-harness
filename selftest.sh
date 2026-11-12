@@ -440,6 +440,10 @@ tgs="$XDG_STATE_HOME/cc-turn-guard"; mkdir -p "$tgs/old" "$tgs/tg1"; : > "$tgs/o
 python3 -c 'import os, sys, time; t = time.time() - 4 * 86400; os.utime(sys.argv[1], (t, t))' "$tgs/old/x.seen"
 tgt g 0; tgp SubagentStart g lim "" "" >/dev/null
 if [ ! -e "$tgs/old/x.seen" ] && [ -e "$tgs/tg1/fresh.seen" ]; then ok "turn-guard-state-gc: state older than two days is removed, fresh state stays"; else bad "turn-guard-state-gc: state older than two days is removed, fresh state stays" "$(ls -R "$tgs" 2>&1 | head -c 200)"; fi
+if [ -f "$TARGET/settings.json" ]; then
+  tgw=$(jq -r 'def has_tg: any(.hooks[]?; (.command // "") | test("turn-guard\\.sh$")); [((.hooks.SubagentStart // []) | any(.[]; has_tg)), ((.hooks.PreToolUse // []) | any(.[]; (.matcher // "") == "" and has_tg)), ((.hooks.PostToolUse // []) | any(.[]; (.matcher // "") == "" and has_tg)), ([.hooks[]?[]?.hooks[]? | select((.command // "") | test("turn-guard\\.sh$")) | select(has("onFailure"))] | length == 0)] | map(tostring) | join(" ")' "$TARGET/settings.json" 2>/dev/null)
+  if [ "$tgw" = "true true true true" ]; then ok "turn-guard-wired: SubagentStart, PreToolUse and PostToolUse for every tool, no onFailure"; else bad "turn-guard-wired: SubagentStart, PreToolUse and PostToolUse for every tool, no onFailure" "start pre post no-onFailure: $tgw"; fi
+fi
 tgctx() { [ "$(printf '%s' "$1" | jq -r --arg e "$2" --arg n "$3" '.hookSpecificOutput | .hookEventName == $e and (.additionalContext | test("TURN LIMIT") and test("(^|[^0-9])" + $n + "([^0-9]|$)"))' 2>/dev/null)" = true ]; }
 tgt n7 7; out=$(tgp PostToolUse n7 lim Bash toolu_7_1); check_empty "turn-guard-notice: turn maxTurns-3, no output" "$out"
 tgt n8 8 2; out=$(tgp PostToolUse n8 lim Bash toolu_8_1)
@@ -884,6 +888,9 @@ if CC_BACKUP_DIR="$TMP/retire-backup" CC_SKIP_PLUGINS=1 "$SRC/install.sh" "$ri" 
   printf '{"modelSettings":{"claude-opus-5":{"effortLevel":"high","maxEffortLevel":"high"}}}' > "$ri/settings.json"
   CC_BACKUP_DIR="$TMP/retire-backup3" CC_SKIP_PLUGINS=1 "$SRC/install.sh" "$ri" >/dev/null 2>&1
   if jq -e '.modelSettings["claude-opus-5"] == {"effortLevel":"high"}' "$ri/settings.json" >/dev/null 2>&1; then ok "install-retire: the harness cap leaves a mixed Opus 5 entry, the effortLevel stays"; else bad "install-retire: the harness cap leaves a mixed Opus 5 entry, the effortLevel stays" "$(jq -c .modelSettings "$ri/settings.json")"; fi
+  CC_BACKUP_DIR="$TMP/retire-backup4" CC_SKIP_PLUGINS=1 "$SRC/install.sh" "$ri" >/dev/null 2>&1
+  tgn=$(jq -r '[.hooks.SubagentStart, .hooks.PreToolUse, .hooks.PostToolUse | [.[]?.hooks[]? | select(.command | test("turn-guard\\.sh$"))] | length] | map(tostring) | join(" ")' "$ri/settings.json" 2>/dev/null)
+  if [ "$tgn" = "1 1 1" ]; then ok "install-rerun-no-dup: a second install leaves one turn-guard entry per event"; else bad "install-rerun-no-dup: a second install leaves one turn-guard entry per event" "SubagentStart PreToolUse PostToolUse: $tgn"; fi
 else bad "install-retire: install.sh into a trial target" "install failed"; fi
 echo "== agenttest"
 if [ -x "$SRC/agenttest.sh" ]; then
