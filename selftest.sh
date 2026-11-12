@@ -395,6 +395,42 @@ check "switch at 50k ctx -> ask" "$out" '"permissionDecision": *"ask"'
 out=$(jq -n '{context_tokens:1000,from_model:"sonnet",to_model:"opus",source:"user"}' | "$H/guard-model-switch.sh")
 check "switch at 1k ctx -> allow" "$out" '"permissionDecision": *"allow"'
 
+echo "== turn-guard"
+tg="$TMP/tg"; mkdir -p "$tg/.claude/agents" "$tg/t/subagents"
+printf -- '---\nname: lim\nmodel: haiku\nmaxTurns: 10\n---\n' > "$tg/.claude/agents/lim.md"
+printf -- '---\nname: nolim\nmodel: haiku\n---\n' > "$tg/.claude/agents/nolim.md"
+tgt() {
+  local a=$1 n=$2 per=${3:-1} i j
+  for ((i = 1; i <= n; i++)); do
+    for ((j = 1; j <= per; j++)); do jq -nc --arg m "msg_$i" --arg u "toolu_${i}_$j" '{type:"assistant",message:{id:$m,content:[{type:"tool_use",id:$u,name:"Bash",input:{}}]}}'; done
+    for ((j = 1; j <= per; j++)); do jq -nc --arg u "toolu_${i}_$j" '{type:"user",message:{content:[{type:"tool_result",tool_use_id:$u}]}}'; done
+  done > "$tg/t/subagents/agent-$a.jsonl"
+}
+tgp() {
+  jq -n --arg e "$1" --arg a "$2" --arg at "$3" --arg tool "$4" --arg u "$5" --arg c "$tg" --arg tp "$tg/t.jsonl" \
+    '{hook_event_name:$e,session_id:"tg1",cwd:$c,transcript_path:$tp} + (if $tool == "" then {} else {tool_name:$tool,tool_use_id:$u,tool_input:{}} end) + (if $a == "" then {} else {agent_id:$a,agent_type:$at} end)' \
+    | HOME="$TMP" "$H/turn-guard.sh" 2>&1
+}
+tgdeny='"permissionDecision": *"deny"'
+tgt a9 9; tgt a10 10; tgt a1 1; tgt a30 30
+if [ -x "$H/turn-guard.sh" ]; then ok "turn-guard-present: the hook is installed and executable"; else bad "turn-guard-present: the hook is installed and executable" "missing or not +x"; fi
+out_main=$(tgp PreToolUse "" "" Bash toolu_9_1); check_empty "turn-guard-main-silent: no agent_id, no output" "$out_main"
+out=$(tgp PreToolUse a30 ghost Bash toolu_30_1); check_empty "turn-guard-no-limit: an agent without a definition is left alone" "$out"
+out=$(tgp PreToolUse a30 nolim Bash toolu_30_1); check_empty "turn-guard-no-limit: a definition without maxTurns is left alone" "$out"
+out_early=$(tgp PreToolUse a1 lim Bash toolu_1_1); check_empty "turn-guard-early: turn 1 of 10, no output" "$out_early"
+out_deny=$(tgp PreToolUse a9 lim Bash toolu_9_1); check "turn-guard-deny: turn maxTurns-1 is refused" "$out_deny" "$tgdeny"
+check "turn-guard-deny: the reason says TURN LIMIT" "$out_deny" 'TURN LIMIT'
+out=$(tgp PreToolUse a10 lim Bash toolu_10_1); check "turn-guard-deny-last: turn maxTurns is refused" "$out" "$tgdeny"
+tgt a8 8; out=$(tgp PreToolUse a8 lim Bash toolu_8_1); check_empty "turn-guard-deny: turn maxTurns-2 still works" "$out"
+jq -nc '{type:"assistant",message:{id:"msg_9",content:[{type:"tool_use",id:"toolu_9_1",name:"Bash",input:{}}]}}' >> "$tg/t/subagents/agent-a8.jsonl"
+out=$(tgp PreToolUse a8 lim Bash toolu_9_1); check "turn-guard-tail: a turn appended after the last read is counted" "$out" "$tgdeny"
+out_hb=$(tgp PreToolUse a9 lim SubagentHandback toolu_9_1); check_empty "turn-guard-handback: SubagentHandback passes without a decision" "$out_hb"
+if printf '%s' "$out_deny" | grep -qE "$tgdeny" && ! printf '%s%s%s%s' "$out_main" "$out_early" "$out_deny" "$out_hb" | grep -q '"allow"' && ! grep -q 'allow' "$H/turn-guard.sh" 2>/dev/null; then ok "turn-guard-never-allow: a refusal or nothing"; else bad "turn-guard-never-allow: a refusal or nothing" "$out_deny$out_hb"; fi
+out=$(CC_DISABLED_HOOKS=x,turn-guard tgp PreToolUse a9 lim Bash toolu_9_1)
+if printf '%s' "$out_deny" | grep -qE "$tgdeny" && [ -z "$out" ]; then ok "turn-guard-disabled: CC_DISABLED_HOOKS=turn-guard silences it"; else bad "turn-guard-disabled: CC_DISABLED_HOOKS=turn-guard silences it" "$out"; fi
+out=$(jq -n --arg c "$gm" '{session_id:"ad1",cwd:$c,tool_input:{subagent_type:"scout",model:"opus",prompt:"p",description:"d"}}' | HOME="$TMP" CLAUDE_CODE_SUBAGENT_MODEL=sonnet "$H/guard-subagent.sh")
+if [ -x "$H/agent-def.sh" ] && ! grep -q 'frontmatter()' "$H/guard-subagent.sh" && printf '%s' "$out" | grep -q updatedInput; then ok "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup"; else bad "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup" "$out"; fi
+
 echo "== advisor-check"
 printf '[DEBUG] [AdvisorTool] Server-side tool enabled with claude-opus-5 as the advisor model\n' > "$TMP/adv-ok.log"
 printf '[DEBUG] [AdvisorTool] Skipping advisor - sonnet cannot advise opus (advisor must be at least as capable as the base model)\n' > "$TMP/adv-skip.log"
@@ -844,6 +880,7 @@ out=$(jq -n --arg f "$TMP/big.py" '{tool_name:"Read",tool_input:{file_path:$f}}'
 for src_hook in "$SRC"/hooks/*.sh "$SRC"/hooks/*.py; do
   f="$H/$(basename "$src_hook")"; [ -f "$f" ] || continue
   id=$(basename "$f"); id=${id%.*}
+  [ "$id" = agent-def ] && continue
   grep -q 'CC_DISABLED_HOOKS' "$f" && ok "disabled-hooks: $id honours the switch" || bad "disabled-hooks: $id honours the switch" "no CC_DISABLED_HOOKS check in $f"
 done
 

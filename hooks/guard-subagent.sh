@@ -38,10 +38,6 @@ effort_rank() {
   esac
 }
 
-frontmatter() {
-  awk -v k="$2" 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} $0 ~ "^"k":" {sub("^"k": *", ""); print; exit}' "$1"
-}
-
 asked=$(printf '%s' "$payload" | jq -r '.tool_input.model // empty')
 asked_effort=$(printf '%s' "$payload" | jq -r '.tool_input.effort // empty')
 cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty')
@@ -50,14 +46,7 @@ reasons=()
 if { [ -n "$asked" ] || [ -n "$asked_effort" ]; } && [ "$atype" != "fork" ]; then
   defined=""
   defined_effort=""
-  for d in ${cwd:+"$cwd/.claude/agents"} "$HOME/.claude/agents"; do
-    f="$d/$atype.md"
-    [ -f "$f" ] || f=$(grep -lxE "name: *$atype" "$d"/*.md 2>/dev/null | head -n 1)
-    [ -n "$f" ] && [ -f "$f" ] || continue
-    defined=$(frontmatter "$f" model)
-    defined_effort=$(frontmatter "$f" effort)
-    break
-  done
+  { IFS= read -r defined; IFS= read -r defined_effort; } < <("${BASH_SOURCE[0]%/*}/agent-def.sh" "$cwd" "$atype" model effort 2>/dev/null) || true
   case "$defined" in ''|inherit) cap=${CLAUDE_CODE_SUBAGENT_MODEL:-} ;; *) cap=$defined ;; esac
   if [ -n "$asked" ] && [ "$(rank "$asked")" -gt "$(rank "$cap")" ] && [ "$(rank "$cap")" -gt 0 ]; then
     drop+=(model)
