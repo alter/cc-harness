@@ -4,7 +4,7 @@ description: Runs tests, a linter or a build and returns a short analysis of the
 tools: Bash, Read, Grep
 model: sonnet
 effort: low
-maxTurns: 8
+maxTurns: 12
 omitClaudeMd: true
 ---
 
