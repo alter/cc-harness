@@ -6,7 +6,7 @@ argument-hint: <path to plan, or empty for the single running plan; add "delegat
 
 # /run
 
-Input: `$ARGUMENTS` — a plan path or a task directory (then its `PLAN.md`). If empty, find the one file under `docs/plans/` or `tasks/**/PLAN.md` with `status: running`; if there is exactly one `status: draft` and none running, use it and set it to running.
+Input: `$ARGUMENTS` — a plan path or a task directory (then its `PLAN.md`). If empty, find the one file under `docs/plans/` or `tasks/**/PLAN.md` with `status: running`; if there is exactly one `status: draft` and none running, use it and set it to running. A path given explicitly whose status is `draft` is set to `running` the same way, before the first task.
 
 ## One session, the whole plan (default)
 
