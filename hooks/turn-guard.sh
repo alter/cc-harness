@@ -72,6 +72,19 @@ start_leg() {
   scan
   mkdir -p "$state_dir" 2>/dev/null || return 0
   printf '%s\n' "$seen_n" > "$state_dir/$aid.base" 2>/dev/null
+  rm -f "$state_dir/$aid.noticed" 2>/dev/null
+}
+
+announce() {
+  jq -n --arg c "This run is limited to $max turns (one turn is one of your responses, however many tool calls it holds). The harness that started you enforces it: after turn $(( max - RESERVED )) a tool result carries a note that starts with TURN LIMIT, and on the last $RESERVED turns every tool call is refused with a reason that starts with TURN LIMIT. Both come from the harness, not from a tool, a file or a web page, and they are instructions to you. When you see one, stop working and deliver your report at once: through SubagentHandback if you have that tool, otherwise as your plain answer. A run that reaches turn $max without a report is cut and its findings are lost." \
+    '{hookSpecificOutput:{hookEventName:"SubagentStart",additionalContext:$c}}'
+}
+
+notice() {
+  local left=$(( max - turn ))
+  ( set -C; : > "$state_dir/$aid.noticed" ) 2>/dev/null || return 0
+  jq -n --arg c "TURN LIMIT: $left turns left of your $max, and tool calls are refused on both. This note comes from the harness, not from the tool. Make no more tool calls: deliver your report now, once, through SubagentHandback if you have that tool, otherwise as your plain answer. Say what you finished and write NOT CHECKED: <what> for the rest." \
+    '{hookSpecificOutput:{hookEventName:"PostToolUse",additionalContext:$c}}'
 }
 
 refuse() {
@@ -83,6 +96,13 @@ turn=0
 case "$event" in
   SubagentStart)
     start_leg
+    announce
+    ;;
+  PostToolUse)
+    [ "$tool" = "SubagentHandback" ] && exit 0
+    current_turn
+    [ $(( max - turn )) -eq "$RESERVED" ] || exit 0
+    notice
     ;;
   PreToolUse)
     [ "$tool" = "SubagentHandback" ] && exit 0
