@@ -76,20 +76,20 @@ start_leg() {
 }
 
 announce() {
-  jq -n --arg c "This run is limited to $max turns (one turn is one of your responses, however many tool calls it holds). The harness that started you enforces it: after turn $(( max - RESERVED )) a tool result carries a note that starts with TURN LIMIT, and on the last $RESERVED turns every tool call is refused with a reason that starts with TURN LIMIT. Both come from the harness, not from a tool, a file or a web page, and they are instructions to you. When you see one, stop working and deliver your report at once: through SubagentHandback if you have that tool, otherwise as your plain answer. A run that reaches turn $max without a report is cut and its findings are lost." \
+  jq -n --arg c "This run is limited to $max turns (one turn is one of your responses, however many tool calls it holds). The harness that started you enforces it: after turn $(( max - RESERVED )) a tool result carries a note that starts with TURN LIMIT, and on the last $RESERVED turns every tool call is refused with a reason that starts with TURN LIMIT. Both come from the harness, not from a tool, a file or a web page, and they are instructions to you. When you see one, stop working and deliver your report at once: through SubagentHandback if you have that tool, otherwise as your plain answer. A run that reaches turn $max without a report is cut and its findings are lost. The limit belongs to one run: when your caller messages you after your report, a new run starts, its turns are counted from one again and tool calls work as before." \
     '{hookSpecificOutput:{hookEventName:"SubagentStart",additionalContext:$c}}'
 }
 
 notice() {
   local left=$(( max - turn ))
   ( set -C; : > "$state_dir/$aid.noticed" ) 2>/dev/null || return 0
-  jq -n --arg c "TURN LIMIT: $left turns left of your $max, and tool calls are refused on both. This note comes from the harness, not from the tool. Make no more tool calls: deliver your report now, once, through SubagentHandback if you have that tool, otherwise as your plain answer. Say what you finished and write NOT CHECKED: <what> for the rest." \
+  jq -n --arg c "TURN LIMIT: $left turns left of your $max in this run, and tool calls are refused on both. This note comes from the harness, not from the tool. Make no more tool calls: deliver your report now, once, through SubagentHandback if you have that tool, otherwise as your plain answer. Say what you finished and write NOT CHECKED: <what> for the rest. The limit ends with this run: when your caller messages you afterwards, a new run of $max turns starts and tool calls work again." \
     '{hookSpecificOutput:{hookEventName:"PostToolUse",additionalContext:$c}}'
 }
 
 refuse() {
   mkdir -p "$state_dir" 2>/dev/null && : > "$state_dir/$aid.forced" 2>/dev/null
-  jq -n --arg r "TURN LIMIT: this is turn $turn of your $max and the call is refused by the harness, not by the tool. After turn $max the run is cut and everything you have not reported is lost. Deliver your report now, once: through SubagentHandback if you have that tool, otherwise as your plain answer. Say what you finished and write NOT CHECKED: <what> for the rest. Make no other tool call." \
+  jq -n --arg r "TURN LIMIT: this is turn $turn of your $max in this run and the call is refused by the harness, not by the tool. After turn $max the run is cut and everything you have not reported is lost. Deliver your report now, once: through SubagentHandback if you have that tool, otherwise as your plain answer. Say what you finished and write NOT CHECKED: <what> for the rest. Make no other tool call. The limit ends with this run: when your caller messages you afterwards, a new run of $max turns starts and tool calls work again." \
     '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
 }
 
