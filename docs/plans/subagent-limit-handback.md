@@ -1,5 +1,5 @@
 ---
-status: running
+status: done
 created: 2026-11-12
 ---
 # Subagents hand back a report even at the turn limit
@@ -8,15 +8,15 @@ created: 2026-11-12
 A subagent that runs into its `maxTurns` no longer ends with "produced no report". A new hook, `turn-guard`, counts the subagent's turns in the current leg and, on the last two turns, refuses every tool call except `SubagentHandback`, so the agent's only move is to deliver what it has. The coordinator has a written rule for the case the hook cannot cover. The limits of the short agents are raised so that the two reserved turns do not eat their working budget. The result is installed into `~/.claude`.
 
 ## Acceptance criteria
-- [ ] AC1 A subagent on turn `maxTurns-1` or later gets every tool call except `SubagentHandback` refused with a `TURN LIMIT` reason; `SubagentHandback` passes without any decision — `./selftest.sh` (turn-guard-*)
-- [ ] AC2 Turn counting is exact: several tool calls of one model response are one turn; a call whose response is not yet in the transcript is counted; a resumed leg starts from zero — `./selftest.sh` (turn-guard-*)
-- [ ] AC3 The hook is silent everywhere else: the main session, an agent with no definition or no `maxTurns`, early turns. It never emits `permissionDecision: "allow"`, honours `CC_DISABLED_HOOKS=turn-guard`, and carries no `onFailure` — `./selftest.sh` (turn-guard-*)
-- [ ] AC4 `subagent-evidence` does not send a report forced by `turn-guard` back to work — `./selftest.sh` (subagent-evidence-forced)
-- [ ] AC5 Live on Claude Code 2.1.322: a 5-turn agent given a 7-step task delivers a report to its parent on the first run and on a resumed run, started in the foreground and in the background — `! grep -l 'produced no report' .claude/scratch/turn-guard-live/run-*.json`, outputs quoted in `## Log`
-- [ ] AC6 Limits: `reviewer` 40, `scout` 10, `Explore` 10, `test-runner` 12, `researcher` 20 — `grep -n '^maxTurns:' agents/{reviewer,scout,Explore,test-runner,researcher}.md`
-- [ ] AC7 `CLAUDE.md` tells the coordinator what to do with a subagent that stopped at its turn limit without a report — `grep -n 'turn limit' CLAUDE.md`
-- [ ] AC8 README.md, HARNESS.md and BEHAVIOR.md describe the hook, the new limits and the evidence behind the design — `grep -n 'turn-guard' README.md HARNESS.md BEHAVIOR.md`
-- [ ] AC9 No regression: every selftest check green at T00 is green at the end; a trial install passes `./selftest.sh <trial>`; the live install passes `./selftest.sh ~/.claude`; one live run through the installed hook delivers a report
+- [x] AC1 A subagent on turn `maxTurns-1` or later gets every tool call except `SubagentHandback` refused with a `TURN LIMIT` reason; `SubagentHandback` passes without any decision — `./selftest.sh` (turn-guard-*)
+- [x] AC2 Turn counting is exact: several tool calls of one model response are one turn; a call whose response is not yet in the transcript is counted; a resumed leg starts from zero — `./selftest.sh` (turn-guard-*)
+- [x] AC3 The hook is silent everywhere else: the main session, an agent with no definition or no `maxTurns`, early turns. It never emits `permissionDecision: "allow"`, honours `CC_DISABLED_HOOKS=turn-guard`, and carries no `onFailure` — `./selftest.sh` (turn-guard-*)
+- [x] AC4 `subagent-evidence` does not send a report forced by `turn-guard` back to work — `./selftest.sh` (subagent-evidence-forced)
+- [x] AC5 Live on Claude Code 2.1.322: a 5-turn agent given a 7-step task delivers a report to its parent on the first run and on a resumed run, started in the foreground and in the background — `! grep -l 'produced no report' .claude/scratch/turn-guard-live/run-*.json`, outputs quoted in `## Log`
+- [x] AC6 Limits: `reviewer` 40, `scout` 10, `Explore` 10, `test-runner` 12, `researcher` 20 — `grep -n '^maxTurns:' agents/{reviewer,scout,Explore,test-runner,researcher}.md`
+- [x] AC7 `CLAUDE.md` tells the coordinator what to do with a subagent that stopped at its turn limit without a report — `grep -n 'turn limit' CLAUDE.md`
+- [x] AC8 README.md, HARNESS.md and BEHAVIOR.md describe the hook, the new limits and the evidence behind the design — `grep -n 'turn-guard' README.md HARNESS.md BEHAVIOR.md`
+- [x] AC9 No regression: every selftest check green at T00 is green at the end; a trial install passes `./selftest.sh <trial>`; the live install passes `./selftest.sh ~/.claude`; one live run through the installed hook delivers a report
 
 ## Stack
 - bash 5.3, jq 1.6, python 3.14 (stdlib), git.
@@ -102,7 +102,7 @@ From the audit `docs/upgrade-2.1.322.md` (binary strings of 2.1.322, no live run
 - [x] T10 Docs. README.md hook table: a `hooks/turn-guard.sh` row. HARNESS.md: a hook-table row, the file count in line 3, and a paragraph after the table on why a `PreToolUse` refusal and not `SubagentStop` or a notice alone (E3, E7, E8), checked 2026-11-12 on 2.1.322. BEHAVIOR.md: a row in the hook table of §7 and the new turn counts in the agent table of §10, with one sentence on the two reserved turns. INSTALL.md: the `turn-guard` cases in the list of what selftest checks — verify: `grep -n 'turn-guard' README.md HARNESS.md BEHAVIOR.md INSTALL.md && grep -n '40 turns\|10 turns\|12 turns\|20 turns' BEHAVIOR.md`
 - [x] T11 Final gate. Full `./selftest.sh` compared against the T00 baseline. Trial install into a separate directory seeded with the live `settings.json`, then `./selftest.sh <trial>` — verify: `./selftest.sh && ./selftest.sh <trial dir>`
 - [x] T11a fix: after the digit check in `hooks/turn-guard.sh` add `max=$((10#$max))`, so the comparison, the arithmetic and the message all use the decimal value; add a selftest case with `maxTurns: 010` (reviewer, CONFIRMED: `maxTurns: 010` is refused from turn 7 of 10, `maxTurns: 09` prints "value too great for base" and stays silent) — verify: `./selftest.sh` (turn-guard-leading-zero)
-- [ ] T12 Live install per D3: `./install.sh`, then `./selftest.sh ~/.claude`. Then one live run through the installed hook, in a scratch directory that has the 5-turn agent and no project hooks: the parent receives a report (`.claude/scratch/turn-guard-live/run-installed.json`) — verify: `./selftest.sh ~/.claude && ! grep -q 'produced no report' .claude/scratch/turn-guard-live/run-installed.json`
+- [x] T12 Live install per D3: `./install.sh`, then `./selftest.sh ~/.claude`. Then one live run through the installed hook, in a scratch directory that has the 5-turn agent and no project hooks: the parent receives a report (`.claude/scratch/turn-guard-live/run-installed.json`) — verify: `./selftest.sh ~/.claude && ! grep -q 'produced no report' .claude/scratch/turn-guard-live/run-installed.json`
 
 ## Log
 - 2026-11-12 T00 baseline: `./selftest.sh` exit 0, passed 441, failed 0, no red checks; `claude --version` 2.1.322; output in `.claude/scratch/selftest-T00.log`
@@ -120,3 +120,6 @@ From the audit `docs/upgrade-2.1.322.md` (binary strings of 2.1.322, no live run
 - 2026-11-12 T11 done: `./selftest.sh` passed 475, failed 0 (`.claude/scratch/selftest-T11.log`); every check that passed at T00 passes (441 names compared with temp-dir names normalised; four differ only in a measured value inside the name), 34 new. Trial install into `.claude/scratch/trial-turn-guard` seeded with the live `settings.json`: install exit 0, one `turn-guard` entry per event, `./selftest.sh <trial>` passed 494, failed 0, no SKIP
 - 2026-11-12 review (reviewer, diff 113f1c5..HEAD of hooks, settings.json, selftest.sh): one CONFIRMED finding → T11a. No under-count on 25 real transcripts fed as growing byte prefixes, no wrong refusal, `agent-def.sh` equal to the old inline lookup. PLAUSIBLE, no task: the definition is looked up by the payload's `cwd`, so a subagent in a worktree without the project's uncommitted `.claude/agents` falls back to the config dir. NOT CHECKED by the reviewer: real concurrent parallel calls (covered live by run `parallel` of T07), a transcript truncated below the stored offset, how Claude Code reads `maxTurns: 010`
 - 2026-11-12 T11a done: `max=$((10#$max))` after the digit check; `turn-guard-leading-zero` (two checks) seen red (`.claude/scratch/tgdev/T11a-red.log`), `./selftest.sh` passed 477, failed 0
+- 2026-11-12 review round 2 (reviewer, only the T11a finding): both reproductions FIXED — `maxTurns: 010` silent on turn 7 and refused on turn 9 ("turn 9 of your 10"), `maxTurns: 09` refused on turn 8 with no stderr
+- 2026-11-12 T12 done: `./install.sh` exit 0, backup `~/.claude-backup/20261112-190902`; `./selftest.sh ~/.claude` passed 497, failed 0, no SKIP. Live run through the installed hook from `.claude/scratch/turn-guard-live/installed/` (5-turn agent, no project hooks): `run-installed.json` — "Completed: echo one (output: one), echo two (output: two), echo three (output: three). NOT CHECKED: echo four, echo five, echo six, echo seven. The run hit its 5-turn limit (the harness reported 2 turns left after turn 3 and refused further tool calls)"; the subagent transcript carries `hook_additional_context` for `SubagentStart` and `PostToolUse`
+- 2026-11-12 plan closed: AC1–AC4 `./selftest.sh` passed 477, failed 0 on the final code (`.claude/scratch/selftest-T11a.log`, run after the last change to a hook; 31 `turn-guard-*` and `subagent-evidence-forced` checks), no check green at T00 is missing; AC5 six `run-*.json`, none says "produced no report"; AC6–AC8 greps print matches; AC9 trial 494/0, live 497/0, `run-installed.json` has a report. Not run again: the full selftest after T12, because no file changed after T11a
