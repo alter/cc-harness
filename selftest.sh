@@ -428,6 +428,18 @@ out_hb=$(tgp PreToolUse a9 lim SubagentHandback toolu_9_1); check_empty "turn-gu
 if printf '%s' "$out_deny" | grep -qE "$tgdeny" && ! printf '%s%s%s%s' "$out_main" "$out_early" "$out_deny" "$out_hb" | grep -q '"allow"' && ! grep -q 'allow' "$H/turn-guard.sh" 2>/dev/null; then ok "turn-guard-never-allow: a refusal or nothing"; else bad "turn-guard-never-allow: a refusal or nothing" "$out_deny$out_hb"; fi
 out=$(CC_DISABLED_HOOKS=x,turn-guard tgp PreToolUse a9 lim Bash toolu_9_1)
 if printf '%s' "$out_deny" | grep -qE "$tgdeny" && [ -z "$out" ]; then ok "turn-guard-disabled: CC_DISABLED_HOOKS=turn-guard silences it"; else bad "turn-guard-disabled: CC_DISABLED_HOOKS=turn-guard silences it" "$out"; fi
+tgt p8 8 3; out=$(tgp PreToolUse p8 lim Bash toolu_8_3); check_empty "turn-guard-parallel: three calls of one response are one turn (8 of 10)" "$out"
+tgt p9 9 3; out=$(tgp PreToolUse p9 lim Bash toolu_9_2); check "turn-guard-parallel: the ninth response is refused whichever call asks" "$out" "$tgdeny"
+tgt l7 7; out=$(tgp PreToolUse l7 lim Bash toolu_8_1); check_empty "turn-guard-lag: a call not yet in the transcript is the next turn (8 of 10)" "$out"
+tgt l8 8; out=$(tgp PreToolUse l8 lim Bash toolu_9_1); check "turn-guard-lag: a call not yet in the transcript is the next turn (9 of 10)" "$out" "$tgdeny"
+tgt r 12; tgp SubagentStart r lim "" "" >/dev/null
+tgt r 13; out=$(tgp PreToolUse r lim Bash toolu_13_1); check_empty "turn-guard-resume: turn 1 of the new leg, no output" "$out"
+tgt r 20; out=$(tgp PreToolUse r lim Bash toolu_20_1); check_empty "turn-guard-resume: turn 8 of the new leg, no output" "$out"
+tgt r 21; out=$(tgp PreToolUse r lim Bash toolu_21_1); check "turn-guard-resume: turn maxTurns-1 of the new leg is refused" "$out" "$tgdeny"
+tgs="$XDG_STATE_HOME/cc-turn-guard"; mkdir -p "$tgs/old" "$tgs/tg1"; : > "$tgs/old/x.seen"; : > "$tgs/tg1/fresh.seen"
+python3 -c 'import os, sys, time; t = time.time() - 4 * 86400; os.utime(sys.argv[1], (t, t))' "$tgs/old/x.seen"
+tgt g 0; tgp SubagentStart g lim "" "" >/dev/null
+if [ ! -e "$tgs/old/x.seen" ] && [ -e "$tgs/tg1/fresh.seen" ]; then ok "turn-guard-state-gc: state older than two days is removed, fresh state stays"; else bad "turn-guard-state-gc: state older than two days is removed, fresh state stays" "$(ls -R "$tgs" 2>&1 | head -c 200)"; fi
 out=$(jq -n --arg c "$gm" '{session_id:"ad1",cwd:$c,tool_input:{subagent_type:"scout",model:"opus",prompt:"p",description:"d"}}' | HOME="$TMP" CLAUDE_CODE_SUBAGENT_MODEL=sonnet "$H/guard-subagent.sh")
 if [ -x "$H/agent-def.sh" ] && ! grep -q 'frontmatter()' "$H/guard-subagent.sh" && printf '%s' "$out" | grep -q updatedInput; then ok "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup"; else bad "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup" "$out"; fi
 

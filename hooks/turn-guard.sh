@@ -57,10 +57,21 @@ scan() {
 }
 
 current_turn() {
-  local present=0
+  local present=0 base=0
   scan
+  [ -f "$state_dir/$aid.base" ] && read -r base < "$state_dir/$aid.base"
+  case "$base" in ''|*[!0-9]*) base=0 ;; esac
   case ",$seen_ids," in *",$tuid,"*) [ -n "$tuid" ] && present=1 ;; esac
-  turn=$(( seen_n + 1 - present ))
+  turn=$(( seen_n - base + 1 - present ))
+}
+
+start_leg() {
+  local root="${state_dir%/*}"
+  find "$root" -type f -mtime +2 -delete 2>/dev/null
+  find "$root" -mindepth 1 -type d -empty -delete 2>/dev/null
+  scan
+  mkdir -p "$state_dir" 2>/dev/null || return 0
+  printf '%s\n' "$seen_n" > "$state_dir/$aid.base" 2>/dev/null
 }
 
 refuse() {
@@ -70,6 +81,9 @@ refuse() {
 
 turn=0
 case "$event" in
+  SubagentStart)
+    start_leg
+    ;;
   PreToolUse)
     [ "$tool" = "SubagentHandback" ] && exit 0
     current_turn
