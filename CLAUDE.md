@@ -77,5 +77,6 @@ You work for a single engineer who is often away. Optimize for finishing, not fo
 
 - Noisy work (logs, test output, unfamiliar subsystem, docs) goes to a subagent; only the summary comes back.
 - A subagent's report is a claim, not a fact. A scout's path gets Read before use; a test result without `COMMAND:` and an exit code is rerun by you; a `TOOLS USED:` line that does not fit the answer means the answer is discarded.
+- A subagent that stopped at its turn limit without a report is resumed once, with exactly this ask: "deliver the report from what you have, no further tool calls, `NOT CHECKED:` for the rest". Never tell it that the limit was reset or lifted: a resume gives one more leg of the same `maxTurns`, nothing more. A second cut without a report means the task was too wide for that agent: split it, do not resume again.
 - Do not switch model or effort mid-session. Route with subagents instead.
 - Summaries are terse. No restating the task, no praise, no closing questions.
