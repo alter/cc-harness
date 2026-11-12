@@ -17,6 +17,7 @@ case "$aid$session" in *[!A-Za-z0-9_-]*) exit 0 ;; esac
 
 max=$("${BASH_SOURCE[0]%/*}/agent-def.sh" "$cwd" "$atype" maxTurns 2>/dev/null) || exit 0
 case "$max" in ''|*[!0-9]*) exit 0 ;; esac
+max=$((10#$max))
 [ "$max" -gt "$RESERVED" ] || exit 0
 
 transcript="${tpath%.jsonl}/subagents/agent-$aid.jsonl"

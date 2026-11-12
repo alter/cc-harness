@@ -444,6 +444,11 @@ if [ -f "$TARGET/settings.json" ]; then
   tgw=$(jq -r 'def has_tg: any(.hooks[]?; (.command // "") | test("turn-guard\\.sh$")); [((.hooks.SubagentStart // []) | any(.[]; has_tg)), ((.hooks.PreToolUse // []) | any(.[]; (.matcher // "") == "" and has_tg)), ((.hooks.PostToolUse // []) | any(.[]; (.matcher // "") == "" and has_tg)), ([.hooks[]?[]?.hooks[]? | select((.command // "") | test("turn-guard\\.sh$")) | select(has("onFailure"))] | length == 0)] | map(tostring) | join(" ")' "$TARGET/settings.json" 2>/dev/null)
   if [ "$tgw" = "true true true true" ]; then ok "turn-guard-wired: SubagentStart, PreToolUse and PostToolUse for every tool, no onFailure"; else bad "turn-guard-wired: SubagentStart, PreToolUse and PostToolUse for every tool, no onFailure" "start pre post no-onFailure: $tgw"; fi
 fi
+printf -- '---\nname: oct\nmaxTurns: 010\n---\n' > "$tg/.claude/agents/oct.md"
+printf -- '---\nname: nine\nmaxTurns: 09\n---\n' > "$tg/.claude/agents/nine.md"
+tgt z7 7; out=$(tgp PreToolUse z7 oct Bash toolu_7_1); tgt z9 9; out2=$(tgp PreToolUse z9 oct Bash toolu_9_1)
+if [ -z "$out" ] && printf '%s' "$out2" | grep -qE "$tgdeny"; then ok "turn-guard-leading-zero: maxTurns 010 is ten turns, not eight"; else bad "turn-guard-leading-zero: maxTurns 010 is ten turns, not eight" "turn 7: $out turn 9: $out2"; fi
+tgt y8 8; out=$(tgp PreToolUse y8 nine Bash toolu_8_1); check "turn-guard-leading-zero: maxTurns 09 is nine turns" "$out" "$tgdeny"
 tgctx() { [ "$(printf '%s' "$1" | jq -r --arg e "$2" --arg n "$3" '.hookSpecificOutput | .hookEventName == $e and (.additionalContext | test("TURN LIMIT") and test("(^|[^0-9])" + $n + "([^0-9]|$)"))' 2>/dev/null)" = true ]; }
 tgt n7 7; out=$(tgp PostToolUse n7 lim Bash toolu_7_1); check_empty "turn-guard-notice: turn maxTurns-3, no output" "$out"
 tgt n8 8 2; out=$(tgp PostToolUse n8 lim Bash toolu_8_1)
