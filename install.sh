@@ -110,7 +110,7 @@ echo "== check"
 for f in "$TARGET"/hooks/*.sh "$TARGET/statusline.sh" "$TARGET/graph-setup.sh"; do bash -n "$f"; done
 for f in "$TARGET"/hooks/*.py; do [ -e "$f" ] || continue; python3 -c "import ast,sys,pathlib; ast.parse(pathlib.Path(sys.argv[1]).read_text())" "$f"; done
 for f in "$TARGET"/agents/*.md "$TARGET"/skills/*/SKILL.md; do
-  head -n 1 "$f" | grep -q '^---$' || { echo "bad frontmatter: $f" >&2; exit 1; }
+  grep -q '^---$' < <(head -n 1 "$f") || { echo "bad frontmatter: $f" >&2; exit 1; }
   grep -qE '^name: ' "$f" || { echo "no name: $f" >&2; exit 1; }
 done
 echo "   hooks: $(ls "$TARGET"/hooks/ | wc -l | tr -d ' '), agents: $(ls "$TARGET"/agents/*.md | wc -l | tr -d ' '), skills: $(ls -d "$TARGET"/skills/*/ | wc -l | tr -d ' ')"

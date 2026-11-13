@@ -16,7 +16,7 @@ pass=0; fail=0
 
 ok()   { pass=$((pass+1)); printf '  PASS  %s\n' "$1"; }
 bad()  { fail=$((fail+1)); printf '  FAIL  %s\n        got: %s\n' "$1" "$(printf '%s' "$2" | head -c 300)"; }
-check(){ local name=$1 out=$2 pattern=$3; if printf '%s' "$out" | grep -qE "$pattern"; then ok "$name"; else bad "$name" "$out"; fi; }
+check(){ local name=$1 out=$2 pattern=$3; if grep -qE "$pattern" < <(printf '%s' "$out"); then ok "$name"; else bad "$name" "$out"; fi; }
 check_empty(){ local name=$1 out=$2; if [ -z "$out" ]; then ok "$name"; else bad "$name" "$out"; fi; }
 
 echo "== syntax"
@@ -181,7 +181,7 @@ sed -i.bak 's/^## Assumptions$/## Assumptions\n- src\/a.py: noqa on generated li
 out=$(sgp); check_empty "integrity-stop: a declared change releases" "$out"
 sed -i.bak -e 's/^- \[x\] T02/- [ ] T02/' -e '/^- src\/a.py: noqa/d' "$sg/docs/plans/p.md"
 sgs() { jq -n --arg c "$sg" '{cwd:$c,session_id:"integ-stall",last_assistant_message:"x"}' | CC_STOP_GUARD_STALL=3 HOME="$TMP" "$H/stop-guard.sh"; }
-blocks=0; for _ in 1 2 3; do sgs | grep -q '"block"' && blocks=$((blocks+1)); done
+blocks=0; for _ in 1 2 3; do grep -q '"block"' < <(sgs) && blocks=$((blocks+1)); done
 out=$(sgs); [ "$blocks" -eq 3 ] && [ -z "$out" ] && ok "integrity-stop-stall-releases: an unresolved finding is released after STALL blocks" || bad "integrity-stop-stall-releases: an unresolved finding is released after STALL blocks" "blocks=$blocks, 4th: $out"
 fz="$TMP/freeze-rerun"; mkdir -p "$fz/docs/plans"
 printf -- '---\nstatus: running\ncreated: 2026-01-01\n---\n# R\n## Acceptance criteria\n- [x] AC1 old — `true`\n## Tasks\n- [x] T01 a — verify: `true`\n## Log\n' > "$fz/docs/plans/r.md"
@@ -278,7 +278,7 @@ stallproj="$TMP/stall"; mkdir -p "$stallproj/docs/plans"
 printf -- '---\nstatus: running\n---\n# S\n## Tasks\n- [ ] T01 a\n- [ ] T02 b\n- [ ] T03 c\n## Log\n' > "$stallproj/docs/plans/s.md"
 stp() { jq -n --arg c "$stallproj" '{cwd:$c,session_id:"stall-case",last_assistant_message:"stopping"}'; }
 blocks=0
-for _ in 1 2 3; do out=$(stp | HOME="$TMP" "$H/stop-guard.sh"); printf '%s' "$out" | grep -q '"block"' && blocks=$((blocks+1)); done
+for _ in 1 2 3; do out=$(stp | HOME="$TMP" "$H/stop-guard.sh"); grep -q '"block"' < <(printf '%s' "$out") && blocks=$((blocks+1)); done
 [ "$blocks" -eq 3 ] && ok "stop-guard blocks while the plan may still move (3)" || bad "stop-guard blocks while the plan may still move (3)" "blocked $blocks times"
 out=$(stp | HOME="$TMP" "$H/stop-guard.sh"); check_empty "stalled plan releases after CC_STOP_GUARD_STALL blocks" "$out"
 out=$(stp | HOME="$TMP" "$H/stop-guard.sh"); check_empty "stalled plan stays released while nothing changes" "$out"
@@ -408,18 +408,18 @@ check "subagent-model-up: opus asked for a haiku agent is dropped" "$out" '"upda
 if printf '%s' "$out" | jq -e '.hookSpecificOutput.updatedInput | (has("model") | not) and .prompt == "p" and .subagent_type == "scout"' >/dev/null 2>&1; then ok "subagent-model-up: the rest of the input is kept"; else bad "subagent-model-up: the rest of the input is kept" "$out"; fi
 out=$(gmc verifier claude-fable-5-1); check "subagent-model-up: a full fable id over a sonnet agent is dropped" "$out" '"updatedInput"'
 out=$(gmc general-purpose opus); check "subagent-model-up: no definition, capped by CLAUDE_CODE_SUBAGENT_MODEL" "$out" '"updatedInput"'
-out=$(gmc reviewer haiku); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-model-down: a cheaper model is left alone" "$out"; else ok "subagent-model-down: a cheaper model is left alone"; fi
-out=$(gmc reviewer opus); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-model-same: the agent's own model is left alone" "$out"; else ok "subagent-model-same: the agent's own model is left alone"; fi
+out=$(gmc reviewer haiku); if grep -q updatedInput < <(printf '%s' "$out"); then bad "subagent-model-down: a cheaper model is left alone" "$out"; else ok "subagent-model-down: a cheaper model is left alone"; fi
+out=$(gmc reviewer opus); if grep -q updatedInput < <(printf '%s' "$out"); then bad "subagent-model-same: the agent's own model is left alone" "$out"; else ok "subagent-model-same: the agent's own model is left alone"; fi
 printf -- '---\nname: test-runner\nmodel: sonnet\neffort: low\n---\n' > "$gm/.claude/agents/test-runner.md"
 gec() { jq -n --arg c "$gm" --arg t "$1" --arg e "$2" --arg m "${3:-}" '{session_id:("ge-"+$t+$e+$m),cwd:$c,tool_input:({subagent_type:$t,effort:$e,prompt:"p",description:"d"} + (if $m == "" then {} else {model:$m} end))}' \
   | HOME="$TMP" CLAUDE_CODE_SUBAGENT_MODEL=sonnet CLAUDE_CODE_SUBAGENT_EFFORT="${GE_ENV-medium}" "$H/guard-subagent.sh"; }
 noeffort() { printf '%s' "$1" | jq -e '.hookSpecificOutput.updatedInput | (has("effort") | not) and .prompt == "p"' >/dev/null 2>&1; }
 out=$(gec test-runner max); if noeffort "$out"; then ok "subagent-effort-over: max asked for a low agent is dropped"; else bad "subagent-effort-over: max asked for a low agent is dropped" "$out"; fi
-out=$(gec test-runner low); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-effort-within: the agent's own effort is left alone" "$out"; else ok "subagent-effort-within: the agent's own effort is left alone"; fi
+out=$(gec test-runner low); if grep -q updatedInput < <(printf '%s' "$out"); then bad "subagent-effort-within: the agent's own effort is left alone" "$out"; else ok "subagent-effort-within: the agent's own effort is left alone"; fi
 out=$(gec general-purpose high); if noeffort "$out"; then ok "subagent-effort-env-cap: no definition, capped by CLAUDE_CODE_SUBAGENT_EFFORT"; else bad "subagent-effort-env-cap: no definition, capped by CLAUDE_CODE_SUBAGENT_EFFORT" "$out"; fi
 out=$(gec scout xhigh); if noeffort "$out"; then ok "subagent-effort-env-cap: a definition without effort falls back to the env cap"; else bad "subagent-effort-env-cap: a definition without effort falls back to the env cap" "$out"; fi
-out=$(GE_ENV='' gec general-purpose max); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-effort-nocap: no definition and no env leaves effort alone" "$out"; else ok "subagent-effort-nocap: no definition and no env leaves effort alone"; fi
-out=$(gec fork max); if printf '%s' "$out" | grep -q updatedInput; then bad "subagent-effort-fork: a fork is left alone" "$out"; else ok "subagent-effort-fork: a fork is left alone"; fi
+out=$(GE_ENV='' gec general-purpose max); if grep -q updatedInput < <(printf '%s' "$out"); then bad "subagent-effort-nocap: no definition and no env leaves effort alone" "$out"; else ok "subagent-effort-nocap: no definition and no env leaves effort alone"; fi
+out=$(gec fork max); if grep -q updatedInput < <(printf '%s' "$out"); then bad "subagent-effort-fork: a fork is left alone" "$out"; else ok "subagent-effort-fork: a fork is left alone"; fi
 out=$(gec test-runner high opus); if printf '%s' "$out" | jq -e '.hookSpecificOutput.updatedInput | (has("effort") | not) and (has("model") | not) and .prompt == "p"' >/dev/null 2>&1; then ok "subagent-effort-and-model: both dropped in one updatedInput"; else bad "subagent-effort-and-model: both dropped in one updatedInput" "$out"; fi
 out=$(jq -n '{context_tokens:50000,from_model:"sonnet",to_model:"opus",source:"user"}' | "$H/guard-model-switch.sh")
 check "switch at 50k ctx -> ask" "$out" '"permissionDecision": *"ask"'
@@ -456,9 +456,9 @@ tgt a8 8; out=$(tgp PreToolUse a8 lim Bash toolu_8_1); check_empty "turn-guard-d
 jq -nc '{type:"assistant",message:{id:"msg_9",content:[{type:"tool_use",id:"toolu_9_1",name:"Bash",input:{}}]}}' >> "$tg/t/subagents/agent-a8.jsonl"
 out=$(tgp PreToolUse a8 lim Bash toolu_9_1); check "turn-guard-tail: a turn appended after the last read is counted" "$out" "$tgdeny"
 out_hb=$(tgp PreToolUse a9 lim SubagentHandback toolu_9_1); check_empty "turn-guard-handback: SubagentHandback passes without a decision" "$out_hb"
-if printf '%s' "$out_deny" | grep -qE "$tgdeny" && ! printf '%s%s%s%s' "$out_main" "$out_early" "$out_deny" "$out_hb" | grep -q '"allow"' && ! grep -q 'allow' "$H/turn-guard.sh" 2>/dev/null; then ok "turn-guard-never-allow: a refusal or nothing"; else bad "turn-guard-never-allow: a refusal or nothing" "$out_deny$out_hb"; fi
+if grep -qE "$tgdeny" < <(printf '%s' "$out_deny") && ! grep -q '"allow"' < <(printf '%s%s%s%s' "$out_main" "$out_early" "$out_deny" "$out_hb") && ! grep -q 'allow' "$H/turn-guard.sh" 2>/dev/null; then ok "turn-guard-never-allow: a refusal or nothing"; else bad "turn-guard-never-allow: a refusal or nothing" "$out_deny$out_hb"; fi
 out=$(CC_DISABLED_HOOKS=x,turn-guard tgp PreToolUse a9 lim Bash toolu_9_1)
-if printf '%s' "$out_deny" | grep -qE "$tgdeny" && [ -z "$out" ]; then ok "turn-guard-disabled: CC_DISABLED_HOOKS=turn-guard silences it"; else bad "turn-guard-disabled: CC_DISABLED_HOOKS=turn-guard silences it" "$out"; fi
+if grep -qE "$tgdeny" < <(printf '%s' "$out_deny") && [ -z "$out" ]; then ok "turn-guard-disabled: CC_DISABLED_HOOKS=turn-guard silences it"; else bad "turn-guard-disabled: CC_DISABLED_HOOKS=turn-guard silences it" "$out"; fi
 tgt p8 8 3; out=$(tgp PreToolUse p8 lim Bash toolu_8_3); check_empty "turn-guard-parallel: three calls of one response are one turn (8 of 10)" "$out"
 tgt p9 9 3; out=$(tgp PreToolUse p9 lim Bash toolu_9_2); check "turn-guard-parallel: the ninth response is refused whichever call asks" "$out" "$tgdeny"
 tgt l7 7; out=$(tgp PreToolUse l7 lim Bash toolu_8_1); check_empty "turn-guard-lag: a call not yet in the transcript is the next turn (8 of 10)" "$out"
@@ -478,7 +478,7 @@ fi
 printf -- '---\nname: oct\nmaxTurns: 010\n---\n' > "$tg/.claude/agents/oct.md"
 printf -- '---\nname: nine\nmaxTurns: 09\n---\n' > "$tg/.claude/agents/nine.md"
 tgt z7 7; out=$(tgp PreToolUse z7 oct Bash toolu_7_1); tgt z9 9; out2=$(tgp PreToolUse z9 oct Bash toolu_9_1)
-if [ -z "$out" ] && printf '%s' "$out2" | grep -qE "$tgdeny"; then ok "turn-guard-leading-zero: maxTurns 010 is ten turns, not eight"; else bad "turn-guard-leading-zero: maxTurns 010 is ten turns, not eight" "turn 7: $out turn 9: $out2"; fi
+if [ -z "$out" ] && grep -qE "$tgdeny" < <(printf '%s' "$out2"); then ok "turn-guard-leading-zero: maxTurns 010 is ten turns, not eight"; else bad "turn-guard-leading-zero: maxTurns 010 is ten turns, not eight" "turn 7: $out turn 9: $out2"; fi
 tgt y8 8; out=$(tgp PreToolUse y8 nine Bash toolu_8_1); check "turn-guard-leading-zero: maxTurns 09 is nine turns" "$out" "$tgdeny"
 tgctx() { [ "$(printf '%s' "$1" | jq -r --arg e "$2" --arg n "$3" '.hookSpecificOutput | .hookEventName == $e and (.additionalContext | test("TURN LIMIT") and test("(^|[^0-9])" + $n + "([^0-9]|$)"))' 2>/dev/null)" = true ]; }
 tgt n7 7; out=$(tgp PostToolUse n7 lim Bash toolu_7_1); check_empty "turn-guard-notice: turn maxTurns-3, no output" "$out"
@@ -494,10 +494,10 @@ printf -- '---\nname: worker\nmodel: sonnet\nmaxTurns: 10\n---\n' > "$tg/.claude
 sef() { jq -n --arg a "$1" --arg t "$tg/t/subagents/agent-$1.jsonl" '{session_id:"tg1",agent_id:$a,agent_type:"worker",agent_transcript_path:$t,last_assistant_message:"Half of the parser is written. NOT CHECKED: the tests.",stop_hook_active:false}' | "$H/subagent-evidence.sh"; }
 tgt f0 9; tgt f9 9
 out0=$(sef f0); tgp PreToolUse f9 worker Bash toolu_9_1 >/dev/null; out=$(sef f9)
-if printf '%s' "$out0" | grep -qE '"decision": *"block"' && [ -z "$out" ]; then ok "subagent-evidence-forced: a report forced by turn-guard passes, the same report without the marker is blocked"; else bad "subagent-evidence-forced: a report forced by turn-guard passes, the same report without the marker is blocked" "unmarked: $out0 marked: $out"; fi
+if grep -qE '"decision": *"block"' < <(printf '%s' "$out0") && [ -z "$out" ]; then ok "subagent-evidence-forced: a report forced by turn-guard passes, the same report without the marker is blocked"; else bad "subagent-evidence-forced: a report forced by turn-guard passes, the same report without the marker is blocked" "unmarked: $out0 marked: $out"; fi
 tgp SubagentStart f9 worker "" "" >/dev/null; out=$(sef f9); check "subagent-evidence-forced: a new leg clears the marker" "$out" '"decision": *"block"'
 out=$(jq -n --arg c "$gm" '{session_id:"ad1",cwd:$c,tool_input:{subagent_type:"scout",model:"opus",prompt:"p",description:"d"}}' | HOME="$TMP" CLAUDE_CODE_SUBAGENT_MODEL=sonnet "$H/guard-subagent.sh")
-if [ -x "$H/agent-def.sh" ] && ! grep -q 'frontmatter()' "$H/guard-subagent.sh" && printf '%s' "$out" | grep -q updatedInput; then ok "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup"; else bad "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup" "$out"; fi
+if [ -x "$H/agent-def.sh" ] && ! grep -q 'frontmatter()' "$H/guard-subagent.sh" && grep -q updatedInput < <(printf '%s' "$out"); then ok "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup"; else bad "agent-def-shared: guard-subagent and turn-guard read definitions through one lookup" "$out"; fi
 
 echo "== advisor-check"
 printf '[DEBUG] [AdvisorTool] Server-side tool enabled with claude-opus-5 as the advisor model\n' > "$TMP/adv-ok.log"
@@ -649,7 +649,7 @@ while IFS= read -r line; do
     "test_"*" ... FAIL"|"test_"*" ... ERROR") bad "${line%% *}" "$(printf '%s' "$tt" | grep -A12 "^[A-Z]*: ${line%% *}" | tail -n +3)" ;;
   esac
 done <<< "$tt"
-printf '%s' "$tt" | grep -qE '^Ran [1-9]' || bad "task tree tests ran" "$tt"
+grep -qE '^Ran [1-9]' < <(printf '%s' "$tt") || bad "task tree tests ran" "$tt"
 
 echo "== full run"
 FR="$SRC/fullrun.sh"
@@ -832,7 +832,7 @@ true
 EOF
 out=$(cd "$fl" && bash "$FR" --out "$fl/r" 2>&1); rep=$(cat "$fl"/r/FULLRUN-*.md 2>/dev/null)
 check "fullrun-leftover: a command that leaves resources behind is named with the delta" "$rep" 'leaves 2 '
-printf '%s' "$rep" | sed -n '/^## Findings/,$p' | grep -q 'tmp_x.*leaves' && bad "fullrun-leftover: a command that cleans up is not named" "$rep" || ok "fullrun-leftover: a command that cleans up is not named"
+grep -q 'tmp_x.*leaves' < <(printf '%s' "$rep" | sed -n '/^## Findings/,$p') && bad "fullrun-leftover: a command that cleans up is not named" "$rep" || ok "fullrun-leftover: a command that cleans up is not named"
 check "fullrun-leftover-not-a-number: a leftover command must print a number" "$rep" 'did not print a number'
 check "fullrun-leftover: leftovers are a finding, not a red status" "$out" 'fail=0 .*mem=0'
 flp="$TMP/fullrun-leftover-par"; mkdir -p "$flp/docs" "$flp/dbs"
@@ -851,7 +851,7 @@ touch dbs/leak_{shard}; sleep 2; [ {shard} -eq 3 ] || rm dbs/leak_{shard}
 ## 7. Delivery
 EOF
 (cd "$flp" && bash "$FR" --out "$flp/r" >/dev/null 2>&1); findings=$(sed -n '/^## Findings/,$p' "$flp"/r/FULLRUN-*.md 2>/dev/null | grep 'leaves')
-printf '%s' "$findings" | grep -q 'clean_' && bad "fullrun-leftover-parallel-no-false-finding: shards that clean up are not reported" "$findings" || ok "fullrun-leftover-parallel-no-false-finding: shards that clean up are not reported"
+grep -q 'clean_' < <(printf '%s' "$findings") && bad "fullrun-leftover-parallel-no-false-finding: shards that clean up are not reported" "$findings" || ok "fullrun-leftover-parallel-no-false-finding: shards that clean up are not reported"
 [ "$(printf '%s\n' "$findings" | grep -c 'leak_')" -eq 1 ] && ok "fullrun-leftover-parallel-leak: one leaking shard gives one finding for the command" || bad "fullrun-leftover-parallel-leak: one leaking shard gives one finding for the command" "$findings"
 fsh="$TMP/fullrun-mem-shared"; mkdir -p "$fsh/docs"
 cat > "$fsh/fork.py" <<'EOF'
@@ -917,7 +917,7 @@ while IFS= read -r line; do
     "test_"*" ... FAIL"|"test_"*" ... ERROR") bad "${line%% *}" "$(printf '%s' "$ft" | grep -A12 "^[A-Z]*: ${line%% *}" | tail -n +3)" ;;
   esac
 done <<< "$ft"
-printf '%s' "$ft" | grep -qE '^Ran [1-9]' || bad "full run engine tests ran" "$ft"
+grep -qE '^Ran [1-9]' < <(printf '%s' "$ft") || bad "full run engine tests ran" "$ft"
 
 echo "== install: retired keys"
 ri="$TMP/retire"; mkdir -p "$ri/skills"
@@ -956,11 +956,18 @@ for src_hook in "$SRC"/hooks/*.sh "$SRC"/hooks/*.py; do
 done
 
 echo "== lint (the harness itself)"
+pgq_files=("$H"/*.sh); [ "$TARGET" = "$SRC" ] && pgq_files+=("$SRC"/*.sh)
+pgq=""
+for f in "${pgq_files[@]}"; do
+  [ -f "$f" ] && grep -q 'pipefail' "$f" || continue
+  while IFS=: read -r n _; do pgq="$pgq ${f#"$TARGET"/}:$n"; done < <(grep -nE '\|[[:space:]]*grep([[:space:]]+-[A-Za-z]+)*[[:space:]]+(-[A-Za-z]*q|--quiet|--silent)' "$f")
+done
+if [ -z "$pgq" ]; then ok "no-pipe-grep-q: no pipe into grep -q in a pipefail script"; else bad "no-pipe-grep-q: no pipe into grep -q in a pipefail script" "${pgq# }"; fi
 if command -v shellcheck >/dev/null; then
   sc=$(shellcheck -S warning "$H"/*.sh "$SRC"/*.sh 2>&1); [ -z "$sc" ] && ok "lint-shell: shellcheck, warnings and above" || bad "lint-shell: shellcheck, warnings and above" "$sc"
 else echo "  SKIP  lint-shell: shellcheck not installed"; fi
 if command -v ruff >/dev/null; then
-  rf=$(ruff check --no-cache --extend-exclude "$SRC/selftest/agentcases" "$H" "$SRC/project-template" "$SRC/selftest" "$SRC/fullrun" 2>&1); printf '%s' "$rf" | grep -q 'All checks passed' && ok "lint-python: ruff" || bad "lint-python: ruff" "$rf"
+  rf=$(ruff check --no-cache --extend-exclude "$SRC/selftest/agentcases" "$H" "$SRC/project-template" "$SRC/selftest" "$SRC/fullrun" 2>&1); grep -q 'All checks passed' < <(printf '%s' "$rf") && ok "lint-python: ruff" || bad "lint-python: ruff" "$rf"
 else echo "  SKIP  lint-python: ruff not installed"; fi
 if command -v gitleaks >/dev/null && [ -d "$SRC/.git" ]; then
   gl=$(gitleaks git --no-banner --redact "$SRC" 2>&1); [ $? -eq 0 ] && ok "no-secrets: gitleaks over the history" || bad "no-secrets: gitleaks over the history" "$gl"
