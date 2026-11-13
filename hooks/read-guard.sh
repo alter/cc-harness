@@ -22,7 +22,7 @@ case "$file" in
   */docs/plans/*|*/CLAUDE.md|*/.claude/*|*.json|*.toml|*.yaml|*.yml|*.lock|*.md) exit 0 ;;
 esac
 
-if file --mime "$file" 2>/dev/null | grep -qvE 'text|json|xml|empty'; then exit 0; fi
+if grep -qvE 'text|json|xml|empty' < <(file --mime "$file" 2>/dev/null); then exit 0; fi
 
 lines=$(wc -l < "$file" | tr -d ' ')
 [ "$lines" -le "$LIMIT" ] && exit 0
