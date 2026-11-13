@@ -12,7 +12,7 @@ source=$(printf '%s' "$payload" | jq -r '.source // "startup"')
 plan=""
 for f in "$cwd"/docs/plans/*.md "$cwd"/tasks/*/PLAN.md "$cwd"/tasks/*/*/PLAN.md; do
   [ -f "$f" ] || continue
-  if head -n 8 "$f" | grep -qE '^status: *running *$'; then plan="$f"; break; fi
+  if grep -qE '^status: *running *$' <<<"$(head -n 8 "$f")"; then plan="$f"; break; fi
 done
 [ -z "$plan" ] && exit 0
 

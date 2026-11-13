@@ -73,6 +73,10 @@ seq 1 40 > "$TMP/small.py"
 seq 1 900 > "$TMP/with space.py"
 out=$(jq -n --arg f "$TMP/big.md" '{tool_name:"Read",tool_input:{file_path:$f}}' | "$H/read-guard.sh")
 check_empty "allow .md regardless of size" "$out"
+nofile="$TMP/nofile-bin"; mkdir -p "$nofile"
+for c in bash jq wc tr basename grep cat; do ln -sf "$(command -v "$c")" "$nofile/$c"; done
+out=$(jq -n --arg f "$TMP/big.py" '{tool_name:"Read",tool_input:{file_path:$f}}' | PATH="$nofile" "$H/read-guard.sh" 2>&1)
+check "read-guard-pipe-no-file: with no file binary the guard still refuses a 600-line read" "$out" '"permissionDecision": *"deny"'
 
 echo "== bash-read-guard"
 brg() { jq -n --arg c "$1" '{tool_name:"Bash",tool_input:{command:$c}}' | python3 "$H/bash-read-guard.py"; }
@@ -330,6 +334,8 @@ check "stop-guard-pipe-long-header: a running plan with a 100 KiB line 3 is stil
 out=$(jq -n --arg c "$proj" '{cwd:$c,source:"compact"}' | "$H/session-start.sh")
 check "session-start after compact re-injects plan" "$out" 'Context was just compacted.*2 open, 1 blocked'
 check "session-start carries last log" "$out" 'T00 done: baseline green'
+out=$(jq -n --arg c "$ph" '{cwd:$c,source:"compact"}' | "$H/session-start.sh" 2>&1)
+check "session-start-pipe-long-header: a running plan with a 100 KiB line 3 is still re-injected" "$out" 'h\.md.*1 open'
 sed -i.bak -E 's/^- \[ \] (T0[12])/- [x] \1/' "$proj/docs/plans/smoke.md"
 out=$(sp "done" | HOME="$TMP" "$H/stop-guard.sh"); check_empty "0 open: stop allowed" "$out"
 
