@@ -310,9 +310,9 @@ out=$(fp | HOME="$TMP" "$H/stop-guard.sh"); check_empty "ac-freeze-restored: res
 sed -i.bak 's/verify: `pytest -k parser`/verify: `true`/' "$frz/docs/plans/f.md"
 out=$(fp | HOME="$TMP" "$H/stop-guard.sh"); check "ac-freeze-verify-changed-blocks: a weakened verify blocks the stop" "$out" '"decision": *"block"'
 
-big="$TMP/big-100k"; head -c 102400 /dev/zero | tr '\0' x > "$big"
+filler="$TMP/filler-100k"; head -c 102400 /dev/zero | tr '\0' x > "$filler"
 pz="$TMP/pipe-freeze"; mkdir -p "$pz/docs/plans"
-v500=$(head -c 500 "$big")
+v500=$(head -c 500 "$filler")
 { printf -- '---\nstatus: running\n---\n# P\n\n\n\n\n## Acceptance criteria\n- [x] AC1 short — `true`\n## Tasks\n'
   for i in $(seq 100 299); do printf -- '- [x] T%s t — verify: `%s`\n' "$i" "$v500"; done; printf '## Log\n'; } > "$pz/docs/plans/p.md"
 pzp() { jq -n --arg c "$pz" '{cwd:$c,session_id:"pipe-freeze",last_assistant_message:"x"}' | HOME="$TMP" "$H/stop-guard.sh" 2>&1; }
@@ -321,13 +321,13 @@ out=$(pzp); check_empty "stop-guard-pipe-unchanged: frozen lines that total 100 
 sed -i.bak 's/AC1 short/AC1 weak/' "$pz/docs/plans/p.md"
 out=$(pzp); check "stop-guard-pipe-changed: an edited short line still blocks and is named" "$out" 'AC: AC1 short'
 if grep -qE 'T[0-9]{3}:' <<<"$out"; then bad "stop-guard-pipe-changed-only: the lines that did not change are not named" "$out"; else ok "stop-guard-pipe-changed-only: the lines that did not change are not named"; fi
-bigmsg="$TMP/big-need-human"; { printf 'NEED_HUMAN\n'; cat "$big"; } > "$bigmsg"
+bigmsg="$TMP/big-need-human"; { printf 'NEED_HUMAN\n'; cat "$filler"; } > "$bigmsg"
 pn="$TMP/pipe-need-human"; mkdir -p "$pn/docs/plans"
 printf -- '---\nstatus: running\n---\n# N\n## Tasks\n- [ ] T01 open — verify: `true`\n## Log\n' > "$pn/docs/plans/n.md"
 out=$(jq -n --arg c "$pn" --rawfile l "$bigmsg" '{cwd:$c,session_id:"pipe-need-human",last_assistant_message:$l}' | HOME="$TMP" "$H/stop-guard.sh" 2>&1)
 check_empty "stop-guard-pipe-need-human: NEED_HUMAN on the first line of a 100 KiB message releases the turn" "$out"
 ph="$TMP/pipe-header"; mkdir -p "$ph/docs/plans"
-{ printf -- '---\nstatus: running\nnote: '; cat "$big"; printf -- '\n---\n# H\n## Tasks\n- [ ] T01 open — verify: `true`\n## Log\n'; } > "$ph/docs/plans/h.md"
+{ printf -- '---\nstatus: running\nnote: '; cat "$filler"; printf -- '\n---\n# H\n## Tasks\n- [ ] T01 open — verify: `true`\n## Log\n'; } > "$ph/docs/plans/h.md"
 out=$(jq -n --arg c "$ph" '{cwd:$c,session_id:"pipe-header",last_assistant_message:"x"}' | HOME="$TMP" "$H/stop-guard.sh" 2>&1)
 check "stop-guard-pipe-long-header: a running plan with a 100 KiB line 3 is still found" "$out" 'T01 open'
 
@@ -365,6 +365,10 @@ out=$(se researcher "$tr_none" "NOT DONE: no network" | "$H/subagent-evidence.sh
 check_empty "NOT DONE always allowed" "$out"
 out=$(se scout "$tr_none" "anything" | jq '.stop_hook_active=true' | "$H/subagent-evidence.sh")
 check_empty "stop_hook_active -> allow (no loop)" "$out"
+sebig() { { printf '%s\n' "$3"; cat "$filler"; } > "$TMP/se-big.txt"; jq -n --arg a "$1" --arg t "$2" --rawfile l "$TMP/se-big.txt" '{agent_type:$a,agent_transcript_path:$t,last_assistant_message:$l,stop_hook_active:false}' | "$H/subagent-evidence.sh" 2>&1; }
+check_empty "subagent-evidence-pipe-scout: a path on line 1 of a 100 KiB report passes" "$(sebig scout "$tr_grep" "src/app.py:12 handles auth.")"
+check_empty "subagent-evidence-pipe-test-runner: COMMAND and PASS on line 1 of a 100 KiB report pass" "$(sebig test-runner "$TMP/tr-bash.jsonl" "COMMAND: pytest -q PASS 1")"
+check_empty "subagent-evidence-pipe-not-done: NOT DONE on line 1 of a 100 KiB report passes" "$(sebig worker "$tr_none" "NOT DONE: x")"
 
 tr_graph="$TMP/tr-graph.jsonl"
 { jq -nc '{message:{content:[{type:"tool_use",name:"mcp__graphify__get_node",input:{}}]}}'; jq -nc '{message:{content:[{type:"tool_use",name:"mcp__graphify__get_neighbors",input:{}}]}}'; } > "$tr_graph"
