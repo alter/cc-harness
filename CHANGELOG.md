@@ -2,6 +2,18 @@
 
 One entry per `stable-*` tag, newest first. The reasons and the evidence behind each entry are in the plan under `docs/plans/` named in it.
 
+## stable-2026-11-13 — no pipe into `grep -q` under pipefail
+
+Plan: `docs/plans/pipefail-grep-q.md`.
+
+### Fixed
+- `stop-guard` reported "acceptance criteria or verify commands changed" on an unchanged plan, now and then. Under `set -o pipefail`, `printf … | grep -q` returns 141 when `grep` finds the match and exits while `printf` is still writing: the writer gets SIGPIPE and the pipeline reports failure although `grep` returned 0. Measured on the installed hook: 3 false blocks in 600 rounds on an unchanged plan, `PIPESTATUS` `141 0` once in 10 800 comparisons; 0 in 2000 with the fix. A false finding also reset the "plan not advancing" count, because the reason is part of its key.
+- The same race in the other direction: `NEED_HUMAN` on line 1 of a 2001-line message was missed 283 times in 5000, so the escape hatch kept blocking; a running plan with a long line in its first 8 could be missed by `stop-guard` and `session-start`; `subagent-evidence` could refuse a report whose path, `COMMAND:`, `PASS` or `NOT DONE` was there.
+- Every such test now reads a here-string, or process substitution where empty input must stay "no line" (`read-guard` with no `file` binary). With 100 KiB of input after the match the race is deterministic, which is what the new selftest cases use.
+
+### Added
+- Selftest `no-pipe-grep-q`: no `*.sh` that sets `pipefail` pipes into `grep -q`; selftest's own checks follow the rule.
+
 ## stable-2026-11-12-2 — /plan no longer traps its own window
 
 ### Fixed
