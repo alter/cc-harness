@@ -59,7 +59,7 @@ else
   changed=""
   while IFS= read -r line; do
     [ -z "$line" ] && continue
-    printf '%s\n' "$current" | grep -qxF -- "$line" || changed="$changed; ${line%%|*}: ${line#*|}"
+    grep -qxF -- "$line" <<<"$current" || changed="$changed; ${line%%|*}: ${line#*|}"
   done < "$freeze"
   if [ -n "$changed" ]; then
     guard_reason="Plan $rel: acceptance criteria or verify commands changed since the plan started running (${changed#; }). The executor may not weaken or rewrite what proves the work; restore those lines exactly. Splitting a task adds lines, it does not rewrite them. Only the owner changes acceptance: they edit the plan and change its 'created:' line, or delete $freeze."
