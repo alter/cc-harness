@@ -306,6 +306,18 @@ out=$(fp | HOME="$TMP" "$H/stop-guard.sh"); check_empty "ac-freeze-restored: res
 sed -i.bak 's/verify: `pytest -k parser`/verify: `true`/' "$frz/docs/plans/f.md"
 out=$(fp | HOME="$TMP" "$H/stop-guard.sh"); check "ac-freeze-verify-changed-blocks: a weakened verify blocks the stop" "$out" '"decision": *"block"'
 
+big="$TMP/big-100k"; head -c 102400 /dev/zero | tr '\0' x > "$big"
+pz="$TMP/pipe-freeze"; mkdir -p "$pz/docs/plans"
+v500=$(head -c 500 "$big")
+{ printf -- '---\nstatus: running\n---\n# P\n\n\n\n\n## Acceptance criteria\n- [x] AC1 short — `true`\n## Tasks\n'
+  for i in $(seq 100 299); do printf -- '- [x] T%s t — verify: `%s`\n' "$i" "$v500"; done; printf '## Log\n'; } > "$pz/docs/plans/p.md"
+pzp() { jq -n --arg c "$pz" '{cwd:$c,session_id:"pipe-freeze",last_assistant_message:"x"}' | HOME="$TMP" "$H/stop-guard.sh" 2>&1; }
+pzp >/dev/null
+out=$(pzp); check_empty "stop-guard-pipe-unchanged: frozen lines that total 100 KiB are not reported as changed" "$out"
+sed -i.bak 's/AC1 short/AC1 weak/' "$pz/docs/plans/p.md"
+out=$(pzp); check "stop-guard-pipe-changed: an edited short line still blocks and is named" "$out" 'AC: AC1 short'
+if grep -qE 'T[0-9]{3}:' <<<"$out"; then bad "stop-guard-pipe-changed-only: the lines that did not change are not named" "$out"; else ok "stop-guard-pipe-changed-only: the lines that did not change are not named"; fi
+
 out=$(jq -n --arg c "$proj" '{cwd:$c,source:"compact"}' | "$H/session-start.sh")
 check "session-start after compact re-injects plan" "$out" 'Context was just compacted.*2 open, 1 blocked'
 check "session-start carries last log" "$out" 'T00 done: baseline green'
