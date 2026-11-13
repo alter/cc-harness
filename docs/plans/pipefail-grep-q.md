@@ -1,5 +1,5 @@
 ---
-status: draft
+status: running
 created: 2026-11-13
 ---
 # No `| grep -q` under pipefail: the SIGPIPE race in the hooks
@@ -55,7 +55,7 @@ From the user's report (measured on their machine, installed hook, commit 057b4a
 - Pushing commits or the tag.
 
 ## Tasks
-- [ ] T00 Baseline: `./selftest.sh > .claude/scratch/pipefail/T00-selftest.log 2>&1`, record pass/fail counts and any red check in `## Log` — verify: `test -s .claude/scratch/pipefail/T00-selftest.log`
+- [x] T00 Baseline: `./selftest.sh > .claude/scratch/pipefail/T00-selftest.log 2>&1`, record pass/fail counts and any red check in `## Log` — verify: `test -s .claude/scratch/pipefail/T00-selftest.log`
 - [ ] T01 `stop-guard.sh:62`. Selftest cases `stop-guard-pipe-unchanged` (running plan, 0 open tasks, frozen lines: a short AC line, then a task whose verify line is 100 KiB; first run freezes, second run on the unchanged plan prints nothing on stdout and stderr together) and `stop-guard-pipe-changed` (the short AC line edited: block naming `AC`). Seen red first (`.claude/scratch/pipefail/T01-red.log`), then `grep -qxF -- "$line" <<<"$current" || changed=…` — verify: `./selftest.sh`
 - [ ] T02 `stop-guard.sh:32` and `:23`. Cases `stop-guard-pipe-need-human` (plan with one open task, last message `NEED_HUMAN` + newline + 100 KiB: no block) and `stop-guard-pipe-long-header` (running plan whose line 3 is 100 KiB, one open task: block for the open task). Seen red first (`T02-red.log`), then here-strings on both lines — verify: `./selftest.sh`
 - [ ] T03 `session-start.sh:15` and `read-guard.sh:25`. Case `session-start-pipe-long-header` (running plan with a 100 KiB line 3: the session-start output names the plan as it does for a normal plan). Seen red first (`T03-red.log`), then a here-string in `session-start.sh` and process substitution in `read-guard.sh` (E6a); case `read-guard-pipe-no-file` (`PATH` without `file`: the guard still runs on a text file, as the old pipe did) green before and after the change; the existing read-guard cases stay green — verify: `./selftest.sh`
@@ -67,3 +67,4 @@ From the user's report (measured on their machine, installed hook, commit 057b4a
 - [ ] T09 Tag per D2: `git tag stable-2026-11-13` on the final commit, no push — verify: `git tag --points-at HEAD | grep -x stable-2026-11-13`
 
 ## Log
+- 2026-11-13 T00 done: `./selftest.sh` exit 0, passed 477, failed 0 (`.claude/scratch/pipefail/T00-selftest.log`, 2:30 wall); no red check before the change
