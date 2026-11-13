@@ -20,7 +20,7 @@ if [ -n "$(find "$nap" -mmin -15 2>/dev/null)" ] && jq -e '.pending == true' "$n
 plan=""
 for f in "$cwd"/docs/plans/*.md "$cwd"/tasks/*/PLAN.md "$cwd"/tasks/*/*/PLAN.md; do
   [ -f "$f" ] || continue
-  if head -n 8 "$f" | grep -qE '^status: *running *$'; then plan="$f"; break; fi
+  if grep -qE '^status: *running *$' <<<"$(head -n 8 "$f")"; then plan="$f"; break; fi
 done
 [ -z "$plan" ] && exit 0
 
@@ -29,7 +29,7 @@ blocked=$(grep -cE '^- \[!\] ' "$plan" || true)
 rel=${plan#"$cwd"/}
 
 
-if printf '%s' "$last" | grep -q 'NEED_HUMAN'; then
+if grep -q 'NEED_HUMAN' <<<"$last"; then
   [ -x "$NOTIFY" ] && "$NOTIFY" "Claude needs you" "$rel: $blocked blocked, $open open" || true
   exit 0
 fi

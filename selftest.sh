@@ -317,6 +317,15 @@ out=$(pzp); check_empty "stop-guard-pipe-unchanged: frozen lines that total 100 
 sed -i.bak 's/AC1 short/AC1 weak/' "$pz/docs/plans/p.md"
 out=$(pzp); check "stop-guard-pipe-changed: an edited short line still blocks and is named" "$out" 'AC: AC1 short'
 if grep -qE 'T[0-9]{3}:' <<<"$out"; then bad "stop-guard-pipe-changed-only: the lines that did not change are not named" "$out"; else ok "stop-guard-pipe-changed-only: the lines that did not change are not named"; fi
+bigmsg="$TMP/big-need-human"; { printf 'NEED_HUMAN\n'; cat "$big"; } > "$bigmsg"
+pn="$TMP/pipe-need-human"; mkdir -p "$pn/docs/plans"
+printf -- '---\nstatus: running\n---\n# N\n## Tasks\n- [ ] T01 open — verify: `true`\n## Log\n' > "$pn/docs/plans/n.md"
+out=$(jq -n --arg c "$pn" --rawfile l "$bigmsg" '{cwd:$c,session_id:"pipe-need-human",last_assistant_message:$l}' | HOME="$TMP" "$H/stop-guard.sh" 2>&1)
+check_empty "stop-guard-pipe-need-human: NEED_HUMAN on the first line of a 100 KiB message releases the turn" "$out"
+ph="$TMP/pipe-header"; mkdir -p "$ph/docs/plans"
+{ printf -- '---\nstatus: running\nnote: '; cat "$big"; printf -- '\n---\n# H\n## Tasks\n- [ ] T01 open — verify: `true`\n## Log\n'; } > "$ph/docs/plans/h.md"
+out=$(jq -n --arg c "$ph" '{cwd:$c,session_id:"pipe-header",last_assistant_message:"x"}' | HOME="$TMP" "$H/stop-guard.sh" 2>&1)
+check "stop-guard-pipe-long-header: a running plan with a 100 KiB line 3 is still found" "$out" 'T01 open'
 
 out=$(jq -n --arg c "$proj" '{cwd:$c,source:"compact"}' | "$H/session-start.sh")
 check "session-start after compact re-injects plan" "$out" 'Context was just compacted.*2 open, 1 blocked'
