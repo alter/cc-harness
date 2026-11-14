@@ -9,18 +9,12 @@ source=$(printf '%s' "$payload" | jq -r '.source // "startup"')
 [ -z "$cwd" ] && exit 0
 [ -f "$cwd/.claude/plan-pause" ] && exit 0
 
-plan=""
-for f in "$cwd"/docs/plans/*.md "$cwd"/tasks/*/PLAN.md "$cwd"/tasks/*/*/PLAN.md; do
-  [ -f "$f" ] || continue
-  if grep -qE '^status: *running *$' <<<"$(head -n 8 "$f")"; then plan="$f"; break; fi
-done
+plan=""; open=0; blocked=0
+{ IFS= read -r plan; IFS= read -r open; IFS= read -r blocked; } < <("$(dirname "$0")/plan-pick.sh" "$cwd" 2>/dev/null)
 [ -z "$plan" ] && exit 0
-
-open=$(grep -cE '^- \[ \] ' "$plan" || true)
-blocked=$(grep -cE '^- \[!\] ' "$plan" || true)
 [ "$open" -eq 0 ] && exit 0
 rel=${plan#"$cwd"/}
-next=$(grep -E '^- \[ \] ' "$plan" | head -n 3 | sed -E 's/^- \[ \] //' | tr '\n' ';' | sed 's/;$//')
+next=$(grep -E '^- \[ \] T[0-9]' "$plan" | head -n 3 | sed -E 's/^- \[ \] //' | tr '\n' ';' | sed 's/;$//')
 lastlog=$(awk '/^## Log/{f=1;next} /^## /{f=0} f && /^- /' "$plan" | tail -n 2 | tr '\n' ' ')
 
 case "$source" in
