@@ -11,11 +11,21 @@ payload=$(cat)
 cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty')
 session=$(printf '%s' "$payload" | jq -r '.session_id // "unknown"')
 last=$(printf '%s' "$payload" | jq -r '.last_assistant_message // ""')
+transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // ""')
 
 [ -z "$cwd" ] && exit 0
 [ -f "$cwd/.claude/plan-pause" ] && exit 0
 nap="${CLAUDE_STATE_DIR:-$HOME/.claude/state}/catnap/$session.json"
 if [ -n "$(find "$nap" -mmin -15 2>/dev/null)" ] && jq -e '.pending == true' "$nap" >/dev/null 2>&1; then exit 0; fi
+if [ -f "$transcript" ]; then
+  last_tool=$(tail -n 400 "$transcript" | jq -r 'if .type == "system" and .subtype == "compact_boundary" then "compact_boundary" elif .type == "assistant" then (.message.content[]? | select(.type == "tool_use") | .name) else empty end' 2>/dev/null | tail -n 1)
+  [ "$last_tool" = "mcp__catnap__compact_now" ] && exit 0
+  idle=${CC_STOP_GUARD_AGENT_IDLE:-15}
+  for meta in "${transcript%.jsonl}"/subagents/agent-*.meta.json; do
+    [ -f "$meta" ] && [ -n "$(find "${meta%.meta.json}.jsonl" -mmin -"$idle" 2>/dev/null)" ] || continue
+    jq -e '.requestShape == "background" and (.finished // false | not)' "$meta" >/dev/null 2>&1 && exit 0
+  done
+fi
 
 plan=""; open=0; blocked=0
 { IFS= read -r plan; IFS= read -r open; IFS= read -r blocked; } < <("$(dirname "$0")/plan-pick.sh" "$cwd" 2>/dev/null)

@@ -361,6 +361,27 @@ pp3="$TMP/pp3"; mkdir -p "$pp3/docs/plans"
 printf -- '---\nstatus: running\n---\n# A\n## Acceptance criteria\n- [x] AC1 parser — `pytest -k parser`\n## Tasks\n- [x] T01 a — verify: `true`\n## Log\n' > "$pp3/docs/plans/a.md"
 pcp "$pp3" pp3 >/dev/null; sed -i.bak 's/pytest -k parser/true/' "$pp3/docs/plans/a.md"
 check "plan-pick-fresh-finished: a plan finished just now is still checked for weakened criteria" "$(pcp "$pp3" pp3)" '"decision": *"block"'
+rl="$TMP/rel"; mkdir -p "$rl/docs/plans" "$rl/tr/s1/subagents"
+printf -- '---\nstatus: running\n---\n# R\n## Tasks\n- [ ] T01 open — verify: `true`\n## Log\n' > "$rl/docs/plans/r.md"
+jq -nc '{type:"assistant",message:{content:[{type:"tool_use",name:"Bash",input:{}}]}}' > "$rl/tr/s1.jsonl"
+rlp() { jq -n --arg c "$rl" --arg t "$rl/tr/s1.jsonl" --arg s "$1" '{cwd:$c,session_id:$s,transcript_path:$t,last_assistant_message:"x"}' | HOME="$TMP" CC_STOP_GUARD_STALL=100 "$H/stop-guard.sh" 2>&1; }
+sa="$rl/tr/s1/subagents"
+agent() { rm -f "$sa"/*; printf '%s\n' "$1" > "$sa/agent-a1.meta.json"; printf '{}\n' > "$sa/agent-a1.jsonl"; [ -n "${2:-}" ] && touch -t "$2" "$sa/agent-a1.jsonl"; true; }
+agent '{"requestShape":"background"}'
+check_empty "stop-release-agent-live: a coordinator whose background agent is working may wait for it" "$(rlp ra1)"
+agent '{"requestShape":"background","finished":true}'
+check "stop-release-agent-finished: a finished background agent does not release the stop" "$(rlp ra2)" '"decision": *"block"'
+agent '{"requestShape":"foreground","finished":true}'
+check "stop-release-agent-foreground: a foreground agent that just returned does not release the stop" "$(rlp ra3)" '"decision": *"block"'
+agent '{"requestShape":"background"}' 202001010000
+check "stop-release-agent-stale: a background agent silent for long does not release the stop" "$(rlp ra4)" '"decision": *"block"'
+rm -f "$sa"/*
+{ jq -nc '{type:"assistant",message:{content:[{type:"tool_use",name:"Bash",input:{}}]}}'; jq -nc '{type:"assistant",message:{content:[{type:"tool_use",name:"mcp__catnap__compact_now",input:{}}]}}'; jq -nc '{type:"assistant",message:{content:[{type:"text",text:"done"}]}}'; } > "$rl/tr/s1.jsonl"
+check_empty "stop-release-catnap-race: a turn that ended on compact_now lets the compaction run before the flag is on disk" "$(rlp rc1)"
+jq -nc '{type:"assistant",message:{content:[{type:"tool_use",name:"Bash",input:{}}]}}' >> "$rl/tr/s1.jsonl"
+check "stop-release-catnap-later-call: a tool call after compact_now does not release the stop" "$(rlp rc2)" '"decision": *"block"'
+{ jq -nc '{type:"assistant",message:{content:[{type:"tool_use",name:"mcp__catnap__compact_now",input:{}}]}}'; jq -nc '{type:"system",subtype:"compact_boundary"}'; jq -nc '{type:"assistant",message:{content:[{type:"text",text:"continuing"}]}}'; } > "$rl/tr/s1.jsonl"
+check "stop-release-catnap-after-compaction: once the compaction ran, compact_now no longer releases the stop" "$(rlp rc3)" '"decision": *"block"'
 
 out=$(jq -n --arg c "$proj" '{cwd:$c,source:"compact"}' | "$H/session-start.sh")
 check "session-start after compact re-injects plan" "$out" 'Context was just compacted.*2 open, 1 blocked'
