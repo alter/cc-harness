@@ -13,6 +13,29 @@ session=$(printf '%s' "$payload" | jq -r '.session_id // "unknown"')
 last=$(printf '%s' "$payload" | jq -r '.last_assistant_message // ""')
 transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // ""')
 
+bg_task_live() {
+  local hits ended now kind id val paths=()
+  hits=$(grep -F -e 'background with ID: ' -e 'moved to the background (ID: ' -e 'Monitor started (task ' -e '<task-id>' "$1" 2>/dev/null) || return 1
+  ended=$(grep -F '<status>' <<<"$hits" | grep -o '<task-id>[A-Za-z0-9_-]*</task-id>')
+  now=$(date +%s)
+  while IFS=$'\t' read -r kind id val; do
+    [ -n "$id" ] || continue
+    grep -qxF "<task-id>$id</task-id>" <<<"$ended" && continue
+    case $kind in
+      B) [ -e "$val" ] && paths+=("$val") ;;
+      M) [ "$now" -lt "$val" ] && return 0 ;;
+    esac
+  done < <(jq -r '
+    select(.type == "user")
+    | ((.timestamp // "") | sub("\\.[0-9]+Z$"; "Z") | (try fromdateiso8601 catch 0)) as $ts
+    | .message.content[]? | select(.type? == "tool_result")
+    | (.content | if type == "string" then . else ([.[]? | .text? // empty] | join("\n")) end)
+    | (capture("(background with ID: |moved to the background \\(ID: )(?<id>[A-Za-z0-9_-]+)\\)?\\. Output is being written to: (?<p>\\S+?\\.output)") | "B\t\(.id)\t\(.p)"),
+      (capture("Monitor started \\(task (?<id>[A-Za-z0-9_-]+), expires in (?<n>[0-9]+)(?<u>[smh])") | "M\t\(.id)\t\($ts + (.n | tonumber) * ({"s": 1, "m": 60, "h": 3600}[.u]) | floor)")
+  ' <<<"$hits" 2>/dev/null)
+  [ ${#paths[@]} -gt 0 ] && command -v lsof >/dev/null && [ -n "$(lsof -t -- "${paths[@]}" 2>/dev/null)" ]
+}
+
 [ -z "$cwd" ] && exit 0
 [ -f "$cwd/.claude/plan-pause" ] && exit 0
 nap="${CLAUDE_STATE_DIR:-$HOME/.claude/state}/catnap/$session.json"
@@ -25,6 +48,7 @@ if [ -f "$transcript" ]; then
     [ -f "$meta" ] && [ -n "$(find "${meta%.meta.json}.jsonl" -mmin -"$idle" 2>/dev/null)" ] || continue
     jq -e '.requestShape == "background" and (.finished // false | not)' "$meta" >/dev/null 2>&1 && exit 0
   done
+  bg_task_live "$transcript" && exit 0
 fi
 
 plan=""; open=0; blocked=0
