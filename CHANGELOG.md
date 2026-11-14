@@ -2,6 +2,13 @@
 
 One entry per `stable-*` tag, newest first. The reasons and the evidence behind each entry are in the plan under `docs/plans/` named in it.
 
+## stable-2026-11-14-3 — stop-guard waits for background commands and monitors
+
+Plan: `docs/plans/stop-guard-background-tasks.md`.
+
+### Fixed
+- `stable-2026-11-14-2` let a session wait for a background agent but not for a background command or a `Monitor`. In one game repository the model started its probe chain with `run_in_background` and a `Monitor` on it, `stop-guard` blocked each following turn end, and the model went back to polling the output file in a `sleep` loop. `stop-guard` now stays quiet while a background command of the session has no completion notice and `lsof` finds its output file held open (the file's age says nothing: a command that writes to its own log leaves it empty), or while a `Monitor` has no completion notice and is inside its `expires in` window. A monitor's event notices carry no `<status>` and do not end it. Without `lsof` the command rule never releases.
+
 ## stable-2026-11-14-2 — stop-guard waits for background agents and for catnap
 
 Plan: `docs/plans/stop-guard-releases.md`.
