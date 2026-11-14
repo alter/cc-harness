@@ -1,5 +1,5 @@
 ---
-status: running
+status: done
 created: 2026-11-14
 ---
 # stop-guard counts tasks, not criteria; skips finished plans; integrity-check skips binaries
@@ -8,13 +8,13 @@ created: 2026-11-14
 `stop-guard` and `session-start` count and name only task lines (`- [ ] T…`), so an open or HUMAN acceptance criterion neither keeps a finished plan blocking nor appears as "Next". Both hooks pick the plan through one shared helper that prefers a running plan with open tasks and ignores a running plan with no open task that has not been touched for two hours, so a stale plan no longer steals the stop of a session that has only a draft. `integrity-check` skips binary files and stops at a time budget below the hook timeout, so it never runs for minutes. `/run` finishes a plan when no task line is open. The fix is installed into `~/.claude`.
 
 ## Acceptance criteria
-- [ ] AC1 A running plan whose tasks are all `[x]` and whose acceptance lines are still `[ ]` lets the stop through; "Next" names task lines only; `session-start` counts task lines only — `./selftest.sh` (plan-count-*)
-- [ ] AC2 A stale running plan with no open task (mtime older than `CC_STOP_GUARD_FRESH` minutes, default 120) is ignored by `stop-guard` and `session-start`; a running plan with open tasks is chosen over a finished one earlier in the glob; a freshly finished plan is still checked — `./selftest.sh` (plan-pick-*)
-- [ ] AC3 `integrity-check` reports nothing for a binary file that carries a marker, still reports a marker added to a text file, and with `CC_INTEGRITY_SECONDS=0` stops at once without a finding — `./selftest.sh` (integrity-binary-*, integrity-deadline)
-- [ ] AC4 Each case of AC1–AC3 that changes behaviour was seen red on the unfixed code; red output under `.claude/scratch/plan-pick/` — `ls .claude/scratch/plan-pick/*-red.log`
-- [ ] AC5 On `project E` (base `dac5e8b`, 867 changed files, 562 binary) `integrity-check` finishes in under 15 s with the same finding; the installed `stop-guard` on a scratch clone of `project E` where `plan-1.md` is `draft` and the real freeze of `plan-2.md` is copied in is silent within the hook timeout — `.claude/scratch/plan-pick/T06-*.log`
-- [ ] AC6 `/run` finishes when no task line is open; HUMAN acceptance lines are listed for the owner — `grep -n 'task line' skills/run/SKILL.md`
-- [ ] AC7 No regression: selftest green at T00 stays green; trial install and live install pass selftest — `./selftest.sh`, `./selftest.sh <trial>`, `./selftest.sh ~/.claude`
+- [x] AC1 A running plan whose tasks are all `[x]` and whose acceptance lines are still `[ ]` lets the stop through; "Next" names task lines only; `session-start` counts task lines only — `./selftest.sh` (plan-count-*)
+- [x] AC2 A stale running plan with no open task (mtime older than `CC_STOP_GUARD_FRESH` minutes, default 120) is ignored by `stop-guard` and `session-start`; a running plan with open tasks is chosen over a finished one earlier in the glob; a freshly finished plan is still checked — `./selftest.sh` (plan-pick-*)
+- [x] AC3 `integrity-check` reports nothing for a binary file that carries a marker, still reports a marker added to a text file, and with `CC_INTEGRITY_SECONDS=0` stops at once without a finding — `./selftest.sh` (integrity-binary-*, integrity-deadline)
+- [x] AC4 Each case of AC1–AC3 that changes behaviour was seen red on the unfixed code; red output under `.claude/scratch/plan-pick/` — `ls .claude/scratch/plan-pick/*-red.log`
+- [x] AC5 On `project E` (base `dac5e8b`, 867 changed files, 562 binary) `integrity-check` finishes in under 15 s with the same finding; the installed `stop-guard` on a scratch clone of `project E` where `plan-1.md` is `draft` and the real freeze of `plan-2.md` is copied in is silent within the hook timeout — `.claude/scratch/plan-pick/T06-*.log`
+- [x] AC6 `/run` finishes when no task line is open; HUMAN acceptance lines are listed for the owner — `grep -n 'task line' skills/run/SKILL.md`
+- [x] AC7 No regression: selftest green at T00 stays green; trial install and live install pass selftest — `./selftest.sh`, `./selftest.sh <trial>`, `./selftest.sh ~/.claude`
 
 ## Stack
 - bash 5.3.9, ugrep 7.8.4, jq, python 3 (stdlib), git. Claude Code 2.1.323 per the user.
@@ -48,7 +48,7 @@ created: 2026-11-14
 - [x] T03 `skills/run/SKILL.md` Finish per Assumptions — verify: `grep -n 'task line' skills/run/SKILL.md`
 - [x] T04 Docs: README.md and HARNESS.md hook tables name `plan-pick.sh`; INSTALL.md bullets for the new cases; CHANGELOG entry `stable-2026-11-14` (not tagged) — verify: `grep -n 'plan-pick' README.md HARNESS.md INSTALL.md CHANGELOG.md`
 - [x] T05 Final gate: `./selftest.sh` against T00; trial install with an absolute path, `./selftest.sh <trial>` — verify: `./selftest.sh && ./selftest.sh $PWD/.claude/scratch/plan-pick/trial`
-- [ ] T06 Live install, `./selftest.sh ~/.claude`; on `project E`: timed `integrity-check` with base `dac5e8b` (`T06-integrity.log`), and the installed `stop-guard` against a `git clone --shared` scratch copy with `plan-1.md` set to `draft` and the real `plan-2` freeze copied under the clone's key, in scratch `XDG_STATE_HOME`/`HOME` (`T06-stop.log`) — verify: `./selftest.sh ~/.claude && test -s .claude/scratch/plan-pick/T06-integrity.log && test -s .claude/scratch/plan-pick/T06-stop.log`
+- [x] T06 Live install, `./selftest.sh ~/.claude`; on `project E`: timed `integrity-check` with base `dac5e8b` (`T06-integrity.log`), and the installed `stop-guard` against a `git clone --shared` scratch copy with `plan-1.md` set to `draft` and the real `plan-2` freeze copied under the clone's key, in scratch `XDG_STATE_HOME`/`HOME` (`T06-stop.log`) — verify: `./selftest.sh ~/.claude && test -s .claude/scratch/plan-pick/T06-integrity.log && test -s .claude/scratch/plan-pick/T06-stop.log`
 
 ## Log
 - 2026-11-14 T00 (cited): `./selftest.sh` 488 passed, 0 failed at `ec703c4` (`.claude/scratch/pipefail/T07-selftest.log`); no code changed since
@@ -57,3 +57,5 @@ created: 2026-11-14
 - 2026-11-14 T03 done: `skills/run/SKILL.md` loop and Finish count task lines (`- [ ] T…`); an open HUMAN acceptance line no longer holds the plan and is listed for the owner; verify grep prints lines 29, 90–92
 - 2026-11-14 T04 done: README (stop-guard paragraph, hook table row for `plan-pick.sh`, integrity row), HARNESS (file count 215, stop-guard row, `plan-pick.sh` row, integrity row), INSTALL bullet, CHANGELOG `stable-2026-11-14` (not tagged); verify grep finds `plan-pick` in all four
 - 2026-11-14 T05 done: `./selftest.sh` passed 499, failed 0 (`T05-selftest.log`); against T00 (`pipefail/T07-selftest.log`, temp paths and measured values normalised) no check is missing; trial install at the absolute path, `./selftest.sh …/plan-pick/trial` passed 518, failed 0
+- 2026-11-14 T06 done: `./install.sh` exit 0, backup `~/.claude-backup/20261114-165130`; `./selftest.sh ~/.claude` passed 519, failed 0. `project E` reproduction on a `git clone --shared` in `.claude/scratch/plan-pick/mg2` (plans copied with their mtimes, `plan-1.md` set to `draft`, the real `plan-2` freeze with base `dac5e8b` copied under the clone's key, scratch `HOME`/`XDG_STATE_HOME`): installed `stop-guard` exit 0, 1 s, no output; reverse control, `stop-guard.sh` + `integrity-check.py` from `ec703c4` on the same clone: 32 s (warm cache), `decision: block` on `plan-2.md` with `android/gradlew` (`T06-stop.log`); installed `integrity-check` alone: 2 s, the same finding (`T06-integrity.log`)
+- 2026-11-14 plan closed: AC1–AC3 cases green in `T05-selftest.log` (499/0) and live (519/0); AC4 `T01-red.log`, `T02-red.log`; AC5 `T06-*.log`; AC6 `skills/run/SKILL.md:29,90-92`; AC7 T00 488/0 → 499/0 with no check missing, trial 518/0, live 519/0. Not pushed, not tagged (D2)
