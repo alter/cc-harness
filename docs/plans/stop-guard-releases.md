@@ -30,7 +30,7 @@ created: 2026-11-14
 
 ## Assumptions
 - Live background agent: `${transcript_path%.jsonl}/subagents/agent-*.meta.json` with `requestShape == "background"`, no `finished: true`, and its `.jsonl` modified within `CC_STOP_GUARD_AGENT_IDLE` minutes (15: a Bash call may run 10 minutes without a write). A dead agent releases the stop for at most that long.
-- catnap: the last `tool_use` in the tail (400 lines) of `transcript_path` is `mcp__catnap__compact_now` → silent. The existing flag check stays.
+- catnap: among `tool_use` names and `compact_boundary` entries in the tail (400 lines) of `transcript_path`, the latest is `mcp__catnap__compact_now` → silent; a boundary after it means the compaction already ran (E3: each `compact_now` in `e94375fa` is followed by a `compact_boundary`). The existing flag check stays.
 - Both checks run before the plan is picked, like the existing catnap check.
 
 ## Out of scope
@@ -38,9 +38,10 @@ created: 2026-11-14
 - Changes to catnap.
 
 ## Tasks
-- [ ] T01 Cases `stop-release-agent-live` (silent), `-agent-finished`, `-agent-foreground`, `-agent-stale` (all block), `stop-release-catnap-race` (silent), `-catnap-later-call` (blocks); seen red first (`.claude/scratch/stop-release/T01-red.log`); then the two checks in `stop-guard.sh` — verify: `./selftest.sh`
+- [x] T01 Cases `stop-release-agent-live` (silent), `-agent-finished`, `-agent-foreground`, `-agent-stale` (all block), `stop-release-catnap-race` (silent), `-catnap-later-call` (blocks); seen red first (`.claude/scratch/stop-release/T01-red.log`); then the two checks in `stop-guard.sh` — verify: `./selftest.sh`
 - [ ] T02 Docs: README stop-guard paragraph and table row, HARNESS stop-guard row, INSTALL bullet, CHANGELOG `stable-2026-11-14-2`; gate: `./selftest.sh` against T00, trial install (absolute path) and its selftest — verify: `./selftest.sh && ./selftest.sh /Users/rdolgov/workflow/git/cc-harness/.claude/scratch/stop-release/trial && grep -n 'CC_STOP_GUARD_AGENT_IDLE' README.md HARNESS.md CHANGELOG.md`
 - [ ] T03 Live install, `./selftest.sh ~/.claude`; the installed hook and the `a44c14b` hook on the payload of session `548b3dac` with its real `transcript_path`, scratch `HOME`/`XDG_STATE_HOME` (`T03-live.log`); tag `stable-2026-11-14-2`, push `main` and the tag — verify: `./selftest.sh ~/.claude && test -s .claude/scratch/stop-release/T03-live.log && git ls-remote --tags origin stable-2026-11-14-2 | grep -q .`
 
 ## Log
 - 2026-11-14 T00 (cited): `./selftest.sh` 499 passed, 0 failed at `a44c14b` (`.claude/scratch/plan-pick/T05-selftest.log`); no code changed since
+- 2026-11-14 T01 done: `stop-guard.sh` reads `transcript_path`; silent when the latest of tool calls and compaction boundaries is `mcp__catnap__compact_now`, or when an unfinished background agent's transcript changed within `CC_STOP_GUARD_AGENT_IDLE` (15) minutes. `stop-release-agent-live` and `-catnap-race` red on the unfixed hook, `-agent-finished/-foreground/-stale` and `-catnap-later-call` green before and after (`.claude/scratch/stop-release/T01-red.log`); added `-catnap-after-compaction`, red on a copy without the boundary rule (same log); `./selftest.sh` passed 506, failed 0
