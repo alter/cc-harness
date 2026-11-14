@@ -2,6 +2,16 @@
 
 One entry per `stable-*` tag, newest first. The reasons and the evidence behind each entry are in the plan under `docs/plans/` named in it.
 
+## stable-2026-11-14 — stop-guard counts tasks and leaves finished plans alone
+
+Plan: `docs/plans/plan-pick-and-integrity.md`.
+
+### Fixed
+- `stop-guard` and `session-start` counted every `- [ ]`, acceptance criteria included: a plan with all tasks done but an open HUMAN criterion kept blocking, and "Next" named `AC1 …` instead of the next task. Only task lines (`- [ ] T…`, `- [!] T…`) are counted and named now.
+- A plan finished long ago and left `status: running` was taken by both hooks before any other, because it came first in the glob. In a session that had only a draft plan, `stop-guard` ran `integrity-check` against that plan's base: in one game repository 285 commits and 867 changed paths, 2 min 14 s, far past the 20 s hook timeout, ending in a block about a file of another plan. Both hooks now pick through `hooks/plan-pick.sh`: the first running plan with an open task, else a running plan with no open task touched in the last `CC_STOP_GUARD_FRESH` minutes (120).
+- `integrity-check` read binary files as text: 562 of the 867 paths there were binary. It skips files with a NUL byte in their first 8000 bytes (3.6 s on the same diff, same finding) and stops after `CC_INTEGRITY_SECONDS` (15) without blocking, naming how many paths it did not check.
+- `/run` finished a plan only when no `- [ ]` remained, which an open HUMAN acceptance line never allows. It finishes when no task line is open and lists the HUMAN lines for the owner.
+
 ## stable-2026-11-13 — no pipe into `grep -q` under pipefail
 
 Plan: `docs/plans/pipefail-grep-q.md`.
