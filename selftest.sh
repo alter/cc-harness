@@ -166,6 +166,11 @@ printf '#!/bin/sh\ngo test -count=1 ./...\n' > "$ir/scripts/test.sh"; (cd "$ir" 
 printf '#!/bin/sh\ngo test -count=1 ./...\necho done\n' > "$ir/scripts/test.sh"; out=$(ic); check "integrity-existing-repeat-ignored: an old -count flag does not count" "$out" 'integrity: 0 finding'; (cd "$ir" && git checkout -q -- scripts)
 mkdir -p "$ir/assets"; printf '\211PNG\r\n\032\n\000\377\376' > "$ir/assets/icon.png"; (cd "$ir" && git add assets && git -c user.name=t -c user.email=t@t commit -qm png); base=$(git -C "$ir" rev-parse HEAD)
 printf '\211PNG\r\n\032\n\000\375\374\373' > "$ir/assets/icon.png"; out=$(ic); check "integrity-binary-changed: a replaced binary file is read without a crash" "$out" 'integrity: 0 finding'; (cd "$ir" && git checkout -q -- assets)
+printf '\211PNG\000 # noqa eslint-disable || true\n' > "$ir/assets/icon.png"; out=$(ic); check "integrity-binary-skip: marker bytes inside a binary file are not a finding" "$out" 'integrity: 0 finding'
+printf 'x = 1  # noqa\n' > "$ir/src/c.py"; out=$(ic); check "integrity-binary-text-still: next to a skipped binary, a text file with a new marker is a finding" "$out" 'integrity: 1 finding'
+out=$(cd "$ir" && CC_INTEGRITY_SECONDS=0 python3 "$IC" --base "$base" --plan docs/plans/p.md 2>&1); rc=$?
+if [ "$rc" -eq 0 ] && grep -q 'integrity: 0 finding' <<<"$out"; then ok "integrity-deadline: past its time budget the check stops without blocking"; else bad "integrity-deadline: past its time budget the check stops without blocking" "exit $rc: $out"; fi
+rm -f "$ir/src/c.py"; (cd "$ir" && git checkout -q -- assets)
 
 sg="$TMP/sgint"; mkdir -p "$sg/docs/plans" "$sg/src"
 ( cd "$sg" && git init -q && printf 'x = 1\n' > src/a.py \
