@@ -382,6 +382,32 @@ jq -nc '{type:"assistant",message:{content:[{type:"tool_use",name:"Bash",input:{
 check "stop-release-catnap-later-call: a tool call after compact_now does not release the stop" "$(rlp rc2)" '"decision": *"block"'
 { jq -nc '{type:"assistant",message:{content:[{type:"tool_use",name:"mcp__catnap__compact_now",input:{}}]}}'; jq -nc '{type:"system",subtype:"compact_boundary"}'; jq -nc '{type:"assistant",message:{content:[{type:"text",text:"continuing"}]}}'; } > "$rl/tr/s1.jsonl"
 check "stop-release-catnap-after-compaction: once the compaction ran, compact_now no longer releases the stop" "$(rlp rc3)" '"decision": *"block"'
+bgout="$TMP/bg-task.output"; : > "$bgout"
+tres() { jq -nc --arg ts "$1" --arg c "$2" '{type:"user",timestamp:$ts,message:{content:[{type:"tool_result",tool_use_id:"t1",content:$c}]}}'; }
+tnote() { jq -nc --arg c "<task-notification>
+<task-id>$1</task-id>
+$2
+</task-notification>" '{type:"queue-operation",content:$c}'; }
+now_iso=$(jq -nr 'now|todate'); old_iso=$(jq -nr '(now-3600)|todate')
+bgbase() { { jq -nc '{type:"assistant",message:{content:[{type:"tool_use",name:"Bash",input:{}}]}}'; tres "$now_iso" "$1"; jq -nc '{type:"assistant",message:{content:[{type:"text",text:"waiting"}]}}'; } > "$rl/tr/s1.jsonl"; }
+sleep 120 > "$bgout" & bgpid=$!
+bgbase "Command running in background with ID: bx1. Output is being written to: $bgout. You will be notified when it completes."
+check_empty "stop-release-bash-live: a session waiting for its running background command may stop" "$(rlp rb1)"
+bgbase "Command did not complete within its 120s timeout and was moved to the background (ID: bx2). Output is being written to: $bgout. You will be notified when it completes."
+check_empty "stop-release-bash-moved: a command moved to the background on timeout counts as running" "$(rlp rb2)"
+tnote bx2 '<status>completed</status>' >> "$rl/tr/s1.jsonl"
+check "stop-release-bash-ended: a background command with its completion notice does not release the stop" "$(rlp rb3)" '"decision": *"block"'
+kill "$bgpid" 2>/dev/null; wait "$bgpid" 2>/dev/null
+bgbase "Command running in background with ID: bx3. Output is being written to: $bgout. You will be notified when it completes."
+check "stop-release-bash-released: a background command nobody runs any more does not release the stop" "$(rlp rb4)" '"decision": *"block"'
+bgbase "Monitor started (task mx1, expires in 30m unless the source ends first; you get one notice at expiry)."
+check_empty "stop-release-monitor-live: a session waiting for its monitor may stop" "$(rlp rm1)"
+tnote mx1 '<event>line 1</event>' >> "$rl/tr/s1.jsonl"
+check_empty "stop-release-monitor-event: an event from a monitor does not end it" "$(rlp rm2)"
+tnote mx1 '<status>completed</status>' >> "$rl/tr/s1.jsonl"
+check "stop-release-monitor-ended: a monitor whose stream ended does not release the stop" "$(rlp rm3)" '"decision": *"block"'
+{ jq -nc '{type:"assistant",message:{content:[{type:"tool_use",name:"Monitor",input:{}}]}}'; tres "$old_iso" "Monitor started (task mx2, expires in 30m unless the source ends first)."; } > "$rl/tr/s1.jsonl"
+check "stop-release-monitor-expired: a monitor past its expiry does not release the stop" "$(rlp rm4)" '"decision": *"block"'
 
 out=$(jq -n --arg c "$proj" '{cwd:$c,source:"compact"}' | "$H/session-start.sh")
 check "session-start after compact re-injects plan" "$out" 'Context was just compacted.*2 open, 1 blocked'
