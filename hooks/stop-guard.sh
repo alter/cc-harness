@@ -17,15 +17,9 @@ last=$(printf '%s' "$payload" | jq -r '.last_assistant_message // ""')
 nap="${CLAUDE_STATE_DIR:-$HOME/.claude/state}/catnap/$session.json"
 if [ -n "$(find "$nap" -mmin -15 2>/dev/null)" ] && jq -e '.pending == true' "$nap" >/dev/null 2>&1; then exit 0; fi
 
-plan=""
-for f in "$cwd"/docs/plans/*.md "$cwd"/tasks/*/PLAN.md "$cwd"/tasks/*/*/PLAN.md; do
-  [ -f "$f" ] || continue
-  if grep -qE '^status: *running *$' <<<"$(head -n 8 "$f")"; then plan="$f"; break; fi
-done
+plan=""; open=0; blocked=0
+{ IFS= read -r plan; IFS= read -r open; IFS= read -r blocked; } < <("$(dirname "$0")/plan-pick.sh" "$cwd" 2>/dev/null)
 [ -z "$plan" ] && exit 0
-
-open=$(grep -cE '^- \[ \] ' "$plan" || true)
-blocked=$(grep -cE '^- \[!\] ' "$plan" || true)
 rel=${plan#"$cwd"/}
 
 
@@ -115,7 +109,7 @@ if [ -n "$guard_reason" ]; then
   exit 0
 fi
 
-next=$(grep -E '^- \[ \] ' "$plan" | head -n 3 | sed -E 's/^- \[ \] //' | tr '\n' ';' | sed 's/;$//')
+next=$(grep -E '^- \[ \] T[0-9]' "$plan" | head -n 3 | sed -E 's/^- \[ \] //' | tr '\n' ';' | sed 's/;$//')
 
 jq -n --arg r "Plan $rel still has $open unchecked task(s). Next: $next. Continue with the next unchecked task now. Mark it [x] only after its verify command passes, append a Log line, then take the following one. Do not stop while any '- [ ]' remains. Use '- [!] BLOCKED: <reason>' only for irreversible actions, missing credentials or a missing dependency." \
   '{decision:"block",reason:$r}'

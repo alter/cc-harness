@@ -330,6 +330,32 @@ ph="$TMP/pipe-header"; mkdir -p "$ph/docs/plans"
 { printf -- '---\nstatus: running\nnote: '; cat "$filler"; printf -- '\n---\n# H\n## Tasks\n- [ ] T01 open — verify: `true`\n## Log\n'; } > "$ph/docs/plans/h.md"
 out=$(jq -n --arg c "$ph" '{cwd:$c,session_id:"pipe-header",last_assistant_message:"x"}' | HOME="$TMP" "$H/stop-guard.sh" 2>&1)
 check "stop-guard-pipe-long-header: a running plan with a 100 KiB line 3 is still found" "$out" 'T01 open'
+pcp() { jq -n --arg c "$1" --arg s "$2" '{cwd:$c,session_id:$s,last_assistant_message:"x"}' | HOME="$TMP" "$H/stop-guard.sh" 2>&1; }
+pc1="$TMP/pc1"; mkdir -p "$pc1/docs/plans"
+printf -- '---\nstatus: running\n---\n# C\n## Acceptance criteria\n- [ ] AC1 gate — `true`\n- [ ] AC2 HUMAN owner looks\n## Tasks\n- [x] T01 a — verify: `true`\n- [x] T02 b — verify: `true`\n## Log\n' > "$pc1/docs/plans/c.md"
+check_empty "plan-count-ac-open: open acceptance lines do not hold a plan whose tasks are done" "$(pcp "$pc1" pc1)"
+check_empty "plan-count-session-start-done: session-start stays silent when only acceptance lines are open" "$(jq -n --arg c "$pc1" '{cwd:$c,source:"compact"}' | "$H/session-start.sh" 2>&1)"
+pc2="$TMP/pc2"; mkdir -p "$pc2/docs/plans"
+printf -- '---\nstatus: running\n---\n# C\n## Acceptance criteria\n- [ ] AC1 gate — `true`\n## Tasks\n- [x] T01 a — verify: `true`\n- [ ] T02 do the thing — verify: `true`\n## Log\n' > "$pc2/docs/plans/c.md"
+out=$(pcp "$pc2" pc2)
+if grep -q 'T02 do the thing' <<<"$out" && ! grep -q 'AC1' <<<"$out"; then ok "plan-count-next: Next names the open task, not the open criterion"; else bad "plan-count-next: Next names the open task, not the open criterion" "$out"; fi
+check "plan-count-session-start: session-start counts task lines only" "$(jq -n --arg c "$pc2" '{cwd:$c,source:"compact"}' | "$H/session-start.sh" 2>&1)" ' 1 open, 0 blocked'
+pp1="$TMP/pp1"; mkdir -p "$pp1/docs/plans"; git -C "$pp1" init -q; printf 'x = 1\n' > "$pp1/m.py"
+printf -- '---\nstatus: running\ncreated: 2026-01-01\n---\n# A\n## Tasks\n- [x] T01 a — verify: `true`\n## Log\n' > "$pp1/docs/plans/a.md"
+printf -- '---\nstatus: draft\n---\n# B\n## Tasks\n- [ ] T01 b — verify: `true`\n## Log\n' > "$pp1/docs/plans/b.md"
+git -C "$pp1" add -A >/dev/null; git -C "$pp1" -c user.name=t -c user.email=t@t commit -qm base
+touch -t 202001010000 "$pp1/docs/plans/a.md"
+pcp "$pp1" pp1 >/dev/null
+printf 'x = 1  # noqa\n' > "$pp1/m.py"; touch -t 202001010000 "$pp1/docs/plans/a.md"
+check_empty "plan-pick-stale: a running plan finished long ago does not take the stop of a session with only a draft" "$(pcp "$pp1" pp1)"
+pp2="$TMP/pp2"; mkdir -p "$pp2/docs/plans"
+printf -- '---\nstatus: running\n---\n# A\n## Tasks\n- [x] T01 a — verify: `true`\n## Log\n' > "$pp2/docs/plans/a.md"; touch -t 202001010000 "$pp2/docs/plans/a.md"
+printf -- '---\nstatus: running\n---\n# B\n## Tasks\n- [ ] T01 b — verify: `true`\n## Log\n' > "$pp2/docs/plans/b.md"
+check "plan-pick-open-first: a running plan with an open task is chosen over a finished one earlier in the glob" "$(pcp "$pp2" pp2)" 'b\.md'
+pp3="$TMP/pp3"; mkdir -p "$pp3/docs/plans"
+printf -- '---\nstatus: running\n---\n# A\n## Acceptance criteria\n- [x] AC1 parser — `pytest -k parser`\n## Tasks\n- [x] T01 a — verify: `true`\n## Log\n' > "$pp3/docs/plans/a.md"
+pcp "$pp3" pp3 >/dev/null; sed -i.bak 's/pytest -k parser/true/' "$pp3/docs/plans/a.md"
+check "plan-pick-fresh-finished: a plan finished just now is still checked for weakened criteria" "$(pcp "$pp3" pp3)" '"decision": *"block"'
 
 out=$(jq -n --arg c "$proj" '{cwd:$c,source:"compact"}' | "$H/session-start.sh")
 check "session-start after compact re-injects plan" "$out" 'Context was just compacted.*2 open, 1 blocked'
@@ -951,7 +977,7 @@ out=$(jq -n --arg f "$TMP/big.py" '{tool_name:"Read",tool_input:{file_path:$f}}'
 for src_hook in "$SRC"/hooks/*.sh "$SRC"/hooks/*.py; do
   f="$H/$(basename "$src_hook")"; [ -f "$f" ] || continue
   id=$(basename "$f"); id=${id%.*}
-  [ "$id" = agent-def ] && continue
+  case "$id" in agent-def|plan-pick) continue ;; esac
   grep -q 'CC_DISABLED_HOOKS' "$f" && ok "disabled-hooks: $id honours the switch" || bad "disabled-hooks: $id honours the switch" "no CC_DISABLED_HOOKS check in $f"
 done
 
