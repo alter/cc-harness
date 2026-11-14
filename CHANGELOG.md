@@ -2,6 +2,14 @@
 
 One entry per `stable-*` tag, newest first. The reasons and the evidence behind each entry are in the plan under `docs/plans/` named in it.
 
+## stable-2026-11-14-2 — stop-guard waits for background agents and for catnap
+
+Plan: `docs/plans/stop-guard-releases.md`.
+
+### Fixed
+- A coordinator that handed the plan to a background agent was blocked on every turn end, and answered by polling: in one session 4 blocks between 13:57 and 14:06, each followed by a 600 s `until … sleep` loop waiting for the agent. `stop-guard` now reads the session's `transcript_path` and stays quiet while an agent of the session with `requestShape: background` is not `finished` and its transcript changed within `CC_STOP_GUARD_AGENT_IDLE` minutes (15); a finished, foreground or idle agent does not hold it.
+- A catnap compaction raced the hook: `[catnap] Compacting now` at 14:20:40.875 was followed by a `stop-guard` block recorded at 14:20:41.902. catnap queued the compaction at 14:20:40.761 but writes its pending flag in its own tick (here 14:20:41.377), not when `compact_now` returns, so the Stop hook can run before the flag exists. It now also stays quiet when the latest of the tool calls and compaction boundaries in the transcript's tail is `mcp__catnap__compact_now`; a later tool call or a compaction boundary ends that.
+
 ## stable-2026-11-14 — stop-guard counts tasks and leaves finished plans alone
 
 Plan: `docs/plans/plan-pick-and-integrity.md`.
