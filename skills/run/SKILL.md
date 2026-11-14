@@ -26,7 +26,7 @@ Between tasks: nothing to do. The next task starts from the plan line, not from 
 
 You are the coordinator; you implement nothing. For each unchecked task, spawn the `worker` subagent (fresh context, not a fork) with exactly `<plan path> <T##>`. It does the task by the `run-task` procedure and returns two lines. You then Grep only that task's line in the plan to confirm the mark, and take the next one. Run workers one at a time; several only when the tasks live in different task directories (different `task.txt`) — the ownership boundary from `tasks/ROLES.md`.
 
-Loop until no `- [ ]` remains:
+Loop until no open task line (`- [ ] T…`) remains; acceptance lines (`- [ ] AC…`) are not tasks:
 
 1. `Grep -n '^- \[ \] ' <plan>` → first unchecked task id. No other reading.
 2. Spawn `worker` with `<plan path> <T##>`.
@@ -87,9 +87,9 @@ Trade: every worker is a cold start (system prompt + tools + CLAUDE.md + AGENTS.
 
 ## Finish
 
-When no `- [ ]` remains:
-- All `[x]`: set `status: done`, run every acceptance criterion command once more and, when some task changed logic, the full suite, mark each AC. Compare the suite against the `T00` baseline recorded in `## Log`: a test that was green then and is red now is a regression this run caused — it is fixed before the plan closes, or the plan ends `paused` with that test named. A rising coverage floor is expected; a fallen one is a failure, not a formality. In a task tree: apply the `labels.txt` rules above, then list the task directories ready for `/verify-task` — never start it yourself. Report: what changed, why, which checks ran with results, remaining risk, suggested commit message. Stop.
-- Some `[!]`: set `status: paused`, list the blocked tasks with their reasons, and end the message with the literal token `NEED_HUMAN`. Stop.
+When no open task line (`- [ ] T…`) remains — an open HUMAN acceptance line does not hold the plan:
+- All task lines `[x]`: set `status: done`, run every acceptance criterion command once more and, when some task changed logic, the full suite, mark each AC. Compare the suite against the `T00` baseline recorded in `## Log`: a test that was green then and is red now is a regression this run caused — it is fixed before the plan closes, or the plan ends `paused` with that test named. A rising coverage floor is expected; a fallen one is a failure, not a formality. In a task tree: apply the `labels.txt` rules above, then list the task directories ready for `/verify-task` — never start it yourself. HUMAN acceptance lines stay as they are and are listed for the owner. Report: what changed, why, which checks ran with results, remaining risk, suggested commit message. Stop.
+- Some task line `[!]`: set `status: paused`, list the blocked tasks with their reasons, and end the message with the literal token `NEED_HUMAN`. Stop.
 
 ## Context hygiene during a long run
 
