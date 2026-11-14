@@ -8,6 +8,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 
 try:
     import tomllib
@@ -43,6 +44,14 @@ TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]+$|_test\.[
 
 def git(*args: str) -> str:
     return subprocess.run(["git", *args], capture_output=True, text=True, encoding="utf-8", errors="ignore").stdout
+
+
+def is_binary(path: str) -> bool:
+    p = pathlib.Path(path)
+    if not p.is_file():
+        return False
+    with p.open("rb") as f:
+        return b"\0" in f.read(8000)
 
 
 def old_text(base: str, path: str) -> str:
@@ -100,7 +109,7 @@ def floor(text: str) -> float | None:
 SCRATCH = (".claude/scratch/", ".claude/worktrees/")
 
 
-def findings(base: str) -> list[tuple[str, str]]:
+def findings(base: str, deadline: float) -> tuple[list[tuple[str, str]], int]:
     out: list[tuple[str, str]] = []
     markers = [re.compile(m, re.M) for m in MARKERS + project_markers()]
     repeats = [re.compile(m, re.M) for m in REPEATS]
@@ -109,7 +118,9 @@ def findings(base: str) -> list[tuple[str, str]]:
         if not p.startswith(SCRATCH)
     ]
     changed_paths = {line.split("\t")[-1] for line in status if "\t" in line}
-    for line in status:
+    for i, line in enumerate(status):
+        if time.monotonic() >= deadline:
+            return out, len(status) - i
         parts = line.split("\t")
         if len(parts) < 2:
             continue
@@ -118,6 +129,8 @@ def findings(base: str) -> list[tuple[str, str]]:
         if code == "D":
             if TEST_PATH.search(path):
                 out.append((path, "a test file was deleted"))
+            continue
+        if is_binary(path):
             continue
         before, after = (old_text(base, path) if code != "A" else ""), new_text(path)
         if name == ".coverage-gate.json":
@@ -145,7 +158,7 @@ def findings(base: str) -> list[tuple[str, str]]:
             runs = re.findall(r"run:\s*(.*)", after)
             if any(re.search(r"\b" + TEST_WORD + r"\b", r) and "matrix." not in r for r in runs):
                 out.append((path, "a CI matrix was added and its test step does not use the matrix value: every cell runs the same suite"))
-    return out
+    return out, 0
 
 
 def declared(plan: str | None) -> str:
@@ -168,11 +181,15 @@ def main() -> int:
     args = ap.parse_args()
     open_items = []
     accepted = declared(args.plan)
-    for path, why in findings(args.base):
+    budget = float(os.environ.get("CC_INTEGRITY_SECONDS", "15"))
+    found, unchecked = findings(args.base, time.monotonic() + budget)
+    for path, why in found:
         if path in accepted:
             continue
         open_items.append(f"{path}: {why}")
     print(f"integrity: {len(open_items)} finding(s) since {args.base[:12]}")
+    if unchecked:
+        print(f"  ({unchecked} path(s) not checked: the {budget:g} s budget ran out)")
     for item in open_items:
         print(f"  • {item}")
     if open_items:
