@@ -1073,6 +1073,40 @@ names "rules-no-gate-task-contract: a no-logic plan carries no heavy-suite task"
 names "rules-no-gate-task-plan: /plan forbids a heavy-suite task in a no-logic plan" "$RS/plan/SKILL.md" 'no-logic'
 names "rules-no-gate-task-task: /task forbids a heavy-suite VERIFY item in a no-logic task" "$RS/task/SKILL.md" 'no-logic'
 
+echo "== lean rules"
+LEVEL_ROW='Test coverage level'
+both(){ local name=$1 file=$2; if grep -q -- '`standard`' "$file" 2>/dev/null && grep -q -- '`release`' "$file" 2>/dev/null; then ok "$name"; else bad "$name" "no \`standard\` and \`release\` in ${file#"$TARGET"/}"; fi; }
+names "rules-lean-contract-level: the contract names the level row" "$RC" "$LEVEL_ROW"
+names "rules-lean-contract-default: the contract names the smallest level" "$RC" '`critical`'
+names "rules-lean-contract-bug: a fixed bug gets its test at every level" "$RC" 'every level'
+both "rules-lean-contract-ratchet: the contract names the levels that hold the ratchet" "$RC"
+lacks "rules-lean-contract-retired: the unconditional test rule is gone" "$RC" 'A behaviour change is not done until a test covers it'
+names "rules-lean-agents-level: AGENTS.md names the level row" "$RT/AGENTS.md" "$LEVEL_ROW"
+lacks "rules-lean-agents-retired: the unconditional test rule is gone from AGENTS.md" "$RT/AGENTS.md" 'seen failing before the change\. Coverage may not fall'
+names "rules-lean-template-row: PROJECT.md carries the level row, critical by default" "$RT/docs/PROJECT.md" '^\| Test coverage level \(critical / standard / release\) \| critical \|'
+both "rules-lean-template-levels: PROJECT.md describes the other two levels" "$RT/docs/PROJECT.md"
+names "rules-lean-intake-question: /intake asks the level" "$RS/intake/SKILL.md" "$LEVEL_ROW"
+names "rules-lean-intake-default: /intake offers critical first, recommended" "$RS/intake/SKILL.md" 'critical.*\(Recommended\)'
+if grep -q -- "$LEVEL_ROW" < <(sed -n '/^## 2a\./,/^## 3\./p' "$RS/intake/SKILL.md" 2>/dev/null); then ok "rules-lean-intake-refresh: /intake refresh asks the level when the row is absent"; else bad "rules-lean-intake-refresh: /intake refresh asks the level when the row is absent" "no '$LEVEL_ROW' in section 2a"; fi
+for skill in plan run-task run test task verify-task; do
+  names "rules-lean-skill-$skill: /$skill reads the level row" "$RS/$skill/SKILL.md" "$LEVEL_ROW"
+done
+names "rules-lean-plan-no-test: a task line without a test says why" "$RS/plan/SKILL.md" 'no test \(critical level'
+names "rules-lean-test-proposes: /test proposes before it writes" "$RS/test/SKILL.md" 'AskUserQuestion'
+names "rules-lean-test-plan-silent: /test asks nothing inside a running plan" "$RS/test/SKILL.md" 'status: running'
+both "rules-lean-test-ratchet: /test names the levels that get the ratchet" "$RS/test/SKILL.md"
+names "rules-lean-task-item: /task writes reverse control for critical code" "$RS/task/SKILL.md" 'critical code'
+names "rules-lean-task-upgrade: /task compares the tree's validator with the template" "$RS/task/SKILL.md" 'cmp -s'
+names "rules-lean-verifier-agent: the verifier reads the level row" "$TARGET/agents/verifier.md" "$LEVEL_ROW"
+names "rules-lean-verifier-skill: /verify-task judges a missing test by critical code" "$RS/verify-task/SKILL.md" 'critical code'
+names "rules-lean-tree-readme: tasks/README.md names the level row" "$RT/tasks/README.md" "$LEVEL_ROW"
+names "rules-lean-tree-protocol: tasks/PROTOCOL.md names the level row" "$RT/tasks/PROTOCOL.md" "$LEVEL_ROW"
+if [ "$TARGET" = "$SRC" ]; then
+  names "rules-lean-docs-behavior: BEHAVIOR.md names the level row" "$SRC/BEHAVIOR.md" "$LEVEL_ROW"
+  names "rules-lean-docs-readme: README.md names the level row" "$SRC/README.md" "$LEVEL_ROW"
+  names "rules-lean-docs-harness: HARNESS.md names the level row" "$SRC/HARNESS.md" "$LEVEL_ROW"
+fi
+
 echo "== uninstall: a trial target"
 ut="$TMP/untrial"; uh="$TMP/unhome"; mkdir -p "$uh/bin"
 for w in cc-night cc-fullrun cc-pertask cc-sessiontime; do : > "$uh/bin/$w"; done
