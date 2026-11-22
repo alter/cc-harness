@@ -1,11 +1,14 @@
 # test_sessiontime.py
 import datetime
-import importlib
+import importlib.util
 import os
 import pathlib
+import re
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -346,6 +349,180 @@ class Classifying(unittest.TestCase):
             with self.subTest(name=name, arguments=arguments):
                 for kind in rules.categories(name, arguments, self.plain):
                     self.assertIn(kind, rules.CATEGORIES)
+
+
+def munged(path):
+    return re.sub(r"[^A-Za-z0-9]", "-", str(path))
+
+
+class Reporting(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tasks = importlib.import_module("tasks")
+        cls.report = importlib.import_module("report")
+        spec = importlib.util.spec_from_file_location("sessiontime_cli", SESSIONTIME_DIR / "cli.py")
+        cls.cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.cli)
+        cls.base = pathlib.Path(os.path.realpath(tempfile.mkdtemp()))
+        cls.addClassCleanup(shutil.rmtree, cls.base)
+        cls.repo = cls.base / "demo"
+        cls.plan = cls.repo / "docs" / "plans" / "demo.md"
+        cls.plan.parent.mkdir(parents=True)
+        cls.git("init", "-q")
+        cls.commit("10:00:00", [])
+        cls.commit("10:05:00", ["T01"])
+        cls.commit("10:10:30", ["T01", "T02", "T03"])
+        agent = "background/subagents/agent-a0000000000000001.jsonl"
+        cls.place("one", cls.repo, ["split.jsonl"])
+        cls.place("one", pathlib.Path(str(cls.repo) + "2"), ["split.jsonl"], prefix="n")
+        cls.place("two", cls.repo, ["background.jsonl", agent])
+        cls.place("three", cls.repo / "packages" / "web", ["split.jsonl"])
+        (cls.base / "none").mkdir()
+
+    @classmethod
+    def git(cls, *arguments, clock=""):
+        quiet = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull}
+        who = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+        when = {name: f"2026-01-05T{clock}+00:00" for name in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE")} if clock else {}
+        subprocess.run(["git", "-C", str(cls.repo), *arguments], check=True, capture_output=True, env={**os.environ, **quiet, **who, **when})
+
+    @classmethod
+    def commit(cls, clock, done):
+        lines = [f"- [{'x' if task in done else ' '}] {task} step" for task in ("T01", "T02", "T03")]
+        cls.plan.write_text("# Plan\n\n## Tasks\n" + "\n".join(lines) + "\n", encoding="utf-8")
+        cls.git("add", "docs/plans/demo.md")
+        cls.git("commit", "-q", "-m", clock, clock=clock)
+
+    @classmethod
+    def place(cls, projects, cwd, files, prefix=""):
+        for name in files:
+            text = (FIXTURES / name).read_text(encoding="utf-8").replace("/work/demo", str(cwd))
+            target = cls.base / projects / munged(cwd) / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text.replace('"uuid":"', f'"uuid":"{prefix}'), encoding="utf-8")
+
+    def gather(self, projects, *extra):
+        return self.cli.gather(self.cli.parse(["--plan", str(self.plan), "--projects", str(self.base / projects), *extra]))
+
+    def command(self, *arguments, cwd=None):
+        return subprocess.run([sys.executable, str(SESSIONTIME_DIR / "cli.py"), *arguments], capture_output=True, text=True, cwd=cwd or self.repo)
+
+    def timing(self, done):
+        return [line for line in done.stdout.splitlines() if line.startswith("timing:")]
+
+    def test_window_is_the_first_to_the_last_commit_of_the_plan(self):
+        _, begin, end = self.gather("one")
+        self.assertEqual((begin, end), (at("10:00:00"), at("10:10:30")))
+
+    def test_marks_are_the_flips_in_the_history_of_the_plan(self):
+        commits = self.tasks.plan_commits(str(self.repo), str(self.plan))
+        self.assertEqual([moment for moment, _ in commits], [at("10:00:00"), at("10:05:00"), at("10:10:30")])
+        marks = self.tasks.flips(str(self.repo), str(self.plan), commits)
+        self.assertEqual(marks, [("T01", at("10:05:00")), ("T02, T03", at("10:10:30"))])
+
+    def test_tasks_marked_in_one_commit_share_a_window(self):
+        found = self.tasks.windows([("T01", at("10:05:00")), ("T02, T03", at("10:10:30"))], at("10:00:00"), at("10:10:30"))
+        bounds = [(window.task, window.start, window.end) for window in found]
+        self.assertEqual(bounds, [("T01", at("10:00:00"), at("10:05:00")), ("T02, T03", at("10:05:00"), at("10:10:30"))])
+
+    def test_time_after_the_last_mark_has_a_window(self):
+        found = self.tasks.windows([("T01", at("10:05:00"))], at("10:00:00"), at("10:10:30"))
+        self.assertEqual([(window.start, window.end) for window in found], [(at("10:00:00"), at("10:05:00")), (at("10:05:00"), at("10:10:30"))])
+
+    def test_mark_before_the_window_has_no_window(self):
+        found = self.tasks.windows([("T01", at("09:00:00")), ("T02", at("10:10:30"))], at("10:00:00"), at("10:10:30"))
+        self.assertEqual([(window.task, window.start, window.end) for window in found], [("T02", at("10:00:00"), at("10:10:30"))])
+
+    def test_categories_of_the_main_session(self):
+        summary, _, _ = self.gather("one")
+        main = summary.seconds["main"]
+        self.assertAlmostEqual(main["runs"], 89.5)
+        self.assertAlmostEqual(main["read-search"], 12.5)
+        self.assertAlmostEqual(main["reply"], 18.0)
+        self.assertAlmostEqual(summary.active["main"], 120.0)
+        self.assertAlmostEqual(summary.idle, 500.0)
+        self.assertEqual(summary.active["agents"], 0.0)
+
+    def test_session_of_a_neighbour_repository_is_left_out(self):
+        summary, _, _ = self.gather("one")
+        self.assertEqual(len(summary.sheets), 1)
+
+    def test_session_started_in_a_subdirectory_is_counted(self):
+        summary, _, _ = self.gather("three")
+        self.assertAlmostEqual(summary.seconds["main"]["runs"], 89.5)
+
+    def test_runs_per_task(self):
+        summary, _, _ = self.gather("one")
+        rows = {task: (round(run, 3), round(whole, 3)) for task, run, whole in summary.per_task}
+        self.assertEqual(rows, {"T01": (89.5, 100.0), "T02, T03": (0.0, 20.0)})
+
+    def test_agents_have_their_own_column(self):
+        summary, _, _ = self.gather("two")
+        self.assertAlmostEqual(summary.seconds["agents"]["runs"], 49.0)
+        self.assertAlmostEqual(summary.active["agents"], 178.0)
+        self.assertAlmostEqual(summary.seconds["main"]["runs"], 302.0)
+        self.assertEqual(sorted(sheet.role for sheet in summary.sheets), ["agents", "main"])
+
+    def test_waiting_for_agents_is_not_active_time(self):
+        summary, _, _ = self.gather("two")
+        self.assertAlmostEqual(summary.seconds["main"]["agents"], 265.0)
+        self.assertAlmostEqual(summary.active["main"], 365.0)
+
+    def test_unclassified_time_names_its_commands(self):
+        summary, _, _ = self.gather("two")
+        self.assertAlmostEqual(summary.seconds["main"]["other"], 29.0)
+        self.assertEqual([round(value, 3) for value, _ in summary.longest_other], [29.0])
+
+    def test_runs_flag_reaches_the_report(self):
+        summary, _, _ = self.gather("two", "--runs", "selftest.sh")
+        self.assertAlmostEqual(summary.seconds["main"]["runs"], 331.0)
+        self.assertEqual(summary.longest_other, [])
+
+    def test_from_and_to_replace_the_window(self):
+        summary, begin, end = self.gather("two", "--from", "2026-01-05T10:00:00+00:00", "--to", "2026-01-05T10:20:00+00:00")
+        self.assertEqual((begin, end), (at("10:00:00"), at("10:20:00")))
+        self.assertAlmostEqual(summary.seconds["main"]["other"], 355.0)
+        self.assertAlmostEqual(summary.idle, 0.0)
+
+    def test_window_can_end_now(self):
+        _, begin, end = self.gather("one", "--to", "now")
+        self.assertEqual(begin, at("10:00:00"))
+        self.assertLess(abs(end - time.time()), 60)
+
+    def test_every_transcript_adds_up(self):
+        for projects in ("one", "two", "three"):
+            summary, _, _ = self.gather(projects)
+            for sheet in summary.sheets:
+                with self.subTest(projects=projects, sheet=sheet.name):
+                    self.assertAlmostEqual(sum(item.seconds for item in sheet.measure.items) + sheet.measure.idle, sheet.measure.span)
+
+    def test_command_prints_one_timing_line(self):
+        done = self.command("--plan", "docs/plans/demo.md", "--projects", str(self.base / "one"))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(len(self.timing(done)), 1)
+
+    def test_no_transcript_is_said_and_is_not_a_failure(self):
+        with self.assertRaises(self.tasks.Unmeasurable):
+            self.gather("none")
+        measured = self.command("--plan", "docs/plans/demo.md", "--projects", str(self.base / "one"))
+        done = self.command("--plan", "docs/plans/demo.md", "--projects", str(self.base / "none"))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(len(self.timing(done)), 1)
+        self.assertNotEqual(self.timing(done), self.timing(measured))
+
+    def test_plan_outside_a_repository_is_not_a_failure(self):
+        loose = self.base / "loose.md"
+        loose.write_text("- [x] T01 step\n", encoding="utf-8")
+        with self.assertRaises(self.tasks.Unmeasurable):
+            self.cli.gather(self.cli.parse(["--plan", str(loose), "--projects", str(self.base / "one")]))
+        done = self.command("--plan", str(loose), "--projects", str(self.base / "one"), cwd=self.base)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(len(self.timing(done)), 1)
+
+    def test_date_that_cannot_be_read_is_not_a_failure(self):
+        done = self.command("--plan", "docs/plans/demo.md", "--projects", str(self.base / "one"), "--from", "yesterday")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(len(self.timing(done)), 1)
 
 
 if __name__ == "__main__":

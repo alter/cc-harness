@@ -4,6 +4,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import json
+import os
 import pathlib
 import re
 
@@ -206,3 +207,15 @@ def read(path: pathlib.Path, seen: set[str] | None = None) -> Journal:
 def agent_files(session: pathlib.Path) -> list[pathlib.Path]:
     session = pathlib.Path(session)
     return sorted((session.parent / session.stem / "subagents").glob("agent-*.jsonl"))
+
+
+def session_files(projects: str | os.PathLike, root: str, since: float) -> list[pathlib.Path]:
+    found = []
+    for directory in sorted(pathlib.Path(projects).glob(re.sub(r"[^A-Za-z0-9]", "-", root) + "*")):
+        if directory.is_dir():
+            found += [path for path in sorted(directory.glob("*.jsonl")) if path.stat().st_mtime >= since]
+    return found
+
+
+def belongs(book: Journal, root: str) -> bool:
+    return any(cwd == root or cwd.startswith(root.rstrip(os.sep) + os.sep) for cwd in book.cwds)
