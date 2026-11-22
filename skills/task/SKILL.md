@@ -100,6 +100,8 @@ DEPENDS
 
 A `[fast]` item that is a gate command of `docs/PROJECT.md` §6 runs through `cc-pertask run --plan <plan> -- <command>` before the task's mark: within the per-task limit it runs, over it it is deferred to the assembly child or the plan's close, where `cc-pertask status` must exit 0. Write the item as the bare command; the wrapper is the runner's business.
 
+A no-logic task — its `+` lines change only copy, legal text, labels, styles, templates, docs or config values — has no VERIFY item that runs the gate set, e2e, integration or a local CI run, under any name ("checks before sending", "pre-push"). Its VERIFY items are the narrow checks for the touched files: a grep, a render, a lint of that file.
+
 Rules the validator enforces and you must satisfy before running it:
 - all eight sections present, in order; SCOPE has at least one `−` line (the character U+2212, not a hyphen);
 - DEPENDS text and `depends:` label agree; a dependency points at an existing directory and never at a later milestone;
