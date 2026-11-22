@@ -11,13 +11,13 @@ created: 2026-11-14
 - [x] AC1 A background command started in the transcript, with no terminal `<task-notification>` for its id and its output file held open, lets the turn through; one with a terminal notification, or whose output file nobody holds, does not — `./selftest.sh` (stop-release-bash-*)
 - [x] AC2 A `Monitor` started in the transcript, with no terminal notification and inside its `expires in Nm` window, lets the turn through; one past its window or with a terminal notification does not; an event notification without `<status>` does not end it — `./selftest.sh` (stop-release-monitor-*)
 - [x] AC3 The cases that change behaviour were seen red on the unfixed hook — `ls .claude/scratch/stop-bg/T01-red.log`
-- [x] AC4 Live: the installed hook on this session's real transcript, with a background command running, is silent; the hook from `cb4b2fb` blocks on the same payload — `.claude/scratch/stop-bg/T03-live.log`
+- [x] AC4 Live: the installed hook on this session's real transcript, with a background command running, is silent; the hook from `9a1bcb7` blocks on the same payload — `.claude/scratch/stop-bg/T03-live.log`
 - [x] AC5 No regression: T00 green stays green; trial and live installs pass — `./selftest.sh`, `./selftest.sh <trial>`, `./selftest.sh ~/.claude`
 - [x] AC6 CHANGELOG entry `stable-2026-11-14-3`; tag on the final commit, pushed with `main` — `git ls-remote --tags origin stable-2026-11-14-3`
 
 ## Stack
 - bash 5.3.9, jq, `/usr/sbin/lsof` 4.91, git; Claude Code 2.1.325.
-- Gate `./selftest.sh`; T00 = 506 passed, 0 failed at `f1fcc36` (`.claude/scratch/stop-release/T02-selftest.log`); `cb4b2fb` changed only the plan file.
+- Gate `./selftest.sh`; T00 = 506 passed, 0 failed at `3612ff0` (`.claude/scratch/stop-release/T02-selftest.log`); `9a1bcb7` changed only the plan file.
 
 ## Evidence (2026-11-14)
 - E1 project E session `e94375fa`, plan plan-1.md: `Bash` run_in_background `b6qrv0tgq` ("Run T34 full probe chain", 14:48:54) and `Monitor` `bcu3t24w8` (14:49:12, "expires in 30m"); `stop-guard` blocked the turn ends that followed, and at 14:49:34 the model polled the output file in a `for … sleep 5` loop. Both tasks ended with `<task-notification>` `<status>completed</status>` (14:49:46, 14:49:49).
@@ -39,14 +39,14 @@ created: 2026-11-14
 - `TaskStop`-ed tasks without a notification, other task kinds (remote, cron).
 
 ## Tasks
-- [x] T00 Baseline cited: 506 passed, 0 failed at `f1fcc36`
+- [x] T00 Baseline cited: 506 passed, 0 failed at `3612ff0`
 - [x] T01 Cases `stop-release-bash-{live,ended,released}`, `stop-release-monitor-{live,expired,ended,event}`; seen red first (`.claude/scratch/stop-bg/T01-red.log`); then the check in `stop-guard.sh` — verify: `./selftest.sh`
 - [x] T02 Docs: README stop-guard paragraph and row, HARNESS row, INSTALL bullet, CHANGELOG `stable-2026-11-14-3`; gate `./selftest.sh`, trial install (absolute path) and its selftest — verify: `./selftest.sh && ./selftest.sh "$PWD/.claude/scratch/stop-bg/trial" && grep -n 'stable-2026-11-14-3' CHANGELOG.md`
 - [x] T03 Live install, `./selftest.sh ~/.claude`; live check on this session (`T03-live.log`); tag `stable-2026-11-14-3`, push `main` and the tag — verify: `test -s .claude/scratch/stop-bg/T03-live.log && git ls-remote --tags origin stable-2026-11-14-3 | grep -q .`
 
 ## Log
-- 2026-11-14 T00 (cited): `./selftest.sh` 506 passed, 0 failed at `f1fcc36` (`.claude/scratch/stop-release/T02-selftest.log`); no code changed since
+- 2026-11-14 T00 (cited): `./selftest.sh` 506 passed, 0 failed at `3612ff0` (`.claude/scratch/stop-release/T02-selftest.log`); no code changed since
 - 2026-11-14 T01 done: `stop-guard.sh` `bg_task_live`: silent while a background command (started or moved to the background) has no terminal `<task-notification>` and `lsof` finds its output file held, or a `Monitor` has none and is inside its `expires in` window. `bash-live`, `bash-moved`, `monitor-live`, `monitor-event` red on the unfixed hook (`.claude/scratch/stop-bg/T01-red.log`); `bash-ended`, `bash-released`, `monitor-ended`, `monitor-expired` each red on a copy with its rule removed (`T01-breaks.log`). On the real project E transcript (19 MB) 0.97 s and silent: its background command `bv4pjq7b7` ("Wait for T34 chain") was running; a second project's transcript (4.6 MB) 0.20 s. `./selftest.sh` passed 514, failed 0
 - 2026-11-14 T02 done: README paragraph and table row, HARNESS row, INSTALL bullet, CHANGELOG `stable-2026-11-14-3`; `./selftest.sh` passed 514, failed 0 (`.claude/scratch/stop-bg/T02-selftest.log`, T00 506 + 8 new); trial install into `.claude/scratch/stop-bg/trial` and its selftest passed 533, failed 0
-- 2026-11-14 T03 done: `./install.sh` exit 0, backup `~/.claude-backup/20261114-191119`; `./selftest.sh ~/.claude` passed 534, failed 0 (`T03-selftest.log`). Live check on this session (`T03-live.log`, script `live-check.sh`): background `sleep 150` `b0ks162ye` running, no terminal notice, output held by 2 pids → installed hook exit 0 with no output, `cb4b2fb` hook blocked (Next T03); after its completion notice, output not held → installed hook blocked
+- 2026-11-14 T03 done: `./install.sh` exit 0, backup `~/.claude-backup/20261114-191119`; `./selftest.sh ~/.claude` passed 534, failed 0 (`T03-selftest.log`). Live check on this session (`T03-live.log`, script `live-check.sh`): background `sleep 150` `b0ks162ye` running, no terminal notice, output held by 2 pids → installed hook exit 0 with no output, `9a1bcb7` hook blocked (Next T03); after its completion notice, output not held → installed hook blocked
 - 2026-11-14 plan closed: AC1, AC2 `stop-release-bash-*`, `stop-release-monitor-*` green in `T02-selftest.log` (514/0), trial (533/0), live (534/0); AC3 `T01-red.log`, `T01-breaks.log`; AC4 `T03-live.log`; AC5 T00 506/0 → 514/0; AC6 CHANGELOG `stable-2026-11-14-3`, tag on this commit, pushed with `main`. The `Monitor` rule was checked on synthetic transcripts and on the real `bcu3t24w8` start line format only, not on a live monitor through the installed hook
