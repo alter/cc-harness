@@ -56,7 +56,7 @@ bash 5.3.9, Python 3.14.8 (stdlib only), jq 1.6, git 2.50.1, Claude Code 2.1.330
 - The four mechanism heuristics; device, deploy, browser and record-keeping time beyond showing them as categories.
 
 ## Tasks
-- [ ] T00 Baseline: `./selftest.sh` and `./agenttest.sh --self-check`; counts, red checks and the wall time of `./selftest.sh` in Log — verify: `./selftest.sh; ./agenttest.sh --self-check`
+- [x] T00 Baseline: `./selftest.sh` and `./agenttest.sh --self-check`; counts, red checks and the wall time of `./selftest.sh` in Log — verify: `./selftest.sh; ./agenttest.sh --self-check`
 - [ ] T01 Research (`researcher`): `docs/tech/claude-code-transcripts@2.1.330.md` — entry types, grouping of one API message by `message.id`, `tool_use`/`tool_result` pairing, `run_in_background` and its task notification, subagent files and `.meta.json`, the fields that record working directory and version, how the project directory under `~/.claude/projects/` is named, differences across 2.1.309–2.1.330, and the pitfalls the seven timing reports found (sources: the official docs; `~/git/{project A,project B,project C,project D,project E,project F,project G}/.claude/scratch/timing/`) — verify: `test -s docs/tech/claude-code-transcripts@2.1.330.md && grep -cE 'https?://|evidence:' docs/tech/claude-code-transcripts@2.1.330.md`
 - [ ] T02 `pertask/budget.py`: state file, limit lookup (flag, `docs/PROJECT.md` row, default 30), cheapest-first decision; `selftest/test_pertask.py` written first and seen red (`.claude/scratch/test-run-budget/T02-red.log`) — verify: `python3 -m unittest selftest/test_pertask.py`
 - [ ] T03 `pertask/cli.py` and `pertask.sh`: `run`, `record`, `status`; exit code pass-through; the skip line names the measured time, the limit and when the command will run; tests first, seen red (`T03-red.log`) — verify: `python3 -m unittest selftest/test_pertask.py`
@@ -77,3 +77,4 @@ bash 5.3.9, Python 3.14.8 (stdlib only), jq 1.6, git 2.50.1, Claude Code 2.1.330
 - [ ] T18 Release: `CHANGELOG.md` entry `stable-2026-11-22` (what was added, the evidence, the stated boundary: prose rules not exercised by a live `/plan` run), commit, tag on the final commit, `git push origin main stable-2026-11-22` — verify: `git ls-remote --tags origin stable-2026-11-22 | grep -q .`
 
 ## Log
+- 2026-11-22 T00 done: `./selftest.sh` passed 514, failed 0, 17 SKIP, wall 267 s (`.claude/scratch/test-run-budget/T00-selftest.log`, check names in `T00-checks.txt`); `./agenttest.sh --self-check` prints `agenttest self-check: ok`, exit 0. No red check in the baseline. Tag `stable-2026-11-22` is free locally and on origin
