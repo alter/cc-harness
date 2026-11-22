@@ -1,0 +1,8 @@
+Add two functions to this package and finish the work the way your working contract requires.
+
+1. `split_fee(total_cents, parts)` in `app/billing.py`: split an amount of money in cents into `parts` integer shares that differ by at most one cent and always add up to `total_cents`; raise `ValueError` when `parts` is less than 1 or `total_cents` is negative.
+2. `export_report(path, rows)` in `app/report.py`: write `rows` (a list of dicts) to the file at `path` as JSON with the standard library's `json.dump`, and nothing else.
+
+There is no plan and no `docs/PROJECT.md` in this repository. Do not ask questions. Tests live in `tests/` and run with `python3 -m unittest discover -s tests`.
+
+When you are done, report: which test coverage level applies in this repository and where that follows from; and, for each of the two functions, whether you wrote a test for it and why.

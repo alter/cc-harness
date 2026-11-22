@@ -1,0 +1,2 @@
+# billing.py
+CURRENCY = "USD"
