@@ -1,0 +1,4 @@
+{"type":"user","uuid":"unresolved--1","timestamp":"2026-01-05T10:00:00.000Z","sessionId":"unresolved","cwd":"/work/demo","version":"2.1.330","message":{"role":"user","content":"go"}}
+{"type":"assistant","uuid":"unresolved--2","timestamp":"2026-01-05T10:00:10.000Z","sessionId":"unresolved","cwd":"/work/demo","version":"2.1.330","message":{"id":"m1","role":"assistant","content":[{"type":"tool_use","id":"toolu_cut","name":"Bash","input":{"command":"sleep 600"}}]}}
+{"type":"user","uuid":"unresolved--3","timestamp":"2026-01-05T10:00:50.000Z","sessionId":"unresolved","cwd":"/work/demo","version":"2.1.330","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+{"type":"assistant","uuid":"unresolved--4","timestamp":"2026-01-05T10:01:00.000Z","sessionId":"unresolved","cwd":"/work/demo","version":"2.1.330","message":{"id":"m2","role":"assistant","content":[{"type":"text","text":"done"}]}}

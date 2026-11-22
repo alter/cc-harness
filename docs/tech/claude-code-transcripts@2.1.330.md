@@ -36,7 +36,7 @@ The format is almost entirely undocumented. An item cites the official page wher
 - Block types: `thinking`, `text`, `tool_use`, `server_tool_use`, `advisor_tool_result` — evidence: local sample.
 - The end of a message is the latest timestamp among the entries sharing its `message.id`. A `tool_use` block is not the last entry of its message in 3 304 of 30 022 paired calls — evidence: local sample.
 - A tool starts when the message ends, not at the timestamp of its `tool_use` entry — evidence: `project D/.claude/scratch/timing/report.md` lines 27–28: over three commits the commit time minus the message end was 0.1–0.2 s, minus the `tool_use` entry 12.5–57.3 s.
-- The rule has an exception: the result is older than the message end in 927 of 30 022 calls (a tool of a multi-call message that ran while later blocks were still streaming) — evidence: local sample. A tool interval therefore starts at the earlier of the message end and its result.
+- The rule has an exception: the result is older than the message end in 927 of 30 022 calls (a tool of a multi-call message that ran while later blocks were still streaming) — evidence: local sample. A tool whose result precedes the end of its message therefore starts at its own `tool_use` entry, every other tool at the message end.
 
 ## Tool calls and results
 
