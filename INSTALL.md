@@ -15,6 +15,7 @@ You need `jq`, `bash` ≥ 4, `python3` ≥ 3.11 (the guards, `check.py` and `int
 | `~/.claude.json` | MCP servers, login state, onboarding | **no**; copied into the backup |
 | `~/.claude/projects/` | session transcripts | no; not in the backup (gigabytes) — see §1 |
 | `~/bin/cc-night` | the overnight launcher | **yes** |
+| `~/bin/cc-pertask`, `~/.claude/pertask/` | the time limit for gate checks run before a task mark | **yes** |
 
 ## 1. Backup
 
@@ -174,7 +175,7 @@ against `grep -n` before trusting the rest.
 ./uninstall.sh ~/.claude-backup/<stamp>
 ```
 
-It removes the harness's files (only those present in this checkout), restores `settings.json`, `CLAUDE.md`, `hooks/`, `agents/`, `skills/`, `commands/`, `keybindings.json` and `cc-night` from the backup, and verifies the result against `MANIFEST.txt`. `~/.claude.json` is left alone (a copy sits next to the backup as `dot-claude.json` if you need it).
+It removes the harness's files (only those present in this checkout), restores `settings.json`, `CLAUDE.md`, `hooks/`, `agents/`, `skills/`, `commands/`, `keybindings.json`, `cc-night` and `cc-pertask` from the backup, and verifies the result against `MANIFEST.txt`. `~/.claude.json` is left alone (a copy sits next to the backup as `dot-claude.json` if you need it).
 
 To roll back from the full archive in §1: `tar xzf ~/claude-full-<stamp>.tgz -C ~` over the top.
 

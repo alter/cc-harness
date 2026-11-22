@@ -6,8 +6,8 @@ BACKUP=${1:?usage: uninstall.sh <backup-dir> [target-dir]}
 TARGET=${2:-$HOME/.claude}
 TARGET=${TARGET/#\~/$HOME}
 SRC=$(cd "$(dirname "$0")" && pwd)
-BIN_DIR=${CC_BIN_DIR:-$HOME/bin}
-ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template fullrun keybindings.json)
+if [ "$TARGET" = "$HOME/.claude" ]; then BIN_DIR=${CC_BIN_DIR:-$HOME/bin}; else BIN_DIR=${CC_BIN_DIR:-$TARGET/bin}; fi
+ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template fullrun pertask keybindings.json)
 
 [ -f "$BACKUP/MANIFEST.txt" ] || { echo "not a harness backup: $BACKUP" >&2; exit 1; }
 
@@ -16,9 +16,9 @@ rm -f "$TARGET/CLAUDE.md" "$TARGET/statusline.sh" "$TARGET/graph-setup.sh"
 for f in "$SRC"/hooks/*.sh; do rm -f "$TARGET/hooks/$(basename "$f")"; done
 for f in "$SRC"/agents/*.md; do rm -f "$TARGET/agents/$(basename "$f")"; done
 for s in "$SRC"/skills/*/; do rm -rf "$TARGET/skills/$(basename "$s")"; done
-rm -rf "$TARGET/project-template"
+rm -rf "$TARGET/project-template" "$TARGET/pertask"
 rm -f "$TARGET/settings.json"
-rm -f "$BIN_DIR/cc-night" "$BIN_DIR/cc-fullrun"
+rm -f "$BIN_DIR/cc-night" "$BIN_DIR/cc-fullrun" "$BIN_DIR/cc-pertask"
 
 echo "== restore from $BACKUP"
 for item in "${ITEMS[@]}"; do
@@ -30,6 +30,7 @@ for item in "${ITEMS[@]}"; do
 done
 [ -f "$BACKUP/cc-night" ] && cp "$BACKUP/cc-night" "$BIN_DIR/cc-night" && echo "   restored cc-night"
 [ -f "$BACKUP/cc-fullrun" ] && cp "$BACKUP/cc-fullrun" "$BIN_DIR/cc-fullrun" && echo "   restored cc-fullrun"
+[ -f "$BACKUP/cc-pertask" ] && cp "$BACKUP/cc-pertask" "$BIN_DIR/cc-pertask" && echo "   restored cc-pertask"
 
 for d in hooks agents skills; do
   [ -d "$TARGET/$d" ] && [ -z "$(ls -A "$TARGET/$d")" ] && rmdir "$TARGET/$d"
