@@ -14,7 +14,7 @@ The format is almost entirely undocumented. An item cites the official page wher
 ## Files and directories
 
 - One session is one file `~/.claude/projects/<project dir>/<sessionId>.jsonl`; the file name equals the `sessionId` of every entry in it — evidence: 274 126 of 274 126 entries in the local sample.
-- `<project dir>` is the absolute working directory with every character outside `A-Za-z0-9` replaced by `-`: `/`, `_`, `.` and spaces all become `-`, so `project C` is stored as `project-C` and `repo/.claude/scratch/x` as `repo--claude-scratch-x` — evidence: directory listing of `~/.claude/projects/` against the `cwd` recorded inside the files. The mapping loses information, so the directory name selects candidates and the `cwd` field decides.
+- `<project dir>` is the absolute working directory with every character outside `A-Za-z0-9` replaced by `-`: `/`, `_`, `.` and spaces all become `-`, so `my_app.v2` is stored as `my-app-v2` and `repo/.claude/scratch/x` as `repo--claude-scratch-x` — evidence: directory listing of `~/.claude/projects/` against the `cwd` recorded inside the files. The mapping loses information, so the directory name selects candidates and the `cwd` field decides.
 - A session started in a subdirectory or a worktree of a repository gets its own project directory; its name starts with the repository's directory name — evidence: twelve `…-cc-harness--claude-scratch-*` directories beside `…-cc-harness`.
 - Subagent transcripts live in `<project dir>/<sessionId>/subagents/agent-<agentId>.jsonl`, each with `agent-<agentId>.meta.json` — https://code.claude.com/docs/en/hooks for the folder; evidence: the `.meta.json` file, 2.1.308–2.1.330.
 - `/clear` starts a new file with a new `sessionId`; background task output keeps living under the first id of the process, which entries record as `session_id` (snake case). `session_id` differs from `sessionId` in 23 220 entries of the sample — evidence: local sample. Use `sessionId`.
@@ -35,7 +35,7 @@ The format is almost entirely undocumented. An item cites the official page wher
 - An assistant message is written as one entry per content block: 111 732 of 111 735 `assistant` entries hold exactly one block. The entries of one message share `message.id` — evidence: all 169 files. A message spans 1 entry (14 434 messages), 2 (25 153), 3 (7 007) or more (4 156).
 - Block types: `thinking`, `text`, `tool_use`, `server_tool_use`, `advisor_tool_result` — evidence: local sample.
 - The end of a message is the latest timestamp among the entries sharing its `message.id`. A `tool_use` block is not the last entry of its message in 3 304 of 30 022 paired calls — evidence: local sample.
-- A tool starts when the message ends, not at the timestamp of its `tool_use` entry — evidence: `project D/.claude/scratch/timing/report.md` lines 27–28: over three commits the commit time minus the message end was 0.1–0.2 s, minus the `tool_use` entry 12.5–57.3 s.
+- A tool starts when the message ends, not at the timestamp of its `tool_use` entry — evidence: the timing report of project D: over three commits the commit time minus the message end was 0.1–0.2 s, minus the `tool_use` entry 12.5–57.3 s.
 - The rule has an exception: the result is older than the message end in 927 of 30 022 calls (a tool of a multi-call message that ran while later blocks were still streaming) — evidence: local sample. A tool whose result precedes the end of its message therefore starts at its own `tool_use` entry, every other tool at the message end.
 
 ## Tool calls and results
@@ -63,7 +63,7 @@ The format is almost entirely undocumented. An item cites the official page wher
 - `.meta.json` holds `agentType`, `description`, `toolUseId` (the parent's `Agent` call), `spawnDepth`, `finished` and, in some files, `model`, `launchedWithDefaults` and `parentAgentId` — evidence: key sets of 651 meta files.
 - A foreground `Agent` result carries `agentId`, `totalDurationMs`, `totalTokens`, `totalToolUseCount`; a background one reports `<duration_ms>` in its notice — evidence: 28 foreground results (26 of them written by 2.1.322), 2 142 background.
 - For an agent that ran once, `duration_ms` and the span of its file agree within 2.4 s (35 of 35 agents) — evidence: local sample.
-- A resumed agent keeps writing into the same file. `duration_ms` then covers the last leg only, and first-to-last of the file overstates the work by the wait between legs: 992 s to 5 158 s in five agents of the sample — evidence: local sample; `project C/.claude/scratch/timing/REPORT.md` line 213. The wait is the gap between an assistant message without a call and the next prompt; an interval model that treats it as idle needs no special case.
+- A resumed agent keeps writing into the same file. `duration_ms` then covers the last leg only, and first-to-last of the file overstates the work by the wait between legs: 992 s to 5 158 s in five agents of the sample — evidence: local sample; the timing report of project C. The wait is the gap between an assistant message without a call and the next prompt; an interval model that treats it as idle needs no special case.
 
 ## Differences across 2.1.309–2.1.330
 
@@ -73,14 +73,14 @@ The format is almost entirely undocumented. An item cites the official page wher
 
 ## Pitfalls the seven per-project scripts met
 
-- A background run counted as idle: the main session waits, the script sees no tool call. Measure from the call to the notice — evidence: `project B/.claude/scratch/timing/SUMMARY.md` line 40.
-- An agent file outside the window clipped to a negative duration and doubled the peak agent count — evidence: `project B/.claude/scratch/timing/SUMMARY.md` line 129.
-- Words inside a heredoc body matched classification rules — evidence: `project E/.claude/scratch/timing/REPORT.md` lines 25–29; `project D/.claude/scratch/timing/report.md` line 121.
-- A command that edits and then runs went wholly to one category, and the two orders of the rules gave two answers — evidence: `project B/.claude/scratch/timing/SUMMARY.md` line 118.
-- Calls issued in one message overlap; summing them counts the same seconds twice — evidence: `project F/.claude/scratch/timing/REPORT.md` line 83.
-- The window taken from commits misses the work before the first one — evidence: `project F/.claude/scratch/timing/REPORT.md` line 88.
-- Attribution to a task by commit subject fails where subjects carry no task id — evidence: `project F/.claude/scratch/timing/REPORT.md` line 85.
-- A result lags its commit by 0.2–3 s, up to 32 s when the command goes on after `git commit` — evidence: `project C/.claude/scratch/timing/REPORT.md` line 214.
-- An agent waiting for its own nested agents is running for the harness and idle in its file — evidence: `project D/.claude/scratch/timing/report.md` line 106.
-- Task output files under `tasks/` are deleted later; the transcript is the only durable record of a background run — evidence: `project F/.claude/scratch/timing/REPORT.md` line 79.
+- A background run counted as idle: the main session waits, the script sees no tool call. Measure from the call to the notice — evidence: the timing report of project B.
+- An agent file outside the window clipped to a negative duration and doubled the peak agent count — evidence: the timing report of project B.
+- Words inside a heredoc body matched classification rules — evidence: the timing report of project E; the timing report of project D.
+- A command that edits and then runs went wholly to one category, and the two orders of the rules gave two answers — evidence: the timing report of project B.
+- Calls issued in one message overlap; summing them counts the same seconds twice — evidence: the timing report of project F.
+- The window taken from commits misses the work before the first one — evidence: the timing report of project F.
+- Attribution to a task by commit subject fails where subjects carry no task id — evidence: the timing report of project F.
+- A result lags its commit by 0.2–3 s, up to 32 s when the command goes on after `git commit` — evidence: the timing report of project C.
+- An agent waiting for its own nested agents is running for the harness and idle in its file — evidence: the timing report of project D.
+- Task output files under `tasks/` are deleted later; the transcript is the only durable record of a background run — evidence: the timing report of project F.
 - `api-request-blob` lines are large and are not conversation entries; a reader that parses every line pays for them — evidence: 21 112 blob entries in 169 files.

@@ -10,7 +10,7 @@ Sources:
 
 ## What a turn is
 
-- E1 `maxTurns` is per leg of one subagent: 12 model responses on the first run, 12 more after a `SendMessage` resume; the context survives the cut. One turn is one model response (one `message.id`), whatever the number of tool calls in it. Evidence: session `project E/1d7713f3`, agent `a493b25f82eaddc4e`; `scratch/probe-turnwarn/run2.json`.
+- E1 `maxTurns` is per leg of one subagent: 12 model responses on the first run, 12 more after a `SendMessage` resume; the context survives the cut. One turn is one model response (one `message.id`), whatever the number of tool calls in it. Evidence: session project E, `1d7713f3`, agent `a493b25f82eaddc4e`; `scratch/probe-turnwarn/run2.json`.
 - N4 Two tool calls of one response are two `tool_use_id` under one `message.id`, and both transcript lines appear together: four calls took two turns. Evidence: `scratch/turn-guard-live/t01/logs/fg-parallel.jsonl` (`total=1` for both calls of the first response, `total=2` for both of the second).
 - N5 A response with text only is a turn. An agent that made two tool calls and then answered three times with text (a `SubagentStop` hook sent it back twice) was cut at "its 5-turn limit". Evidence: `scratch/turn-guard-live/t01/logs/textonly-bg.jsonl`, `scratch/turn-guard-live/t01/out-textonly-bg.txt`.
 - N8 The count of `api-request` lines in the subagent transcript is not the turn count: a run of five responses had six. Distinct `message.id` is. Evidence: transcript of run `u-fg-last` (session id in `scratch/turn-guard-live/t01/run-u-fg-last.json`).

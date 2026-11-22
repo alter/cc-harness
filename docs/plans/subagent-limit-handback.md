@@ -25,7 +25,7 @@ A subagent that runs into its `maxTurns` no longer ends with "produced no report
 - No `docs/PROJECT.md`, no `tasks/`, no CI, no coverage gate in this repository.
 
 ## Evidence gathered before the plan (2026-11-12, CLI 2.1.322)
-Probe project: `.claude/scratch/probe-turnwarn/` (hook `probe-hook.sh`, logs `payloads*.jsonl`, runs `run*.json`). Real case: session `project E/1d7713f3`, agent `a493b25f82eaddc4e`.
+Probe project: `.claude/scratch/probe-turnwarn/` (hook `probe-hook.sh`, logs `payloads*.jsonl`, runs `run*.json`). Real case: session project E, `1d7713f3`, agent `a493b25f82eaddc4e`.
 - E1 `maxTurns` is per leg of one subagent: 12 model responses on the first run, 12 more after a `SendMessage` resume; the context survives the cut. One turn = one model response (distinct `message.id`), whatever the number of tool calls in it.
 - E2 At the limit the agent is cut with no wrap-up turn. The parent gets "It was still calling tools and had produced no report … Its unsent text is not shown". The report travels only through the `SubagentHandback` tool.
 - E3 `SubagentStop` does not fire at the cut-off (`payloads.jsonl`: no such event), so nothing can rescue the report at that moment.
