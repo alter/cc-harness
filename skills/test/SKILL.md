@@ -40,7 +40,7 @@ Mutations worth trying, in order: invert a condition, drop a guard clause, swap 
 
 ## 5. Wire the ratchet so it holds without you
 
-- Add `python3 scripts/coverage_gate.py --run` to the gate checks in `docs/PROJECT.md` §6. From then on every task's verify line includes it, and `/run` cannot mark `[x]` while coverage has fallen below the floor by more than the tolerance.
+- Add `python3 scripts/coverage_gate.py --run` to the gate checks in `docs/PROJECT.md` §6. From then on it rides in the gate set of every task that changes logic, through `cc-pertask run` and under the same per-task limit as the other gate commands. Where its measured run fits the limit, `/run` cannot mark `[x]` while coverage has fallen below the floor by more than the tolerance; where it does not, it is deferred with the other long checks and holds the plan's close instead.
 - The floor rises by itself when coverage grows and never falls on its own. **Lowering it by hand is a decision, not a fix**: it goes into `docs/PROJECT.md` with a reason and a date, or it does not happen.
 - If the suite is slow, the ratchet belongs to the whole plan rather than each task: run it at `T00` and again at the finish, and keep the per-task verify narrow. Say which you chose in `## Decisions`.
 

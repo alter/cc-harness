@@ -43,7 +43,7 @@ Decide before writing whether the work is one task or several. A part is separab
 When it splits, write the children in this order:
 1. `split:contract` — the signatures and the DATA records the parts rely on;
 2. `split:part` — one per separable part, each `depends:` on the contract, each with its own WRITE-SET; two parts may share a file only at different symbols (`file::Class.method`), never the same unit;
-3. `split:assembly` — depends on every part, merges them and runs the fast tier.
+3. `split:assembly` — depends on every part, merges them and runs the whole fast tier, the checks `cc-pertask` deferred in the parts included.
 
 Parts with no dependency between them and disjoint write sets are the ones `/run` may give to parallel workers.
 
@@ -97,6 +97,8 @@ ROLE
 DEPENDS
   Paths of tasks that must finish first, or (нет) / (none).
 ```
+
+A `[fast]` item that is a gate command of `docs/PROJECT.md` §6 runs through `cc-pertask run --plan <plan> -- <command>` before the task's mark: within the per-task limit it runs, over it it is deferred to the assembly child or the plan's close, where `cc-pertask status` must exit 0. Write the item as the bare command; the wrapper is the runner's business.
 
 Rules the validator enforces and you must satisfy before running it:
 - all eight sections present, in order; SCOPE has at least one `−` line (the character U+2212, not a hyphen);
