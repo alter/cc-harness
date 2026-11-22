@@ -124,17 +124,29 @@ The per-task limit is read by `cc-pertask`; change the number to change it. The 
 
 Baseline accepted as-is (pre-existing failures tolerated): _unanswered_
 
-Coverage: the command, its report format, and where the floor lives (`.coverage-gate.json`). The ratchet
-(`python3 scripts/coverage_gate.py --run`) belongs in the list above per task, or runs at `T00` and at the
-plan's finish when the suite is slow — say which. The floor rises on its own; lowering it is a decision
-recorded here, with a date and a reason, and never a way to make a check pass.
+Test coverage level: how much of the code owes a test. `critical` is the default, and it is what applies
+when this row is absent.
+
+- `critical` — a test for a behaviour change in critical code (money, access rights, anything that can
+  lose or corrupt data, the project's own non-trivial logic) and for every fixed bug. A call into a ready
+  SDK or library, wiring, configuration and layout get none. No coverage ratchet: its command is not in
+  the list above and the coverage rows below hold `n/a (level critical)`.
+- `standard` — a test for every behaviour change. The ratchet (`python3 scripts/coverage_gate.py --run`)
+  runs at `T00` and when the plan closes.
+- `release` — as `standard`, and `/test` brings what is still uncovered under test by a list the owner
+  agreed to. The ratchet is in the list above and runs with the gate checks of every task.
+
+The level is raised by changing the row, or through `/test`, which reads the code and the existing tests,
+proposes what to cover and writes after agreement. The floor lives in `.coverage-gate.json` and rises on
+its own; lowering it is a decision recorded here, with a date and a reason, and never a way to make a
+check pass.
 
 | Question | Answer |
 |---|---|
+| Test coverage level (critical / standard / release) | critical |
 | Coverage command | _unanswered_ |
 | Report format (`coverage-py` / `json-summary` / `cobertura` / `lcov` / `go`) | _unanswered_ |
 | Floor today (from the tool, not from memory) | _unanswered_ |
-| Ratchet per task or per plan | _unanswered_ |
 | Areas deliberately left uncovered, and why | _unanswered_ |
 
 ## 7. Delivery

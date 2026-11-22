@@ -29,7 +29,7 @@ Read the owning guide before changing an area; read only the sections you need. 
 - Match investigation to the change: contracts need producer, consumer, serializer and read/write checks; auth and routing need enforcement, guards and state; async work needs retries, idempotency, ordering, cancellation and failure visibility.
 - Architecture rules live in checks, not prose: put layering and import boundaries into a check that exits non-zero and reports `path:line [rule] message` — the tool the project already uses for it (an import contract, a dependency linter, a module-boundary rule of the build), or a short script — and list it under gate checks.
 - Reproducible bug → failing regression test first, then the fix, then the original reproduction again.
-- A behaviour change carries its test, and that test was seen failing before the change. Coverage may not fall: the floor in `.coverage-gate.json` rises by itself and is lowered only as a recorded decision. A check that has never been red does not count — break the code in a scratch copy once and keep the red output.
+- What owes a test is set by the row `Test coverage level` in `docs/PROJECT.md` §6 (`critical` without the row). At `critical`: a behaviour change in critical code — money, access rights, data that can be lost or corrupted, the project's own non-trivial logic — and every fixed bug. At `standard` and `release`: every behaviour change. The test is seen failing before the change. At `standard` and `release` coverage may not fall: the floor in `.coverage-gate.json` rises by itself and is lowered only as a recorded decision. A test that guards critical code is shown red once: break the code in a scratch copy and keep the red output.
 
 ## Validation
 
