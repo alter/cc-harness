@@ -65,23 +65,38 @@ On small work the cold starts dominate even when parts run in parallel, so one s
 An agent edits all night; nobody is watching which of yesterday's behaviours it traded away for today's
 fix. Prose cannot catch that. Three mechanisms do:
 
-- **A test per behaviour change, seen red first.** The contract and `/plan` make it part of the task, not a
-  follow-up: the task line names the test, and a test that was green the first time it ran has proved
-  nothing yet. A fixed bug gets the test that would have caught it, in the same task.
+- **A test where it pays, seen red first.** How much is tested is the project's choice, the row
+  `Test coverage level` in `docs/PROJECT.md` §6, and `/intake` offers the smallest level first. `critical`,
+  the default: a test for a behaviour change in critical code — money, access rights, data that can be lost
+  or corrupted, the project's own non-trivial logic — and none for a call into a ready SDK or for glue.
+  `standard`: a test for every behaviour change. `release`: as `standard`, plus what `/test` covers by an
+  agreed list. `/plan` decides per task and writes it into the task line; a test that was green the first
+  time it ran has proved nothing yet. A fixed bug gets the test that would have caught it, in the same
+  task, at every level.
 - **`scripts/coverage_gate.py` — a floor that rises and never falls by itself.** It reads the project's
   coverage report (`coverage-py`, `json-summary`, `cobertura`, `lcov`, `go`), compares it with the floor in
   `.coverage-gate.json`, raises the floor when coverage grows, and exits non-zero when it drops by more
-  than the tolerance. Put it in the gate checks and `/run` cannot mark a task `[x]` while coverage is
-  falling. Lowering the floor is a decision recorded in `docs/PROJECT.md`, with a date and a reason.
+  than the tolerance. At `release` it is in the gate checks and `/run` cannot mark a task `[x]` while
+  coverage is falling; at `standard` it runs at `T00` and when the plan closes; at `critical` it is off.
+  Lowering the floor is a decision recorded in `docs/PROJECT.md`, with a date and a reason.
 - **`T00` and the finish, compared.** `T00` records which tests were already red and what coverage was,
   before any edit. At the plan's finish the full suite runs again: a test that was green at `T00` and is red
   now is a regression this run caused, and the plan does not close over it.
 
-`/test` is the procedure for getting there: measure first, choose by risk (money and data, then branchy
-code, then every past defect, then contracts, then nothing), write red first, then prove each guard can go
-red by breaking the code in a scratch copy — the reverse control the task tree already demands. It never
-asserts wording, layout or log text: those tests fail on honest changes and teach the agent to edit tests
-instead of code.
+Why the smallest level is the default. Measured on seven projects before the level existed (labels A–G):
+writing tests took about as long as writing product code in three of them (C 21.8 against 23.4 minutes,
+E 1.2 against 1.4, G 6.8 against 4.2; project B is left out, its tests are probe scripts), while showing a
+test red first took at most 1.7% of active time in five of the six projects that measured it and 5.9% in
+the sixth, and reverse control at most 1.1% in all six. So `critical` drops the test for non-critical code
+and the ratchet, and keeps both cheap steps for the tests that are written. A first version changes fast,
+and a test of a ready SDK call guards code that many applications already exercise.
+
+`/test` is how coverage is raised later, on purpose — before a release or by hand: measure first, read the
+code and the existing tests, then propose what to cover by risk (money and data, then branchy code, then
+every past defect, then contracts, then nothing) and whether to raise the level, and write only after the
+owner agrees: red first, then each guard proved by breaking the code in a scratch copy — the reverse
+control the task tree demands at `standard` and `release`. It never asserts wording, layout or log text:
+those tests fail on honest changes and teach the agent to edit tests instead of code.
 
 The one thing coverage cannot see is a test that executes a line without noticing it is wrong —
 `assert fee(100) is not None` covers the line and survives `0.1` becoming `0.2`. A model raising coverage
@@ -135,7 +150,7 @@ The three task states are the only thing the hooks read. Tasks are never deleted
 | `skills/verify-task` + `agents/verifier.md` | `/verify-task` | independent verification by another context: `VERIFY.md` (verifier line / reproduce from a clean state / reverse control / what was not checked), then `verify:passed\|failed` |
 | `skills/run` | `/run` | execution to the end without questions, in one session; `/run … delegate` makes the session a coordinator: `worker` per task, parallel worktrees for split parts, the coordinator re-runs every verify |
 | `skills/run-task` | `/run-task <plan> <T##>`, preloaded into `worker` | the procedure for one task: what to read, do, verify, mark and log |
-| `skills/test` | `/test` | coverage by risk, red first, reverse control by mutation, and the ratchet wired into the gate checks |
+| `skills/test` | `/test` | reads the code and the tests, proposes what to cover by risk, writes after agreement: red first, reverse control by mutation, the ratchet at `standard` and `release` |
 | `skills/diagnose` | `/diagnose` | engineering diagnosis |
 | `skills/attack` + `agents/attacker.md` | `/attack <scope> [catalog]` | authorized attack review of the project's own code against OWASP Top 10:2025, LLM Top 10 2025 and ASVS 5.0 (`catalogs.md`, sourced and dated) plus a mandatory minimum; every finding reproduced with inert probes; `ATTACK.md`, `attack:passed\|failed` |
 | `skills/pgsql-slow-queries` + `agents/pg-checker.md` | `/pgsql-slow-queries [scope] [--live]` | read-only check: transactions held open across an API, disk or network wait (BLOCK), queries on columns without an index; `reference.md` cites PostgreSQL 17 docs for every reason |

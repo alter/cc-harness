@@ -130,10 +130,16 @@ What the hooks do **not** do: they never edit code, never commit, never touch th
 The failure this exists for: the model fixes T07 and quietly trades away a behaviour that T03 relied on, and
 nobody is awake to notice.
 
-- A behaviour change is not closed until a test covers it, and that test was **seen failing** before the
-  change. `/plan` puts it in the task line; the contract repeats it; a test that was green on its first run
-  has proved nothing yet.
-- Every fixed bug gets the test that would have caught it, in the same task.
+- How much is tested is the project's choice: the row `Test coverage level` in `docs/PROJECT.md` §6, asked by
+  `/intake` with the smallest level first. `critical` (the default, and what a missing row or file means): a
+  test for a behaviour change in critical code — money, access rights, data that can be lost or corrupted,
+  the project's own non-trivial logic — and nothing for a call into a ready SDK, wiring or layout.
+  `standard`: a test for every behaviour change. `release`: as `standard`, plus what `/test` covers by an
+  agreed list.
+- A test that is owed was **seen failing** before the change. `/plan` decides which tasks carry one and puts
+  it in the task line — the test, or `no test (critical level: <reason>)`; the contract repeats it; a test
+  that was green on its first run has proved nothing yet.
+- Every fixed bug gets the test that would have caught it, in the same task, at every level.
 - Before `[x]`: the tests covering the touched files, then the gate checks through `cc-pertask run`: the
   cheapest commands whose measured times fit the per-task limit (30 seconds unless `docs/PROJECT.md` says
   otherwise). The checks that do not fit are not run before every mark; they run before a push or a deploy
@@ -142,11 +148,15 @@ nobody is awake to notice.
   suite, compared with the `T00` baseline in `## Log` — a test green at `T00` and red now is a regression this
   run caused, and it is fixed or the plan ends `paused` naming it.
 - `scripts/coverage_gate.py` holds a floor in `.coverage-gate.json`: it rises when coverage grows, never
-  falls by itself, and exits non-zero when coverage drops past the tolerance. Lowering it is a decision
-  written into `docs/PROJECT.md` with a date and a reason.
-- `/test` is the procedure: measure first, choose by risk (money and data, branchy code, every past defect,
-  contracts, then stop), write red first, then break the code in a scratch copy to prove each guard can go
-  red — the same reverse control the task tree demands. Wording, layout and log text are never asserted.
+  falls by itself, and exits non-zero when coverage drops past the tolerance. It is off at `critical`, runs
+  at `T00` and at the plan's close at `standard`, and with every task's gate checks at `release`. Lowering
+  the floor is a decision written into `docs/PROJECT.md` with a date and a reason.
+- `/test` is how coverage is raised, on purpose: measure first, read the code and the existing tests, then
+  **propose** — what to cover by risk (money and data, branchy code, every past defect, contracts, then
+  stop), what stays uncovered and why, whether to raise the level — and write only after the owner agrees:
+  red first, then the code broken in a scratch copy to prove each guard can go red, the same reverse
+  control the task tree demands at `standard` and `release`. Inside a running plan it asks nothing and
+  covers what the task line names. Wording, layout and log text are never asserted.
 - The advisor is available inside subagents too, and cannot be switched off per agent (no `env` in the agent schema, and it bypasses `disallowedTools`). Measured on a real installation: 13 calls across 50 sessions, median 129k tokens forwarded, **911k on the largest** — all of them in long-running agent sessions. That is why `worker` and `verifier` are told to report a fork upward rather than resolve it, and why subagent contexts are kept small.
 - What coverage cannot see: a test that runs a line without noticing it is wrong. `/test` §5a is a one-off
   mutation audit (`mutmut`, `stryker`) on a single module where a wrong value is worse than a crash; every
