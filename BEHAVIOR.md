@@ -41,7 +41,7 @@ The effect: after any interruption — compaction, a usage limit, a restart — 
 1. Look first, ask second: language and framework versions, package manager, lockfile, tests, linter, CI, Docker, an existing `AGENTS.md`/`README.md`/`docs/`. If `docs/PROJECT.md` already exists, read it and ask only about the `_unanswered_` cells.
 2. The interview goes through AskUserQuestion, up to 4 questions per call, calls back to back, and never again afterwards: the name and who else touches this code; the goal and the first end-to-end journey (and what the first version must NOT do); which capabilities are needed (accounts, storage, payments, background work, scheduling…); which irreversible actions may run unattended and which never may; environments and network; the exact "done" commands (tests, linter, types, architecture check) and whether a red baseline is accepted; the delivery order.
 3. It does not ask about file layout, naming, library choice when the repo already has one, formatting, or anything listed under "decided by the agent".
-4. It writes `docs/PROJECT.md`: the **capability ledger** (`included` / `available` / `absent` / `removed`; no row means `absent`; dead code and an old migration are not a request), **"decided by the agent"** (classes of decision that are never asked about), **gate checks** (the commands verbatim; `/plan` copies them into every task), **the unattended policy** and what must become `[!] BLOCKED`.
+4. It writes `docs/PROJECT.md`: the **capability ledger** (`included` / `available` / `absent` / `removed`; no row means `absent`; dead code and an old migration are not a request), **"decided by the agent"** (classes of decision that are never asked about), **gate checks** (the commands verbatim and the per-task time limit, 30 seconds unless the owner says otherwise; `/plan` puts them behind `cc-pertask run` in the verify line of every task that changes logic), **the unattended policy** and what must become `[!] BLOCKED`.
 5. If there is no `AGENTS.md`, it creates one from the template and makes `CLAUDE.md` contain only `@AGENTS.md`. It suggests `.claude/rules/*.md` with `paths:`. It runs `scripts/project_check.py`.
 
 The result is a five-line summary and a path. After that there are no more questions about the project.
@@ -77,7 +77,7 @@ The session does the tasks itself, one at a time, following the `run-task` proce
 1. **Reads only**: the `T##` line, `## Goal`, `## Decisions`, `## Assumptions`, `## Out of scope`, the last 10 lines of `## Log`; in a tree, that task's `task.txt` (CONTEXT lists what to open first) and `PROTOCOL.md`; `docs/PROJECT.md` §5–6. Other tasks' details only if named as a dependency.
 2. **Checks its authority**: `(needs confirmation)` on the line, or an action from the "must become BLOCKED" column → `- [!] BLOCKED: needs confirmation`, a Log line, next task.
 3. **Does the work**, keeping noise out of the context: repository search → `scout`; tests, builds, linters, long commands → `test-runner`; documentation, changelogs, an unfamiliar subsystem → `researcher`; a review before a risky commit → `reviewer`. It reads only what it will edit, and only the window it needs (Grep first).
-4. **Verifies**: the task's `verify:` command, the tests covering the files it touched, plus the gate checks (the coverage ratchet among them when `docs/PROJECT.md` §6 lists it — a fallen floor fails the task). Pass → `- [x]`, a `- <time> T## done: …` line in the Log, `git add <the files it changed>` and a commit (never `git add -A`: submodule pointers and marker files). Fail → `/diagnose` (§7). Still red → the line stays `- [ ]` and the Log gets `- <time> T## open: <root cause or best hypothesis, with evidence>`, so the next attempt starts from evidence rather than zero.
+4. **Verifies**: the task's `verify:` command, the tests covering the files it touched, plus the gate checks through `cc-pertask run` — the commands whose measured times fit the per-task limit run, the others print `SKIPPED (per-plan)` and are owed before a push or a deploy and at the plan's close (the coverage ratchet among them when `docs/PROJECT.md` §6 lists it — a fallen floor fails the task). Pass → `- [x]`, a `- <time> T## done: …` line in the Log, `git add <the files it changed>` and a commit (never `git add -A`: submodule pointers and marker files). Fail → `/diagnose` (§7). Still red → the line stays `- [ ]` and the Log gets `- <time> T## open: <root cause or best hypothesis, with evidence>`, so the next attempt starts from evidence rather than zero.
 5. **A decision made alone** → one line under `## Assumptions`. A question to the user: never.
 6. Between tasks: nothing. No `/clear`, no manual `/compact`, no recap of what was done. The next task starts from the plan line. If the model catches itself re-reading the plan header, that is context bloat, not progress.
 
@@ -134,7 +134,11 @@ nobody is awake to notice.
   change. `/plan` puts it in the task line; the contract repeats it; a test that was green on its first run
   has proved nothing yet.
 - Every fixed bug gets the test that would have caught it, in the same task.
-- Before `[x]`: the tests covering the touched files, then the gate checks. Before the plan closes: the full
+- Before `[x]`: the tests covering the touched files, then the gate checks through `cc-pertask run`: the
+  cheapest commands whose measured times fit the per-task limit (30 seconds unless `docs/PROJECT.md` says
+  otherwise). The checks that do not fit are not run before every mark; they run before a push or a deploy
+  and when the plan closes, and `cc-pertask status` exits non-zero until they have. A plan made only of
+  changes without logic carries no task that runs heavy suites. Before the plan closes: the full
   suite, compared with the `T00` baseline in `## Log` — a test green at `T00` and red now is a regression this
   run caused, and it is fixed or the plan ends `paused` naming it.
 - `scripts/coverage_gate.py` holds a floor in `.coverage-gate.json`: it rises when coverage grows, never

@@ -122,10 +122,10 @@ Only their descriptions live in context (under 1536 characters all together); th
 
 | Skill | Called by | What it guarantees |
 |---|---|---|
-| `/intake` | you, once per repository | `docs/PROJECT.md`: the capability ledger (`included/available/absent/removed`; no row means `absent`, dormant code is not a requirement), the "decided by the agent" list, gate checks, what may run unattended |
+| `/intake` | you, once per repository | `docs/PROJECT.md`: the capability ledger (`included/available/absent/removed`; no row means `absent`, dormant code is not a requirement), the "decided by the agent" list, gate checks with their per-task time limit, what may run unattended |
 | `/task` | you / the model | a task directory in the tree's format, vocabulary and language taken from `tasks/README.md`, questions asked once, `check.py` at zero problems |
-| `/plan` | you / the model | `task.txt` → `PLAN.md`: VERIFY → acceptance criteria, `+` → tasks, `−` → boundaries, DEPENDS → a dependency check; `T00` is the baseline; every task carries its verify command; it ends with `/clear` + `/run` |
-| `/run` | you / a hook | one task at a time, `[x]` only after the check, a commit per task, `done` only when the artefact exists in the repository, `BLOCKED.md` instead of a stub, `verify:` never touched |
+| `/plan` | you / the model | `task.txt` → `PLAN.md`: VERIFY → acceptance criteria, `+` → tasks, `−` → boundaries, DEPENDS → a dependency check; `T00` is the baseline and measures each gate command; every task carries its verify command, a logic task's gate commands behind `cc-pertask run`; a plan of changes without logic gets no heavy-suite task; it ends with `/clear` + `/run` |
+| `/run` | you / a hook | one task at a time, `[x]` only after the check, a commit per task, checks deferred by the per-task limit run before the plan closes (`cc-pertask status`), `done` only when the artefact exists in the repository, `BLOCKED.md` instead of a stub, `verify:` never touched |
 | `/run-task` | `worker`, or you for a single task | what one task reads, does, verifies, marks and logs — then stops |
 | `/test` | you, or `/plan` when a task needs cover | coverage chosen by risk, every test seen red before it passes, a mutation proving each guard can fail, `scripts/coverage_gate.py` in the gate checks so the floor can only rise, and a one-off `mutmut`/`stryker` audit (by hand, never a gate) whose surviving mutants become tasks |
 | `/verify-task` | you, on a finished task (`disable-model-invocation`: the model cannot start it; `/run` lists what is ready) | a fresh context (`verifier`): `VERIFY.md` stating what this context did *not* do, reproduction from a clean state, reverse control by mutation, "what was not checked" |
