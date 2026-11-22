@@ -2,6 +2,33 @@
 
 One entry per `stable-*` tag, newest first. The reasons and the evidence behind each entry are in the plan under `docs/plans/` named in it.
 
+## stable-2026-11-22-2 — the test coverage level is the project's choice, smallest by default
+
+Plan: `docs/plans/lean.md`.
+
+### Changed
+- How much is tested is no longer one unconditional rule. `docs/PROJECT.md` §6 carries the row `Test coverage level` with three values. `critical`, the default and what applies when the row or the file is absent: a test for a behaviour change in critical code — money, access rights, data that can be lost or corrupted, the project's own non-trivial logic — and for every fixed bug; nothing for a call into a ready SDK, wiring or layout; no coverage ratchet. `standard`: a test for every behaviour change, the ratchet at `T00` and at the plan's close. `release`: as `standard`, plus what `/test` covers by an agreed list, the ratchet with every task's gate checks. Measured on seven projects before the change (labels A–G): writing tests took about as long as writing product code in three of them (C 21.8 against 23.4 minutes, E 1.2 against 1.4, G 6.8 against 4.2; B is left out, its tests are probe scripts), while showing a test red first took at most 1.7% of active time in five of the six projects that measured it (5.9% in the sixth) and reverse control at most 1.1% in all six. So the smallest level drops the test for non-critical code and the ratchet and keeps both cheap steps for the tests that are written.
+- **In force on install, for every project without the row.** A project that should keep a test for every change needs `standard` or `release` in the row: `/intake refresh` asks, or the row is added by hand.
+- `/intake` asks the level, `critical` first and marked recommended, with the reason in the question; coverage mechanics are asked only at `standard` and `release`. `/intake refresh` asks when an existing `PROJECT.md` has no row.
+- `/plan` decides per task and fixes it in the task line: the test, or `no test (critical level: <reason>)`. `/run-task` follows the line and, when the code proves critical, writes the test without asking. The ratchet command is written into verify lines only at `release`.
+- `/test` called by hand reads the code and the existing tests, proposes what to cover and whether to raise the level, and writes only after agreement; inside a running plan it asks nothing. It no longer creates `.coverage-gate.json` at `critical`.
+- Task trees: `format2.py` requires the reverse-control VERIFY item at `standard` and `release` only (an unknown value is read as `standard`); an item that names reverse control without a mutation and a test stays an error at every level. `/task` writes the item at `critical` for a task with critical code, and offers a tree whose `format2.py` differs from the template the one-file upgrade with a `DECISIONS.md` entry. `/verify-task` and the verifier fail critical code changed without a test and do not report glue without one.
+- The template row `Ratchet per task or per plan` is gone: the level decides it.
+
+### Added
+- `scripts/project_check.py` reports a level value outside the three.
+- Agent case `lean-default`: a money function and a JSON-writing function in a repository without `docs/PROJECT.md`.
+
+### Evidence
+- `./selftest.sh`: 634 checks at the start, 674 at the end, none red, every one of the 634 still green; a trial install 691, the live install 692. 40 new: 6 for the validator by level (three seen red before the change, the other three red on a mutated scratch copy), 3 for the row check, 31 reference checks of the rules, all seen red before the texts changed.
+- One live run of `lean-default` under the installed contract: the report names `critical` and where it follows from, the money function got a test seen red and a reverse control, the JSON writer got none.
+
+### Not covered
+- One live case, run once; a model's behaviour is not deterministic. The `/intake` and `/test` interviews and `/plan`'s per-task decision are checked by reference, not by a live run.
+- An existing task tree keeps its validator and its own documents until the owner accepts the upgrade `/task` offers.
+- In a project whose `PROJECT.md` already lists the ratchet command and has no row, the command is left out by the rule in `/plan` and `/run-task`, not by code: `scripts/coverage_gate.py` is unchanged.
+- No target for the ratio of test time to development time.
+
 ## stable-2026-11-22 — gate checks held to a time limit; a timing report for every plan
 
 Plan: `docs/plans/test-run-budget.md`.
