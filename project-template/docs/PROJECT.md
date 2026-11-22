@@ -80,7 +80,7 @@ Two tiers. The harness runs what is declared here and nothing else; a tool the p
 
 ### Fast tier
 
-Commands that must exit 0 before any task is marked `[x]`. `/plan` copies them into every verify line. Unit tests, plus at most three heavy tests per task; the rest of the heavy tests belong to the full tier.
+Commands that must exit 0 before a task that changed logic is marked `[x]`. Each runs through `cc-pertask run --plan <plan> -- <command>`: `T00` measures every command once (`cc-pertask record`), and before a mark only the cheapest commands whose measured times add up to the per-task limit below run. The rest print `SKIPPED (per-plan)` and run before a push or a deploy and when the plan closes (`cc-pertask status` exits non-zero until they have). Unit tests, plus at most three heavy tests per task; the rest of the heavy tests belong to the full tier.
 
 ```
 _unanswered_
@@ -111,11 +111,16 @@ The first line uses pytest-split (`--splits N --group k`, groups from 1 — http
 |---|---|
 | How a test is marked full-only here (marker, build tag, `#[ignore]`, a directory, a separate command) | _unanswered_ |
 | Fast tier wall time at `T00`, seconds, from the run | _unanswered_ |
+| Per-task limit for gate checks, seconds | 30 |
+| Product code paths | _unanswered_ |
+| Test paths | _unanswered_ |
 | Full tier budget, minutes, whole run (over it: a finding, and `/test-audit` is due) | _unanswered_ |
 | Audit: run in another order (a command, for `/test-audit`; e.g. `pytest -p random_order`, `go test -shuffle=on`) | _unanswered_ |
 | Audit: run in parallel (a command, for `/test-audit`; e.g. `pytest -n 4`, `go test -p 4`, `cargo nextest run`) | _unanswered_ |
 | Audit: isolation between parallel workers (a command that runs two workers and fails when one sees the other's data) | _unanswered_ |
 | Audit: calls to the external resource per test (a command printing `<test id> <count>` lines; PostgreSQL: `pg_stat_statements` deltas or driver tracing) | _unanswered_ |
+
+The per-task limit is read by `cc-pertask`; change the number to change it. The two path rows are read by `cc-sessiontime`, which reports how a plan's time divides between writing product code, writing tests and running checks: comma-separated directory prefixes or globs (`src/, app/` and `tests/, *_test.go`).
 
 Baseline accepted as-is (pre-existing failures tolerated): _unanswered_
 

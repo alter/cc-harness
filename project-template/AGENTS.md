@@ -34,8 +34,8 @@ Read the owning guide before changing an area; read only the sections you need. 
 ## Validation
 
 - A check passes only when the behavior is correct and the command exits 0. Report failed or unavailable checks plainly; a task with broken primary behavior is not done.
-- Run the baseline once before the first edit to separate pre-existing failures from new ones; record it in the plan's `## Log`.
-- Narrowest stable check per change; the full gate list before a task is marked `[x]`; broad regression only for cross-cutting changes or release.
+- Run the baseline once before the first edit to separate pre-existing failures from new ones; record it in the plan's `## Log`. Measure each gate command then: `cc-pertask record --plan <plan> -- <command>`.
+- Narrowest stable check per change; before a task that changed logic is marked `[x]`, the gate list through `cc-pertask run --plan <plan> -- <command>` (what fits the per-task limit runs; a `SKIPPED (per-plan)` check is owed before a push or a deploy and at the plan's close); broad regression only for cross-cutting changes or release.
 - End-to-end tests only for the minimal product-critical path; assert outcomes (persisted data, navigation), never wording or layout.
 - Tests that use an external stateful resource (a database, a queue, a bucket):
   - a shared "world" built once is reached by read-only tests through a read-only connection (PostgreSQL: `SET default_transaction_read_only = on`, or a role with `SELECT` only), so a test that starts writing fails at once instead of poisoning the tests after it;
