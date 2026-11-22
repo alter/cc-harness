@@ -2,6 +2,31 @@
 
 One entry per `stable-*` tag, newest first. The reasons and the evidence behind each entry are in the plan under `docs/plans/` named in it.
 
+## stable-2026-11-22 — gate checks held to a time limit; a timing report for every plan
+
+Plan: `docs/plans/test-run-budget.md`.
+
+### Changed
+- Gate checks before a task mark are held to a measured time limit. In the timing reports of nine projects running checks cost 2–40× the writing of the code, mostly a whole suite repeated before every `[x]`. `cc-pertask record` at `T00` runs each gate command once and stores its time; before a mark `cc-pertask run` executes the cheapest commands whose times add up to the limit — 30 s, the row `Per-task limit for gate checks, seconds` of `docs/PROJECT.md`, or `--limit` — and prints `SKIPPED (per-plan)` for the rest without running them. A skipped check has not passed: it runs before a push or a deploy and when the plan closes, and `cc-pertask status` exits non-zero while one is owed. The tests of the touched files still run before every mark. The contract, the project template, `/plan`, `/run`, `/run-task`, `/task`, `/intake` and `/test` carry the rule; the sentence that copied the fast tier into every verify line is gone.
+- A plan or a task made only of changes without logic (copy, labels, styles, templates, docs, config values) has no task, VERIFY item or acceptance criterion that runs the gate set, e2e, integration or a local CI run, under any name. In one project an edit of legal text ran e2e, integration and a tool suite, twice, under a task named "checks before sending" that the plan itself had added. The owner asking for such a run in the interview is still a decision of theirs.
+
+### Added
+- `cc-sessiontime --plan <plan>`: reads the transcripts of the plan's window (the first to the last commit of the plan file, or `--from`/`--to`, `--to now`) and prints where the time went — product code, test code, runs, records, docs, reading, for the main session and for agents — with runs per task, the unclassified share and its ten longest commands, and one `timing:` line. `/run` appends that line to `## Log` when a plan closes. It is a report, never a gate, and there is no target number yet: when it cannot measure it says why and exits 0. Paths and runner commands come from `docs/PROJECT.md` §6 (new rows `Product code paths`, `Test paths`) or from flags. It replaces seven per-project scripts that had diverged.
+- `docs/tech/claude-code-transcripts@2.1.330.md`: the transcript format as the tool reads it, 55 items, each with a URL or the local evidence.
+
+### Fixed
+- `uninstall.sh` took `$HOME/bin` whatever the target, while `install.sh` uses `<target>/bin` for a target other than `~/.claude`: uninstalling a trial removed the live `cc-night` and `cc-fullrun`. It happened during this plan; both were restored from the last backup, byte-identical. The script now uses the target's directory, with two checks run under a substitute `HOME`.
+- `selftest.sh` reported nothing when a unit-test module failed to load; the run now has to end `OK`.
+
+### Evidence
+- `./selftest.sh`: 514 checks at the start, 634 at the end, none red, every one of the 514 still green; a trial install 654, the live install 655. 120 new: 30 for `cc-pertask`, 64 for `cc-sessiontime`, 24 reference checks of the rules, 2 for `uninstall.sh`. All but one were seen red first; the one that was not checks items + idle = span through the command and had nothing to check against the stubs, the same sum is covered by a test that was red.
+- The timing fixtures are synthetic and their expected seconds were worked out by hand. On real transcripts of this repository three independent facts agree: items + idle − span is 0.000 s for every transcript; a resumed agent whose two notices record 370.6 s and 22.3 s is counted 392.4 s, where first-to-last of its file is 598.7 s; every commit of a plan file falls inside the `git commit` call of the transcript, within 3.5 s of its start.
+
+### Not covered
+- The new rules in the contract and the skills are checked by reference (the command is named, the retired sentence is gone), not by a live `/plan` or `/run` on a project.
+- Which code gets a test, the coverage ratchet and `/test` proposing a list before writing are a second plan (`lean`).
+- Timing: a background run that overlaps other work is credited only with the time when nothing else was happening in that session; work done before the first commit of the plan file is outside the default window; sessions started under `.claude/scratch/` are left out as nested runs; without the two path rows a file outside the default test patterns counts as product code.
+
 ## stable-2026-11-14-3 — stop-guard waits for background commands and monitors
 
 Plan: `docs/plans/stop-guard-background-tasks.md`.
