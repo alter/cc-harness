@@ -1022,6 +1022,19 @@ fi
 [ -d "$pt_dir" ] || pt_dir="$SRC/pertask"
 unit_results "pertask" "$(PERTASK_DIR="$pt_dir" python3 -m unittest -v "$SRC/selftest/test_pertask.py" 2>&1)"
 
+echo "== session timing"
+st_dir="$TARGET/sessiontime"
+if [ "$TARGET" != "$SRC" ]; then
+  [ -f "$st_dir/cli.py" ] && ok "installed: sessiontime package present" || bad "installed: sessiontime package present" "missing $st_dir/cli.py"
+  if [ "$TARGET" = "$HOME/.claude" ]; then st_cmd="$HOME/bin/cc-sessiontime"; else st_cmd="$TARGET/bin/cc-sessiontime"; fi
+  if [ -x "$st_cmd" ]; then
+    wd="$TMP/installed-sessiontime"; mkdir -p "$wd"; : > "$wd/plan.md"
+    check "installed: $st_cmd finds its package" "$(cd "$wd" && env -u CLAUDE_CONFIG_DIR bash "$st_cmd" --plan plan.md 2>&1)" '^timing: '
+  else bad "installed: cc-sessiontime command present" "no executable $st_cmd"; fi
+fi
+[ -d "$st_dir" ] || st_dir="$SRC/sessiontime"
+unit_results "sessiontime" "$(SESSIONTIME_DIR="$st_dir" python3 -m unittest -v "$SRC/selftest/test_sessiontime.py" 2>&1)"
+
 echo "== per-task rules"
 RC="$TARGET/CLAUDE.md"; RT="$TARGET/project-template"; RS="$TARGET/skills"
 names(){ local name=$1 file=$2 pattern=$3; if grep -qE -- "$pattern" "$file" 2>/dev/null; then ok "$name"; else bad "$name" "no '$pattern' in ${file#"$TARGET"/}"; fi; }
@@ -1052,12 +1065,12 @@ names "rules-no-gate-task-task: /task forbids a heavy-suite VERIFY item in a no-
 
 echo "== uninstall: a trial target"
 ut="$TMP/untrial"; uh="$TMP/unhome"; mkdir -p "$uh/bin"
-for w in cc-night cc-fullrun cc-pertask; do : > "$uh/bin/$w"; done
+for w in cc-night cc-fullrun cc-pertask cc-sessiontime; do : > "$uh/bin/$w"; done
 if CC_BACKUP_DIR="$TMP/untrial-backup" CC_SKIP_PLUGINS=1 "$SRC/install.sh" "$ut" >/dev/null 2>&1 && HOME="$uh" "$SRC/uninstall.sh" "$TMP/untrial-backup" "$ut" >/dev/null 2>&1; then
   left=$(ls "$uh/bin" | tr '\n' ' ')
-  [ "$left" = "cc-fullrun cc-night cc-pertask " ] && ok "uninstall-trial-keeps-home-bin: commands outside the target stay" || bad "uninstall-trial-keeps-home-bin: commands outside the target stay" "left in the home bin: ${left:-nothing}"
-  gone=$(ls -d "$ut/bin/cc-night" "$ut/bin/cc-fullrun" "$ut/bin/cc-pertask" "$ut/pertask" 2>/dev/null | tr '\n' ' ')
-  [ -z "$gone" ] && ok "uninstall-removes-commands: the target's commands and the pertask package are gone" || bad "uninstall-removes-commands: the target's commands and the pertask package are gone" "still there: $gone"
+  [ "$left" = "cc-fullrun cc-night cc-pertask cc-sessiontime " ] && ok "uninstall-trial-keeps-home-bin: commands outside the target stay" || bad "uninstall-trial-keeps-home-bin: commands outside the target stay" "left in the home bin: ${left:-nothing}"
+  gone=$(ls -d "$ut/bin/cc-night" "$ut/bin/cc-fullrun" "$ut/bin/cc-pertask" "$ut/bin/cc-sessiontime" "$ut/pertask" "$ut/sessiontime" 2>/dev/null | tr '\n' ' ')
+  [ -z "$gone" ] && ok "uninstall-removes-commands: the target's commands and their packages are gone" || bad "uninstall-removes-commands: the target's commands and their packages are gone" "still there: $gone"
 else bad "uninstall-trial: install and uninstall of a trial target" "one of them failed"; fi
 
 echo "== install: retired keys"
@@ -1108,7 +1121,7 @@ if command -v shellcheck >/dev/null; then
   sc=$(shellcheck -S warning "$H"/*.sh "$SRC"/*.sh 2>&1); [ -z "$sc" ] && ok "lint-shell: shellcheck, warnings and above" || bad "lint-shell: shellcheck, warnings and above" "$sc"
 else echo "  SKIP  lint-shell: shellcheck not installed"; fi
 if command -v ruff >/dev/null; then
-  rf=$(ruff check --no-cache --extend-exclude "$SRC/selftest/agentcases" "$H" "$SRC/project-template" "$SRC/selftest" "$SRC/fullrun" "$SRC/pertask" 2>&1); grep -q 'All checks passed' < <(printf '%s' "$rf") && ok "lint-python: ruff" || bad "lint-python: ruff" "$rf"
+  rf=$(ruff check --no-cache --extend-exclude "$SRC/selftest/agentcases" "$H" "$SRC/project-template" "$SRC/selftest" "$SRC/fullrun" "$SRC/pertask" "$SRC/sessiontime" 2>&1); grep -q 'All checks passed' < <(printf '%s' "$rf") && ok "lint-python: ruff" || bad "lint-python: ruff" "$rf"
 else echo "  SKIP  lint-python: ruff not installed"; fi
 if command -v gitleaks >/dev/null && [ -d "$SRC/.git" ]; then
   gl=$(gitleaks git --no-banner --redact "$SRC" 2>&1); [ $? -eq 0 ] && ok "no-secrets: gitleaks over the history" || bad "no-secrets: gitleaks over the history" "$gl"

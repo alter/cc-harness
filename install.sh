@@ -8,7 +8,7 @@ TARGET=${TARGET/#\~/$HOME}
 if [ "$TARGET" = "$HOME/.claude" ]; then BIN_DIR=${CC_BIN_DIR:-$HOME/bin}; else BIN_DIR=${CC_BIN_DIR:-$TARGET/bin}; fi
 STAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP=${CC_BACKUP_DIR:-$HOME/.claude-backup/$STAMP}
-ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template fullrun pertask keybindings.json)
+ITEMS=(settings.json settings.local.json CLAUDE.md statusline.sh graph-setup.sh hooks agents skills commands project-template fullrun pertask sessiontime keybindings.json)
 
 command -v jq >/dev/null 2>&1 || { echo "jq is required (brew install jq / apt install jq)" >&2; exit 1; }
 command -v claude >/dev/null 2>&1 || echo "warning: claude not in PATH; installing anyway" >&2
@@ -30,6 +30,7 @@ fi
 [ -f "$BIN_DIR/cc-night" ] && cp "$BIN_DIR/cc-night" "$BACKUP/cc-night"
 [ -f "$BIN_DIR/cc-fullrun" ] && cp "$BIN_DIR/cc-fullrun" "$BACKUP/cc-fullrun"
 [ -f "$BIN_DIR/cc-pertask" ] && cp "$BIN_DIR/cc-pertask" "$BACKUP/cc-pertask"
+[ -f "$BIN_DIR/cc-sessiontime" ] && cp "$BIN_DIR/cc-sessiontime" "$BACKUP/cc-sessiontime"
 printf 'source=%s\ntarget=%s\nbin=%s\ndate=%s\n' "$SRC" "$TARGET" "$BIN_DIR" "$STAMP" > "$BACKUP/INFO.txt"
 echo "   $(wc -l < "$BACKUP/MANIFEST.txt" | tr -d ' ') files listed, config copied"
 
@@ -49,14 +50,16 @@ fi
 rm -rf "$TARGET/project-template"; cp -R "$SRC/project-template" "$TARGET/project-template"
 rm -rf "$TARGET/fullrun"; mkdir -p "$TARGET/fullrun"; cp "$SRC"/fullrun/*.py "$TARGET/fullrun/"
 rm -rf "$TARGET/pertask"; mkdir -p "$TARGET/pertask"; cp "$SRC"/pertask/*.py "$TARGET/pertask/"
+rm -rf "$TARGET/sessiontime"; mkdir -p "$TARGET/sessiontime"; cp "$SRC"/sessiontime/*.py "$TARGET/sessiontime/"
 cp "$SRC/night.sh" "$BIN_DIR/cc-night"
 cp "$SRC/fullrun.sh" "$BIN_DIR/cc-fullrun"
 cp "$SRC/pertask.sh" "$BIN_DIR/cc-pertask"
-chmod +x "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" "$TARGET"/hooks/* "$BIN_DIR/cc-night" "$BIN_DIR/cc-fullrun" "$BIN_DIR/cc-pertask"
+cp "$SRC/sessiontime.sh" "$BIN_DIR/cc-sessiontime"
+chmod +x "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" "$TARGET"/hooks/* "$BIN_DIR/cc-night" "$BIN_DIR/cc-fullrun" "$BIN_DIR/cc-pertask" "$BIN_DIR/cc-sessiontime"
 
 if [ "$TARGET" != "$HOME/.claude" ]; then
   echo "== rewrite ~/.claude -> $TARGET in installed copies"
-  grep -rlE '[~]/\.claude|\$HOME/\.claude' "$TARGET/hooks" "$TARGET/agents" "$TARGET/skills" "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" "$BIN_DIR/cc-fullrun" "$BIN_DIR/cc-pertask" "$BIN_DIR/cc-night" 2>/dev/null \
+  grep -rlE '[~]/\.claude|\$HOME/\.claude' "$TARGET/hooks" "$TARGET/agents" "$TARGET/skills" "$TARGET/statusline.sh" "$TARGET/graph-setup.sh" "$BIN_DIR/cc-fullrun" "$BIN_DIR/cc-pertask" "$BIN_DIR/cc-sessiontime" "$BIN_DIR/cc-night" 2>/dev/null \
     | xargs -r sed -i.bak -e "s#~/\.claude#$TARGET#g" -e "s#\$HOME/\.claude#$TARGET#g"
   find "$TARGET" -name '*.bak' -delete
 fi
