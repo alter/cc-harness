@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 STATES = {"included", "available", "absent", "removed"}
+LEVELS = ("critical", "standard", "release")
+LEVEL_ROW = re.compile(r"^\|\s*Test coverage level[^|]*\|([^|]*)\|", re.M)
 AGENTS_WORD_BUDGET = 1500
 BOOTSTRAP_MARKERS = ("<!-- BOOTSTRAP_ONLY_START -->", "<!-- BOOTSTRAP_ONLY_END -->")
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
@@ -120,6 +122,15 @@ def check_instructions(text: str, problems: list[str]) -> None:
                 problems.append(f"CLAUDE.md repeats AGENTS.md sections {copied}; it imports them with @AGENTS.md")
 
 
+def check_level(text: str, problems: list[str]) -> None:
+    row = LEVEL_ROW.search(text)
+    if not row:
+        return
+    value = row.group(1).strip(" `*").lower()
+    if value not in LEVELS:
+        problems.append(f"test coverage level is '{value}' (allowed: {list(LEVELS)}; without the row it is 'critical')")
+
+
 def main() -> int:
     path = Path("docs/PROJECT.md")
     if not path.exists():
@@ -168,6 +179,7 @@ def main() -> int:
     if gates and "marked full-only" not in gates:
         problems.append("section 6 does not say how a test is marked full-only in this project")
 
+    check_level(text, problems)
     check_fingerprint(text, completed, problems)
     check_instructions(text, problems)
     check_links(problems)

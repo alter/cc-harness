@@ -729,6 +729,16 @@ while IFS= read -r line; do
 done <<< "$tt"
 grep -qE '^Ran [1-9]' < <(printf '%s' "$tt") || bad "task tree tests ran" "$tt"
 
+echo "== project check"
+pc=$(TASKTREE_TEMPLATE="$TARGET/project-template/tasks" python3 -m unittest -v "$SRC/selftest/test_project_check.py" 2>&1)
+while IFS= read -r line; do
+  case "$line" in
+    "test_"*" ... ok") ok "${line%% *}" ;;
+    "test_"*" ... FAIL"|"test_"*" ... ERROR") bad "${line%% *}" "$(printf '%s' "$pc" | grep -A12 "^[A-Z]*: ${line%% *}" | tail -n +3)" ;;
+  esac
+done <<< "$pc"
+grep -qE '^Ran [1-9]' < <(printf '%s' "$pc") || bad "project check tests ran" "$pc"
+
 echo "== full run"
 FR="$SRC/fullrun.sh"
 frp="$TMP/fullrun"; mkdir -p "$frp/docs"
