@@ -218,4 +218,7 @@ def session_files(projects: str | os.PathLike, root: str, since: float) -> list[
 
 
 def belongs(book: Journal, root: str) -> bool:
-    return any(cwd == root or cwd.startswith(root.rstrip(os.sep) + os.sep) for cwd in book.cwds)
+    root = root.rstrip(os.sep)
+    scratch = os.path.join(root, ".claude", "scratch")
+    inside = [cwd for cwd in book.cwds if cwd == root or cwd.startswith(root + os.sep)]
+    return any(cwd != scratch and not cwd.startswith(scratch + os.sep) for cwd in inside)

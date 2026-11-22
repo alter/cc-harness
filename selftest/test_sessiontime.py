@@ -377,6 +377,8 @@ class Reporting(unittest.TestCase):
         cls.place("one", pathlib.Path(str(cls.repo) + "2"), ["split.jsonl"], prefix="n")
         cls.place("two", cls.repo, ["background.jsonl", agent])
         cls.place("three", cls.repo / "packages" / "web", ["split.jsonl"])
+        cls.place("four", cls.repo, ["split.jsonl"])
+        cls.place("four", cls.repo / ".claude" / "scratch" / "probe", ["split.jsonl"], prefix="s")
         (cls.base / "none").mkdir()
 
     @classmethod
@@ -450,6 +452,18 @@ class Reporting(unittest.TestCase):
     def test_session_started_in_a_subdirectory_is_counted(self):
         summary, _, _ = self.gather("three")
         self.assertAlmostEqual(summary.seconds["main"]["runs"], 89.5)
+
+    def test_session_started_in_scratch_is_left_out(self):
+        summary, _, _ = self.gather("four")
+        self.assertEqual(len(summary.sheets), 1)
+        self.assertAlmostEqual(summary.seconds["main"]["runs"], 89.5)
+
+    def test_session_that_moved_into_scratch_is_kept(self):
+        book = journal.read(FIXTURES / "split.jsonl")
+        book.cwds = {"/work/demo", "/work/demo/.claude/scratch/probe"}
+        self.assertTrue(journal.belongs(book, "/work/demo"))
+        book.cwds = {"/work/demo/.claude/scratch/probe"}
+        self.assertFalse(journal.belongs(book, "/work/demo"))
 
     def test_runs_per_task(self):
         summary, _, _ = self.gather("one")
