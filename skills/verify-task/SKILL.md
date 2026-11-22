@@ -40,6 +40,8 @@ A decision is met only when the code does it the way the decision says. "Use a s
 
 At least one check must be made red on purpose: mutate the input, break the ordering, remove the guard — in a scratch copy — and record the red output. A suite that stays green under mutation does not test what it claims; write that down as a finding, with the mutation.
 
+How far this goes is set by the row `Test coverage level` of `docs/PROJECT.md` §6; no row or no file means `critical`. At `standard` and `release` it holds for every task. At `critical` it holds for a task whose VERIFY names reverse control or whose change touches critical code — money, access rights, data that can be lost or corrupted, the project's own non-trivial logic. Critical code changed without a test is a finding and the task fails. A call into a ready SDK, wiring or layout without a test is not a finding at `critical`. When nothing was owed, the `## Reverse control` section says so in one line with the reason; it is never left out.
+
 ## 5. Write `VERIFY.md` in the task directory
 
 Language of the tree. Required parts, in the tree's wording (Russian trees: `Проверил:`, `## Как воспроизвести`, `## Что не проверено`; English trees: `Verifier:`, `## How to reproduce`, `## What was not checked`):

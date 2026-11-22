@@ -38,8 +38,13 @@ Every item is a command, not an opinion.
 ## 4. Reverse control is not a suggestion
 
 A check that has never been red proves nothing. Every VERIFY item that says
-"reverse control" is executed and its red output is kept. A task without at
-least one executed reverse control is not closed.
+"reverse control" is executed and its red output is kept. At levels `standard`
+and `release` of the row `Test coverage level` (`docs/PROJECT.md` §6) a task
+without at least one executed reverse control is not closed. At `critical`,
+which is also what a missing row means, that holds for a task that changes
+critical code: money, access rights, data that can be lost or corrupted, the
+project's own non-trivial logic. A task of wiring or of a call into a ready SDK
+owes neither a test nor a reverse control.
 
 ## 5. When a task is closed
 

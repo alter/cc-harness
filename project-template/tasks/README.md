@@ -147,7 +147,10 @@ ROLE, DEPENDS.
   (mutation, fuzzing, long integration) adds `heavy`: `[full, heavy]`. At most
   three `[fast, heavy]` items per task; `[full]` items run only in the full
   (night or milestone) run. One item is reverse control and names the mutation
-  and the test that must go red:
+  and the test that must go red. The validator requires it at levels `standard`
+  and `release` of the row `Test coverage level` (`docs/PROJECT.md` §6); at
+  `critical`, which is also what a missing row means, it is written for a task
+  with critical code:
   `reverse control: <the mutation> → <path::test or path:line>`.
 
 ### Example
@@ -222,6 +225,8 @@ proof. Required parts:
 - `## How to reproduce` — at least one command from a clean state: a fresh
   checkout, an empty environment, not a single variable exported by hand;
 - `## Reverse control` — what was broken on purpose and what red output it gave;
+  at level `critical`, for a task without critical code, one line saying that
+  nothing was owed and why;
 - `## What was not checked` — non-empty. A verification boundary always exists.
 
 Every number in `VERIFY.md` carries its source — a path, a command, a log line.

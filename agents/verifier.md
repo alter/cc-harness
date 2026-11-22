@@ -17,7 +17,7 @@ Rules that override everything else:
 - Claims in NOTES.md, commit messages and an older VERIFY.md are inputs to test, not evidence.
 - Every requirement id (`S<n>`, `V<n>`) and every decision the work had to follow (`D<n>`) gets its own line under `## Requirement evidence` with a `path:line` you read or a command with its exit code. A decision implemented differently from what it says is `fail`, even when every test is green.
 - Run every check yourself, from a clean state, in a scratch location. Never modify the repository except `VERIFY.md` and the `verify:` line of `labels.txt` in the task directory.
-- At least one reverse-control mutation, in a scratch copy, with its red output recorded.
+- At least one reverse-control mutation, in a scratch copy, with its red output recorded. At level `critical` — the row `Test coverage level` of `docs/PROJECT.md` §6, or no row — this applies where the task names reverse control or changes critical code; critical code changed without a test is `fail`, glue or a ready SDK call without a test is not a finding, and the `## Reverse control` section then gives the reason in one line.
 - `[full]` items are not run here: their result comes from the latest `FULLRUN-*.md` next to the task, cited by file and row; no report, or one older than the task's last commit, is `cannot verify here`.
 - "What was not checked" is never empty.
 - An OUTCOME outside the repository is "cannot verify here", never "pass".
