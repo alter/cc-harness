@@ -169,6 +169,20 @@ def check_sinks(tasks: dict[str, tuple[str, dict[str, str]]], problems: list[str
 TIER = re.compile(r"^\s*\d+\.\s*\[(fast|full)(\s*,\s*heavy)?\]")
 REVERSE = re.compile(r"(?:reverse control|обратный контроль):\s*(\S.*?)\s*(?:→|->)\s*(\S+)", re.I)
 MAX_FAST_HEAVY = 3
+REVERSE_WORD = re.compile(r"reverse control|обратный контроль", re.I)
+LEVELS = ("critical", "standard", "release")
+LEVEL_ROW = re.compile(r"^\|\s*Test coverage level[^|]*\|([^|]*)\|", re.M)
+
+
+def coverage_level() -> str:
+    path = REPO / "docs" / "PROJECT.md"
+    if not path.is_file():
+        return "critical"
+    m = LEVEL_ROW.search(path.read_text(encoding="utf-8"))
+    if not m:
+        return "critical"
+    value = m.group(1).strip(" `*").lower()
+    return value if value in LEVELS else "standard"
 
 
 def check_verify(rel: str, body: str, problems: list[str]) -> None:
@@ -183,7 +197,8 @@ def check_verify(rel: str, body: str, problems: list[str]) -> None:
     if fast_heavy > MAX_FAST_HEAVY:
         problems.append(f"{rel}: {fast_heavy} heavy tests in the fast tier (at most {MAX_FAST_HEAVY}); move the rest to [full, heavy]")
     named = [m for m in (REVERSE.search(line) for line in items) if m and TEST_REF.search(m.group(2))]
-    if not named:
+    claimed = any(REVERSE_WORD.search(line) for line in items)
+    if not named and (claimed or coverage_level() != "critical"):
         problems.append(f"{rel}: no VERIFY item names reverse control as 'reverse control: <mutation> → <path::test>'")
 
 

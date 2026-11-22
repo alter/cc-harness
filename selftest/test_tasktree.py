@@ -336,6 +336,15 @@ def with_verify(*items):
 
 
 RC = "[fast] reverse control: drop the header loop → tests/test_parser.py::test_headers"
+NO_RC = ("[fast] headers parse", "[fast] body parses")
+PROJECT_HEAD = "# Project\n\n## 6. Gate checks\n\n| Question | Answer |\n|---|---|\n| Coverage command | pytest --cov |\n"
+
+
+def project_level(repo, level=None):
+    docs = repo / "docs"
+    docs.mkdir(exist_ok=True)
+    row = "" if level is None else f"| Test coverage level (critical / standard / release) | {level} |\n"
+    (docs / "PROJECT.md").write_text(PROJECT_HEAD + row, encoding="utf-8")
 
 
 class Tiers(TreeCase):
@@ -360,11 +369,47 @@ class Tiers(TreeCase):
         self.assertNotEqual(r.returncode, 0)
 
     def test_reverse_control_missing(self):
+        project_level(self.tmp, "standard")
         r = self.check_body(with_verify("[fast] headers parse", "[fast] body parses"))
         self.assertNotEqual(r.returncode, 0)
 
     def test_verify_item_without_tier(self):
         r = self.check_body(with_verify(RC, "body parses"))
+        self.assertNotEqual(r.returncode, 0)
+
+
+class CoverageLevel(TreeCase):
+    def check_without_reverse_control(self):
+        self.task("10-build/01-parser", with_verify(*NO_RC), LABELS_V1 + "format:2\n")
+        return run_check(self.root)
+
+    def test_reverse_control_optional_at_critical(self):
+        project_level(self.tmp, "critical")
+        r = self.check_without_reverse_control()
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_reverse_control_optional_without_row(self):
+        project_level(self.tmp)
+        r = self.check_without_reverse_control()
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_reverse_control_optional_without_project_file(self):
+        r = self.check_without_reverse_control()
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_reverse_control_required_at_standard(self):
+        project_level(self.tmp, "standard")
+        r = self.check_without_reverse_control()
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_reverse_control_required_at_release(self):
+        project_level(self.tmp, "release")
+        r = self.check_without_reverse_control()
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_reverse_control_required_at_unknown_value(self):
+        project_level(self.tmp, "realease")
+        r = self.check_without_reverse_control()
         self.assertNotEqual(r.returncode, 0)
 
 
