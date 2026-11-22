@@ -85,8 +85,8 @@ fix. Prose cannot catch that. Three mechanisms do:
 
 Why the smallest level is the default. Measured on seven projects before the level existed (labels A–G):
 writing tests took about as long as writing product code in three of them (C 21.8 against 23.4 minutes,
-E 1.2 against 1.4, G 6.8 against 4.2; project B is left out, its tests are probe scripts), while showing a
-test red first took at most 1.7% of active time in five of the six projects that measured it and 5.9% in
+E 1.2 against 1.4, G 6.8 against 4.2; project B is left out, its tests are probe scripts), while, as the
+reports print them, showing a test red first took at most 1.7% of active time in five of the six projects that measured it and 5.9% in
 the sixth, and reverse control at most 1.1% in all six. So `critical` drops the test for non-critical code
 and the ratchet, and keeps both cheap steps for the tests that are written. A first version changes fast,
 and a test of a ready SDK call guards code that many applications already exercise.

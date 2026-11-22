@@ -87,6 +87,7 @@ VERIFY (<ROLE>)
   1. [fast] Numbered checks a different context can run or observe.
   2. [fast] reverse control: <the mutation> → <path::test that goes red>
      ("обратный контроль"). A check that was never red proves nothing.
+     At level `critical`: only for a task with critical code.
   3. [full, heavy] mutation, fuzzing, long integration — run only in the full
      (night or milestone) run; at most three [fast, heavy] items per task.
   N. Items only a person can judge are marked HUMAN in the item text.
