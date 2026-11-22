@@ -1022,6 +1022,34 @@ fi
 [ -d "$pt_dir" ] || pt_dir="$SRC/pertask"
 unit_results "pertask" "$(PERTASK_DIR="$pt_dir" python3 -m unittest -v "$SRC/selftest/test_pertask.py" 2>&1)"
 
+echo "== per-task rules"
+RC="$TARGET/CLAUDE.md"; RT="$TARGET/project-template"; RS="$TARGET/skills"
+names(){ local name=$1 file=$2 pattern=$3; if grep -qE -- "$pattern" "$file" 2>/dev/null; then ok "$name"; else bad "$name" "no '$pattern' in ${file#"$TARGET"/}"; fi; }
+lacks(){ local name=$1 file=$2 pattern=$3 hit; hit=$(grep -nE -- "$pattern" "$file" 2>/dev/null | head -2); if [ -f "$file" ] && [ -z "$hit" ]; then ok "$name"; else bad "$name" "${hit:-missing ${file#"$TARGET"/}}"; fi; }
+names "rules-pertask-contract-run: gate checks before a mark go through cc-pertask run" "$RC" 'cc-pertask run'
+names "rules-pertask-contract-deferred: a skipped check is run with cc-pertask record" "$RC" 'cc-pertask record'
+names "rules-pertask-contract-close: cc-pertask status proves nothing is owed" "$RC" 'cc-pertask status'
+names "rules-pertask-template-limit-row: PROJECT.md carries the limit row" "$RT/docs/PROJECT.md" '^\| Per-task limit for gate checks, seconds \|'
+names "rules-pertask-template-fast-tier: the fast tier names cc-pertask" "$RT/docs/PROJECT.md" 'cc-pertask'
+names "rules-pertask-template-agents: AGENTS.md names cc-pertask" "$RT/AGENTS.md" 'cc-pertask'
+for skill in plan run run-task task intake test; do
+  names "rules-pertask-skill-$skill: /$skill names cc-pertask" "$RS/$skill/SKILL.md" 'cc-pertask'
+done
+names "rules-pertask-skill-plan-measure: T00 measures the gate set" "$RS/plan/SKILL.md" 'cc-pertask record'
+names "rules-pertask-skill-run-close: the plan closes on cc-pertask status" "$RS/run/SKILL.md" 'cc-pertask status'
+names "rules-pertask-skill-intake-row: /intake writes the limit row" "$RS/intake/SKILL.md" 'Per-task limit for gate checks'
+lacks "rules-pertask-retired-template: the fast tier is no longer copied into every verify line" "$RT/docs/PROJECT.md" 'copies them into every'
+lacks "rules-pertask-retired-intake: the fast tier is no longer copied into every verify line" "$RS/intake/SKILL.md" 'copies them into every'
+lacks "rules-pertask-retired-test: the ratchet is no longer in every verify line" "$RS/test/SKILL.md" "every task's verify line includes it"
+if [ "$TARGET" = "$SRC" ]; then
+  names "rules-pertask-docs-behavior: BEHAVIOR.md names cc-pertask" "$SRC/BEHAVIOR.md" 'cc-pertask'
+  names "rules-pertask-docs-readme: README.md names cc-pertask" "$SRC/README.md" 'cc-pertask'
+  lacks "rules-pertask-retired-behavior: the fast tier is no longer copied into every task" "$SRC/BEHAVIOR.md" 'copies them into every'
+fi
+names "rules-no-gate-task-contract: a no-logic plan carries no heavy-suite task" "$RC" 'no-logic'
+names "rules-no-gate-task-plan: /plan forbids a heavy-suite task in a no-logic plan" "$RS/plan/SKILL.md" 'no-logic'
+names "rules-no-gate-task-task: /task forbids a heavy-suite VERIFY item in a no-logic task" "$RS/task/SKILL.md" 'no-logic'
+
 echo "== uninstall: a trial target"
 ut="$TMP/untrial"; uh="$TMP/unhome"; mkdir -p "$uh/bin"
 for w in cc-night cc-fullrun cc-pertask; do : > "$uh/bin/$w"; done
